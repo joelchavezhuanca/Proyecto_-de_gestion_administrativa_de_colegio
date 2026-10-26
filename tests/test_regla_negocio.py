@@ -1,5 +1,7 @@
 from datetime import time
+
 import pytest
+
 from src.dominio.regla_negocio import (
     CarnetAnuladoException,
     evaluar_asistencia_estudiante,
