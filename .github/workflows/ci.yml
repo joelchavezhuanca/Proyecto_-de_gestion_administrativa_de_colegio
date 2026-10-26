@@ -1,0 +1,32 @@
+name: Continuous Integration - Domingo Savio S.A.C.
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main, dev ]
+
+jobs:
+  lint-and-test:
+    name: Ruff Linteo y Pytest Unitario
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del Repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar Dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Inspección Estática de Código con Ruff
+        run: ruff check .
+
+      - name: Ejecutar Pruebas Automatizadas con Pytest
+        run: pytest -v --cov=src --cov-report=term-missing
