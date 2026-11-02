@@ -1,3 +1,4 @@
+# Mapeo Objeto-Relacional con SQLAlchemy 2.0 y eliminación en cascada
 from datetime import UTC, date, datetime, time
 
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Time
