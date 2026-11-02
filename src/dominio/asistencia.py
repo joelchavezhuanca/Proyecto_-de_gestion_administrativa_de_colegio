@@ -2,10 +2,10 @@ import math
 import uuid
 from dataclasses import dataclass
 from datetime import date, datetime, time
-from enum import Enum
+from enum import StrEnum
 
 
-class EstadoAsistencia(str, Enum):
+class EstadoAsistencia(StrEnum):
     PUNTUAL = "PUNTUAL"
     TARDANZA = "TARDANZA"
     AUSENTE = "AUSENTE"
@@ -13,19 +13,19 @@ class EstadoAsistencia(str, Enum):
     PENDIENTE = "PENDIENTE"
 
 
-class MetodoRegistro(str, Enum):
+class MetodoRegistro(StrEnum):
     CARNET = "CARNET"
     MANUAL_DNI = "MANUAL_DNI"
     MANUAL_BUSQUEDA = "MANUAL_BUSQUEDA"
 
 
-class RolUsuario(str, Enum):
+class RolUsuario(StrEnum):
     ADMIN = "ADMIN"
     COORDINADOR = "COORDINADOR"
     ADMIN_STAFF = "ADMIN_STAFF"
 
 
-class EstadoAlumno(str, Enum):
+class EstadoAlumno(StrEnum):
     ACTIVO = "ACTIVO"
     INACTIVO = "INACTIVO"
 
