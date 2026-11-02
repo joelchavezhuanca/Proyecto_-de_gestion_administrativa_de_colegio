@@ -3,21 +3,21 @@ import secrets
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from enum import Enum
+from enum import StrEnum
 
 
-class RolUsuario(str, Enum):
+class RolUsuario(StrEnum):
     ADMIN = "ADMIN"
     COORDINADOR = "COORDINADOR"
     ADMIN_STAFF = "ADMIN_STAFF"
 
 
-class EstadoUsuario(str, Enum):
+class EstadoUsuario(StrEnum):
     ACTIVO = "ACTIVO"
     INACTIVO = "INACTIVO"
 
 
-class PermisoOperacion(str, Enum):
+class PermisoOperacion(StrEnum):
     REGISTRAR_ASISTENCIA = "REGISTRAR_ASISTENCIA"
     CORREGIR_AUSENTE = "CORREGIR_AUSENTE"
     CONSULTAR_HISTORIAL_ASISTENCIA = "CONSULTAR_HISTORIAL_ASISTENCIA"
