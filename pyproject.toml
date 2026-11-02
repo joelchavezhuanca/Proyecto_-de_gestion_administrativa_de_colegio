@@ -1,0 +1,14 @@
+[tool.ruff]
+# Longitud máxima de línea estándar PEP 8
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+# Reglas seleccionadas: Pyflakes (F), pycodestyle (E), isort (I), pyupgrade (UP)
+select = ["E", "F", "I", "UP"]
+ignore = []
+
+[tool.pytest.ini_options]
+# Asegura que pytest reconozca la raíz para importaciones de src en Windows y Linux
+pythonpath = ["."]
+testpaths = ["tests"]
