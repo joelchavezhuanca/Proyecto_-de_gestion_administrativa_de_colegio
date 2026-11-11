@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icono, chip_estado %}
+
+{% block titulo %}Justificaciones{% endblock %}
+{% block eyebrow %}PBI-04 · Gestión de justificaciones{% endblock %}
+{% block encabezado %}Justificaciones de inasistencia{% endblock %}
+{% block subtitulo %}
+  <p class="page-subtitle">Registre el sustento de una ausencia o tardanza. Solo ADMIN y ADMIN_STAFF pueden gestionar justificaciones según la matriz RBAC.</p>
+{% endblock %}
+
+{% block contenido %}
+{% if error %}
+  <div class="alert alert-error" role="alert">
+    <span class="alert-text">{{ error }}</span>
+  </div>
+{% endif %}
+
+<section class="card filtros-card">
+  <div class="card-head">
+    <div>
+      <h2>Fecha escolar</h2>
+      <p class="muted">Se listan las asistencias en estado AUSENTE o TARDANZA de la fecha seleccionada.</p>
+    </div>
+    <form class="form-inline" method="get" action="{{ url_for('justificaciones.ver_justificaciones') }}" data-auto-filtro>
+      <div class="field">
+        <label for="fecha">Fecha</label>
+        <input id="fecha" name="fecha" type="date" value="{{ fecha.isoformat() }}" max="{{ hora_sistema.date().isoformat() }}">
+      </div>
+      <button class="btn btn-secundario" type="submit">Consultar</button>
+    </form>
+  </div>
+  {% if periodo %}
+    <p class="meta-line">Período académico: <strong>{{ periodo.nombre }}</strong> · {{ periodo.fecha_inicio|fecha_corta }} al {{ periodo.fecha_fin|fecha_corta }}
+      {% if periodo.cerrado %}<span class="chip chip-danger"><span class="chip-dot"></span>Cerrado</span>{% else %}<span class="chip chip-ok"><span class="chip-dot"></span>Abierto</span>{% endif %}
+    </p>
+  {% else %}
+    <div class="alert alert-warning" role="status">
+      <span class="alert-text">No hay un período académico configurado para la fecha seleccionada. No será posible registrar justificaciones.</span>
+    </div>
+  {% endif %}
+</section>
+
+<section class="card">
+  <div class="card-head">
+    <div>
+      <h2>Registros justificables</h2>
+      <p class="muted">Seleccione un registro para iniciar el asistente de justificación.</p>
+    </div>
+    <span class="badge-soft">{{ justificables|length }} registro(s)</span>
+  </div>
+
+  {% if justificables %}
+    <div class="tabla-scroll">
+      <table class="tabla">
+        <thead>
+          <tr><th>Alumno</th><th>Salón</th><th>Estado actual</th><th>Hora</th><th>Tardanza</th><th class="texto-derecha">Acción</th></tr>
+        </thead>
+        <tbody>
+          {% for fila in justificables %}
+            <tr>
+              <td>
+                <strong>{{ fila.alumno.nombres ~ ' ' ~ fila.alumno.apellidos if fila.alumno else 'Alumno no disponible' }}</strong>
+                <span class="muted small block">{{ fila.alumno.codigo if fila.alumno else '' }}</span>
+              </td>
+              <td>{{ fila.alumno.nivel ~ ' · ' ~ fila.alumno.grado ~ ' · ' ~ fila.alumno.seccion if fila.alumno else '—' }}</td>
+              <td>{{ chip_estado(fila.asistencia.estado) }}</td>
+              <td class="mono">{{ fila.asistencia.hora_efectiva|hora_corta }}</td>
+              <td>{{ fila.asistencia.minutos_tardanza }} min</td>
+              <td class="texto-derecha">
+                {% if fila.ya_justificada %}
+                  <span class="badge-soft">Ya justificada</span>
+                {% else %}
+                  <button class="btn btn-pequeno btn-secundario" type="button"
+                          data-justificar="{{ fila.asistencia.id }}"
+                          data-alumno="{{ fila.alumno.nombres ~ ' ' ~ fila.alumno.apellidos if fila.alumno else 'Alumno' }}"
+                          data-fecha="{{ fila.asistencia.fecha_escolar.isoformat() }}">
+                    Justificar
+                  </button>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <strong>No hay ausencias ni tardanzas pendientes de justificar.</strong>
+      <p>Pruebe otra fecha o registre primero la asistencia correspondiente.</p>
+    </div>
+  {% endif %}
+</section>
+
+<section class="card" data-contenedor-wizard data-abrir-wizard="{{ 'si' if abrir_wizard else 'no' }}">
+  <div class="card-head">
+    <div>
+      <h2>Solicitud y registro de justificación</h2>
+      <p class="muted">Asistente de tres pasos: alumno, categoría y motivo, revisión final.</p>
+    </div>
+  </div>
+
+  <ol class="stepper" aria-label="Pasos de la justificación">
+    <li class="step activo" data-paso-indicador="1"><span>1</span> Alumno</li>
+    <li class="step" data-paso-indicador="2"><span>2</span> Categoría y motivo</li>
+    <li class="step" data-paso-indicador="3"><span>3</span> Revisión</li>
+  </ol>
+
+  <form method="post" action="{{ url_for('justificaciones.registrar_justificacion') }}" class="form" data-form-justificacion novalidate>
+    <div class="wizard-step" data-paso="1">
+      <div class="field">
+        <label for="asistencia_id">Registro a justificar</label>
+        <select id="asistencia_id" name="asistencia_id" required>
+          <option value="">Seleccione un alumno de la lista</option>
+          {% for fila in justificables if not fila.ya_justificada %}
+            <option value="{{ fila.asistencia.id }}"
+                    {% if form.asistencia_id == fila.asistencia.id %}selected{% endif %}>
+              {{ fila.alumno.nombres ~ ' ' ~ fila.alumno.apellidos if fila.alumno else 'Alumno' }}
+              · {{ fila.alumno.grado if fila.alumno else '' }} {{ fila.alumno.seccion if fila.alumno else '' }}
+              · {{ fila.asistencia.estado|estado_texto }}
+            </option>
+          {% endfor %}
+        </select>
+        <p class="field-help">El listado contiene únicamente ausencias y tardanzas sin justificación activa.</p>
+      </div>
+      <button class="btn btn-primario" type="button" data-ir-paso="2">Siguiente: categoría y motivo</button>
+    </div>
+
+    <div class="wizard-step" data-paso="2" hidden>
+      <fieldset class="field">
+        <legend>Categoría oficial</legend>
+        <div class="radio-cards">
+          <label class="radio-card">
+            <input type="radio" name="categoria" value="MEDICA"
+                   {% if form.categoria in (none, '', 'MEDICA') %}checked{% endif %}>
+            <span><strong>Cita / descanso médico</strong><small>MEDICA</small></span>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="categoria" value="PERMISO_FAMILIAR"
+                   {% if form.categoria == 'PERMISO_FAMILIAR' %}checked{% endif %}>
+            <span><strong>Permiso familiar escrito</strong><small>PERMISO_FAMILIAR</small></span>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="categoria" value="OTRA"
+                   {% if form.categoria == 'OTRA' %}checked{% endif %}>
+            <span><strong>Causa imprevista de fuerza mayor</strong><small>OTRA</small></span>
+          </label>
+        </div>
+      </fieldset>
+
+      <div class="grid-dos">
+        <div class="field">
+          <label for="fecha_solicitud">Fecha escolar a justificar</label>
+          <input id="fecha_solicitud" name="fecha_solicitud" type="date" required
+                 max="{{ hora_sistema.date().isoformat() }}"
+                 value="{{ form.fecha_solicitud or fecha.isoformat() }}">
+          <p class="field-help">No se permiten fechas futuras.</p>
+        </div>
+        <div class="field">
+          <label for="documento_adjunto">Documento de referencia <span class="opcional">(opcional)</span></label>
+          <input id="documento_adjunto" name="documento_adjunto" type="text"
+                 placeholder="Ej. certificado_medico_001.pdf" value="{{ form.documento_adjunto or '' }}">
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="motivo">Motivo detallado</label>
+        <textarea id="motivo" name="motivo" rows="4" required minlength="10"
+                  maxlength="255" data-contador-motivo
+                  placeholder="Describa el sustento presentado por el apoderado">{{ form.motivo or '' }}</textarea>
+        <p class="field-help"><span data-contador-texto>0</span>/255 caracteres · mínimo 10 requeridos</p>
+      </div>
+
+      <div class="wizard-actions">
+        <button class="btn btn-secundario" type="button" data-volver-paso="1">Volver al paso 1</button>
+        <button class="btn btn-primario" type="button" data-ir-paso="3">Siguiente: revisión</button>
+      </div>
+    </div>
+
+    <div class="wizard-step" data-paso="3" hidden>
+      <div class="resumen-justificacion">
+        <h3>Resumen del cambio</h3>
+        <dl class="detalle-lista">
+          <div><dt>Alumno</dt><dd data-resumen-alumno>—</dd></div>
+          <div><dt>Categoría</dt><dd data-resumen-categoria>—</dd></div>
+          <div><dt>Fecha a justificar</dt><dd data-resumen-fecha>—</dd></div>
+          <div><dt>Nuevo estado</dt><dd><span class="chip chip-info"><span class="chip-dot"></span>JUSTIFICADO</span></dd></div>
+          <div><dt>Operador responsable</dt><dd>{{ usuario_actual.nombre_completo }} · {{ usuario_actual.rol|rol_legible }}</dd></div>
+        </dl>
+      </div>
+      <div class="alert alert-warning" role="note">
+        <span class="alert-text">El cambio afecta el estado de la asistencia y queda registrado en la auditoría.</span>
+      </div>
+      <div class="wizard-actions">
+        <button class="btn btn-secundario" type="button" data-volver-paso="2">Volver</button>
+        <button class="btn btn-primario" type="submit" data-boton-guardar-justificacion>Guardar justificación</button>
+      </div>
+    </div>
+  </form>
+</section>
+
+<section class="card">
+  <div class="card-head">
+    <div>
+      <h2>Justificaciones registradas</h2>
+      <p class="muted">Historial de la fecha consultada. La anulación restaura el estado anterior de la asistencia.</p>
+    </div>
+  </div>
+  {% if justificaciones %}
+    <div class="tabla-scroll">
+      <table class="tabla">
+        <thead>
+          <tr><th>Alumno</th><th>Categoría</th><th>Motivo</th><th>Estado</th><th>Registrada</th><th class="texto-derecha">Acción</th></tr>
+        </thead>
+        <tbody>
+          {% for fila in justificaciones %}
+            <tr>
+              <td>
+                <strong>{{ fila.alumno.nombres ~ ' ' ~ fila.alumno.apellidos if fila.alumno else 'Alumno no disponible' }}</strong>
+                <span class="muted small block">{{ fila.alumno.codigo if fila.alumno else '' }}</span>
+              </td>
+              <td>{{ fila.justificacion.categoria.value }}</td>
+              <td class="celda-motivo">{{ fila.justificacion.motivo }}</td>
+              <td>{{ chip_estado(fila.justificacion.estado) }}</td>
+              <td class="mono">{{ fila.justificacion.fecha_solicitud|fecha_corta }}</td>
+              <td class="texto-derecha">
+                {% if fila.justificacion.estado.value == 'APROBADA' %}
+                  <form method="post" action="{{ url_for('justificaciones.anular_justificacion', codigo=fila.justificacion.id) }}"
+                        data-confirmar="¿Anular esta justificación y restaurar el estado anterior de la asistencia?">
+                    <button class="btn btn-pequeno btn-peligro-suave" type="submit">Anular</button>
+                  </form>
+                {% else %}
+                  <span class="badge-soft">Anulada</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <strong>No hay justificaciones registradas para esta fecha.</strong>
+      <p>Las justificaciones aprobadas aparecerán aquí con su operador responsable.</p>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/justificaciones.js') }}" defer></script>
+{% endblock %}

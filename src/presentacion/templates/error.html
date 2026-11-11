@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ codigo }} · Colegio Domingo Savio</title>
+  <link rel="icon" href="{{ url_for('static', filename='assets/branding/escudo-domingo-savio.png') }}">
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/estilos.css') }}">
+</head>
+<body class="login-body">
+  <main class="error-card">
+    <img class="error-escudo" src="{{ url_for('static', filename='assets/branding/escudo-domingo-savio.png') }}"
+         alt="Escudo institucional del Colegio Domingo Savio">
+    <p class="error-code">{{ codigo }}</p>
+    <h1>{{ titulo }}</h1>
+    <p class="muted">{{ mensaje }}</p>
+    <div class="error-actions">
+      {% if usuario_actual %}
+        <a class="btn btn-primario" href="{{ url_for('main.aforo') }}">Volver al dashboard</a>
+      {% else %}
+        <a class="btn btn-primario" href="{{ url_for('auth.login') }}">Ir al inicio de sesión</a>
+      {% endif %}
+    </div>
+  </main>
+</body>
+</html>

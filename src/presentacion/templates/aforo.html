@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icono, chip_estado %}
+
+{% block titulo %}Dashboard de aforo{% endblock %}
+{% block eyebrow %}PBI-03 · Aforo en tiempo real{% endblock %}
+{% block encabezado %}Dashboard de aforo{% endblock %}
+{% block subtitulo %}
+  <p class="page-subtitle">Vista de la jornada escolar del {{ fecha|fecha_corta }}. Los indicadores se calculan en el servidor con las reglas del dominio.</p>
+{% endblock %}
+
+{% block contenido %}
+<section class="card filtros-card" aria-labelledby="filtros-titulo">
+  <div class="card-head">
+    <div>
+      <h2 id="filtros-titulo">Ámbito académico</h2>
+      <p class="muted">Filtre por nivel, grado o sección. Los indicadores se recalculan para el ámbito seleccionado.</p>
+    </div>
+    <span class="meta-line">{{ icono('reloj') }} Hora del servidor: {{ hora_sistema|hora_corta }}</span>
+  </div>
+
+  <form class="filtros-grid" method="get" action="{{ url_for('main.aforo') }}" data-auto-filtro>
+    <div class="field">
+      <label for="fecha">Fecha escolar</label>
+      <input id="fecha" name="fecha" type="date" value="{{ fecha.isoformat() }}" max="{{ hora_sistema.date().isoformat() }}">
+    </div>
+    <div class="field">
+      <label for="nivel">Nivel</label>
+      <select id="nivel" name="nivel">
+        <option value="">Todos los niveles</option>
+        {% for nivel in opciones.niveles %}
+          <option value="{{ nivel }}" {% if filtros.nivel == nivel %}selected{% endif %}>{{ nivel }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="grado">Grado</label>
+      <select id="grado" name="grado">
+        <option value="">Todos los grados</option>
+        {% for grado in opciones.grados %}
+          <option value="{{ grado }}" {% if filtros.grado == grado %}selected{% endif %}>{{ grado }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="seccion">Sección</label>
+      <select id="seccion" name="seccion">
+        <option value="">Todas las secciones</option>
+        {% for seccion in opciones.secciones %}
+          <option value="{{ seccion }}" {% if filtros.seccion == seccion %}selected{% endif %}>Sección {{ seccion }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filtros-actions">
+      <button class="btn btn-primario" type="submit">Aplicar filtros</button>
+      <a class="btn btn-secundario" href="{{ url_for('main.aforo') }}">Limpiar</a>
+    </div>
+  </form>
+</section>
+
+<section class="kpi-grid" aria-label="Indicadores de aforo">
+  <article class="kpi-card">
+    <span class="kpi-label">Matriculados</span>
+    <strong class="kpi-value">{{ metricas.total_matriculados }}</strong>
+    <span class="kpi-hint">Alumnos ACTIVO del ámbito</span>
+  </article>
+  <article class="kpi-card kpi-ok">
+    <span class="kpi-label">Presentes</span>
+    <strong class="kpi-value">{{ metricas.presentes }}</strong>
+    <span class="kpi-hint">Ingresos puntuales</span>
+  </article>
+  <article class="kpi-card kpi-warn">
+    <span class="kpi-label">Tardanzas</span>
+    <strong class="kpi-value">{{ metricas.tardanzas }}</strong>
+    <span class="kpi-hint">Ingresos después de las 07:15</span>
+  </article>
+  <article class="kpi-card kpi-danger">
+    <span class="kpi-label">Ausentes</span>
+    <strong class="kpi-value">{{ metricas.ausentes }}</strong>
+    <span class="kpi-hint">Sin ingreso o ausencia registrada</span>
+  </article>
+  <article class="kpi-card kpi-info">
+    <span class="kpi-label">Justificados</span>
+    <strong class="kpi-value">{{ metricas.justificados }}</strong>
+    <span class="kpi-hint">Con justificación aprobada</span>
+  </article>
+  <article class="kpi-card kpi-neutral">
+    <span class="kpi-label">Pendientes</span>
+    <strong class="kpi-value">{{ metricas.pendientes }}</strong>
+    <span class="kpi-hint">Aún sin registro antes del cierre</span>
+  </article>
+  <article class="kpi-card kpi-highlight">
+    <span class="kpi-label">Aforo actual del plantel</span>
+    <strong class="kpi-value">{{ metricas.aforo_actual_plantel }}</strong>
+    <span class="kpi-hint">Presentes + tardanzas</span>
+  </article>
+  <article class="kpi-card">
+    <span class="kpi-label">% de asistencia</span>
+    <strong class="kpi-value">{{ "%.2f"|format(metricas.porcentaje_asistencia) }}%</strong>
+    <span class="kpi-hint">Calculado por el dominio</span>
+  </article>
+</section>
+
+<section class="card" aria-labelledby="salones-titulo">
+  <div class="card-head">
+    <div>
+      <h2 id="salones-titulo">Desglose por salón</h2>
+      <p class="muted">Cada salón se identifica por nivel, grado y sección.</p>
+    </div>
+    <span class="badge-soft">{{ total_registros }} registro(s) en la fecha</span>
+  </div>
+
+  {% if metricas.desglose_salones %}
+    <div class="salones-lista">
+      {% for salon in metricas.desglose_salones %}
+        <article class="salon-item">
+          <div class="salon-head">
+            <div>
+              <h3>{{ salon.nivel }} · {{ salon.grado }} · Sección {{ salon.seccion }}</h3>
+              <p class="muted small">{{ salon.presentes + salon.tardanzas }} de {{ salon.total_matriculados }} alumnos con ingreso registrado</p>
+            </div>
+            <span class="salon-pct">{{ "%.1f"|format(salon.porcentaje_asistencia) }}%</span>
+          </div>
+          <div class="progress" role="progressbar" aria-label="Asistencia de {{ salon.nivel }} {{ salon.grado }} sección {{ salon.seccion }}"
+               aria-valuenow="{{ salon.porcentaje_asistencia }}" aria-valuemin="0" aria-valuemax="100">
+            <span class="progress-fill" style="width: {{ salon.porcentaje_asistencia }}%"></span>
+          </div>
+          <ul class="salon-detalle">
+            <li><span class="dot dot-ok"></span>Puntuales: {{ salon.presentes }}</li>
+            <li><span class="dot dot-warn"></span>Tardanzas: {{ salon.tardanzas }}</li>
+            <li><span class="dot dot-danger"></span>Ausentes: {{ salon.ausentes }}</li>
+            <li><span class="dot dot-info"></span>Justificados: {{ salon.justificados }}</li>
+            <li><span class="dot dot-neutral"></span>Pendientes: {{ salon.pendientes }}</li>
+          </ul>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <strong>No hay alumnos para el ámbito seleccionado.</strong>
+      <p>Pruebe con otro nivel, grado o sección para consultar el aforo.</p>
+    </div>
+  {% endif %}
+</section>
+
+<section class="grid-dos">
+  <article class="card card-cierre">
+    <div class="card-head">
+      <div>
+        <h2>{{ icono('candado') }} Cierre escolar diario</h2>
+        <p class="muted">Convierte atómicamente a AUSENTE a los alumnos que siguen PENDIENTES.</p>
+      </div>
+    </div>
+
+    <dl class="detalle-lista">
+      <div><dt>Hora oficial de cierre</dt><dd>{{ hora_cierre|hora_corta }}</dd></div>
+      <div><dt>Alumnos pendientes</dt><dd><strong>{{ metricas.pendientes }}</strong></dd></div>
+      <div><dt>Estado de la jornada</dt>
+        <dd>
+          {% if cierre_ejecutado %}
+            <span class="chip chip-info"><span class="chip-dot"></span>Cierre ejecutado</span>
+          {% else %}
+            <span class="chip chip-neutral"><span class="chip-dot"></span>Cierre no ejecutado</span>
+          {% endif %}
+        </dd>
+      </div>
+    </dl>
+
+    {% if cierre_ejecutado %}
+      <div class="alert alert-info" role="status">
+        <span class="alert-text">La jornada de esta fecha ya fue cerrada. No se puede ejecutar dos veces.</span>
+      </div>
+    {% elif es_admin %}
+      <button class="btn btn-peligro" type="button" data-abrir-cierre>
+        Ejecutar cierre diario
+      </button>
+    {% else %}
+      <div class="alert alert-warning" role="status">
+        <span class="alert-text">El cierre diario está reservado al rol ADMIN. Puede consultar los indicadores, pero no ejecutar la acción.</span>
+      </div>
+    {% endif %}
+  </article>
+
+  <article class="card">
+    <div class="card-head">
+      <div>
+        <h2>Configuración de la hora de cierre</h2>
+        <p class="muted">Regla RN-17: únicamente ADMIN puede modificar este parámetro.</p>
+      </div>
+    </div>
+    {% if es_admin %}
+      <form method="post" action="{{ url_for('main.configurar_hora_cierre') }}" class="form-inline">
+        <div class="field">
+          <label for="hora_cierre">Hora oficial (HH:MM)</label>
+          <input id="hora_cierre" name="hora_cierre" type="time" value="{{ hora_cierre.strftime('%H:%M') }}" required>
+        </div>
+        <button class="btn btn-secundario" type="submit">Guardar hora</button>
+      </form>
+    {% else %}
+      <p class="muted">Hora vigente: <strong>{{ hora_cierre|hora_corta }}</strong>. Solicite a un administrador si necesita cambiarla.</p>
+    {% endif %}
+  </article>
+</section>
+
+<div class="modal" id="modal-cierre" role="dialog" aria-modal="true" aria-labelledby="modal-cierre-titulo" hidden>
+  <div class="modal-backdrop" data-cerrar-cierre></div>
+  <div class="modal-card">
+    <div class="modal-head">
+      <h2 id="modal-cierre-titulo">Confirmar cierre escolar</h2>
+      <button class="icon-button" type="button" data-cerrar-cierre aria-label="Cerrar">×</button>
+    </div>
+    <p>
+      Existen <strong>{{ metricas.pendientes }}</strong> alumno(s) en estado PENDIENTE.
+      Al ejecutar el cierre, pasarán atómicamente a <strong>AUSENTE</strong> para la fecha {{ fecha|fecha_corta }}.
+    </p>
+    <form method="post" action="{{ url_for('main.ejecutar_cierre') }}" data-form-cierre>
+      <label class="checkbox-card">
+        <input type="checkbox" name="confirmo" value="si" required data-check-cierre>
+        <span>Confirmo que la jornada de ingreso ha concluido y autorizo el cierre.</span>
+      </label>
+      <div class="modal-actions">
+        <button class="btn btn-secundario" type="button" data-cerrar-cierre>Cancelar</button>
+        <button class="btn btn-peligro" type="submit" data-boton-cierre disabled>Confirmar cierre definitivo</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/aforo.js') }}" defer></script>
+{% endblock %}

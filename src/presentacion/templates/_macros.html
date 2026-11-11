@@ -1,0 +1,25 @@
+{% macro chip_estado(valor) -%}
+  <span class="chip chip-{{ valor|estado_clase }}">
+    <span class="chip-dot" aria-hidden="true"></span>{{ valor|estado_texto }}
+  </span>
+{%- endmacro %}
+
+{% macro icono(nombre) -%}
+  {% if nombre == 'aforo' %}
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 19V9m5 10V5m5 14v-7m5 7V8" stroke-linecap="round"/></svg>
+  {% elif nombre == 'asistencia' %}
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 12l2.5 2.5L16 9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  {% elif nombre == 'justificaciones' %}
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v5h4M10 12h5M10 16h5" stroke-linecap="round"/></svg>
+  {% elif nombre == 'usuarios' %}
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.3 3.1-6 7-6s7 2.7 7 6" stroke-linecap="round"/></svg>
+  {% elif nombre == 'salir' %}
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  {% elif nombre == 'menu' %}
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke-linecap="round"/></svg>
+  {% elif nombre == 'reloj' %}
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2" stroke-linecap="round"/></svg>
+  {% elif nombre == 'candado' %}
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 118 0v3" stroke-linecap="round"/></svg>
+  {% endif %}
+{%- endmacro %}

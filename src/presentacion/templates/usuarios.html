@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icono, chip_estado %}
+
+{% block titulo %}Gestión de usuarios{% endblock %}
+{% block eyebrow %}PBI-02 / PBI-15 · Cuentas y RBAC{% endblock %}
+{% block encabezado %}Administración de usuarios{% endblock %}
+{% block subtitulo %}
+  <p class="page-subtitle">Solo el rol ADMIN puede crear, editar, activar o desactivar cuentas y restablecer credenciales.</p>
+{% endblock %}
+
+{% block contenido %}
+<section class="card filtros-card">
+  <div class="card-head">
+    <div>
+      <h2>Consulta y filtros</h2>
+      <p class="muted">Filtre por nombre, nombre de usuario, rol o estado operativo.</p>
+    </div>
+    <a class="btn btn-primario" href="{{ url_for('usuarios.nuevo_usuario') }}">+ Crear cuenta</a>
+  </div>
+
+  <form class="filtros-grid" method="get" action="{{ url_for('usuarios.listar_usuarios') }}">
+    <div class="field">
+      <label for="nombre">Nombre completo</label>
+      <input id="nombre" name="nombre" type="search" value="{{ filtros.nombre }}" placeholder="Ej. Luna">
+    </div>
+    <div class="field">
+      <label for="username">Nombre de usuario</label>
+      <input id="username" name="username" type="search" value="{{ filtros.username }}" placeholder="Ej. jluna">
+    </div>
+    <div class="field">
+      <label for="rol">Rol oficial</label>
+      <select id="rol" name="rol">
+        <option value="">Todos los roles</option>
+        {% for rol in roles %}
+          <option value="{{ rol.value }}" {% if filtros.rol == rol.value %}selected{% endif %}>{{ rol|rol_legible }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="estado">Estado</label>
+      <select id="estado" name="estado">
+        <option value="">Todos los estados</option>
+        {% for estado in estados %}
+          <option value="{{ estado.value }}" {% if filtros.estado == estado.value %}selected{% endif %}>{{ estado.value }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filtros-actions">
+      <button class="btn btn-primario" type="submit">Filtrar</button>
+      <a class="btn btn-secundario" href="{{ url_for('usuarios.listar_usuarios') }}">Limpiar</a>
+    </div>
+  </form>
+</section>
+
+<section class="card">
+  <div class="card-head">
+    <div>
+      <h2>Cuentas registradas</h2>
+      <p class="muted">La baja es lógica: el historial de operaciones se conserva.</p>
+    </div>
+    <span class="badge-soft">{{ usuarios|length }} cuenta(s)</span>
+  </div>
+
+  {% if usuarios %}
+    <div class="tabla-scroll">
+      <table class="tabla">
+        <thead>
+          <tr><th>Nombre de usuario</th><th>Nombre completo</th><th>Rol</th><th>Estado</th><th>Creada</th><th class="texto-derecha">Acción</th></tr>
+        </thead>
+        <tbody>
+          {% for usuario in usuarios %}
+            <tr>
+              <td class="mono">{{ usuario.username }}</td>
+              <td><strong>{{ usuario.nombre_completo }}</strong></td>
+              <td><span class="badge-rol">{{ usuario.rol|rol_legible }}</span></td>
+              <td>{{ chip_estado(usuario.estado) }}</td>
+              <td class="mono">{{ usuario.creado_en|fecha_corta }}</td>
+              <td class="texto-derecha">
+                <a class="btn btn-pequeno btn-secundario" href="{{ url_for('usuarios.detalle_usuario', usuario_id=usuario.id) }}">Gestionar</a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <strong>No se encontraron cuentas con los filtros aplicados.</strong>
+      <p>Modifique los filtros o cree una nueva cuenta.</p>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,116 @@
+{% from "_macros.html" import icono %}
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Sistema de gestión administrativa del Colegio Domingo Savio S.A.C.">
+  <title>{% block titulo %}Panel{% endblock %} · Colegio Domingo Savio</title>
+  <link rel="icon" href="{{ url_for('static', filename='assets/branding/escudo-domingo-savio.png') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/estilos.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body class="app-body">
+  <a class="skip-link" href="#contenido">Saltar al contenido principal</a>
+
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar" aria-label="Navegación principal">
+      <div class="sidebar-brand">
+        <img class="sidebar-escudo"
+             src="{{ url_for('static', filename='assets/branding/escudo-domingo-savio.png') }}"
+             alt="Escudo institucional del Colegio Domingo Savio">
+        <div class="sidebar-brand-text">
+          <span class="brand-name">Colegio Domingo Savio</span>
+          <span class="brand-sub">Gestión administrativa</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a class="nav-link {{ 'activo' if (request.endpoint or '').startswith('main.') }}"
+           href="{{ url_for('main.aforo') }}" {% if (request.endpoint or '').startswith('main.') %}aria-current="page"{% endif %}>
+          {{ icono('aforo') }}<span>Dashboard de aforo</span>
+        </a>
+        <a class="nav-link {{ 'activo' if (request.endpoint or '').startswith('asistencia.') }}"
+           href="{{ url_for('asistencia.ver_asistencia') }}" {% if (request.endpoint or '').startswith('asistencia.') %}aria-current="page"{% endif %}>
+          {{ icono('asistencia') }}<span>Registro de asistencia</span>
+        </a>
+        {% if puede_justificar %}
+        <a class="nav-link {{ 'activo' if (request.endpoint or '').startswith('justificaciones.') }}"
+           href="{{ url_for('justificaciones.ver_justificaciones') }}" {% if (request.endpoint or '').startswith('justificaciones.') %}aria-current="page"{% endif %}>
+          {{ icono('justificaciones') }}<span>Justificaciones</span>
+        </a>
+        {% endif %}
+        {% if es_admin %}
+        <a class="nav-link {{ 'activo' if (request.endpoint or '').startswith('usuarios.') }}"
+           href="{{ url_for('usuarios.listar_usuarios') }}" {% if (request.endpoint or '').startswith('usuarios.') %}aria-current="page"{% endif %}>
+          {{ icono('usuarios') }}<span>Gestión de usuarios</span>
+        </a>
+        {% endif %}
+      </nav>
+
+      <div class="sidebar-footer">
+        <span class="demo-pill">Entorno de demostración</span>
+        <span class="sidebar-footer-text">Datos ficticios para la presentación académica.</span>
+      </div>
+    </aside>
+
+    <div class="app-main">
+      <header class="topbar">
+        <button class="icon-button menu-toggle" type="button" data-menu-toggle aria-controls="sidebar" aria-expanded="false">
+          {{ icono('menu') }}<span class="sr-only">Abrir menú</span>
+        </button>
+        <div class="topbar-title">
+          <p class="topbar-eyebrow">{% block eyebrow %}Panel administrativo{% endblock %}</p>
+          <h1>{% block encabezado %}Panel{% endblock %}</h1>
+          {% block subtitulo %}{% endblock %}
+        </div>
+        <div class="topbar-user">
+          <div class="user-avatar" aria-hidden="true">{{ usuario_actual.nombre_completo[:1]|upper }}</div>
+          <div class="user-meta">
+            <span class="user-name">{{ usuario_actual.nombre_completo }}</span>
+            <span class="user-role">{{ usuario_actual.rol|rol_legible }}</span>
+          </div>
+          <form method="post" action="{{ url_for('auth.logout') }}">
+            <button class="icon-button" type="submit" title="Cerrar sesión">
+              {{ icono('salir') }}<span class="sr-only">Cerrar sesión</span>
+            </button>
+          </form>
+        </div>
+      </header>
+
+      <div class="demo-banner" role="note">
+        <strong>Demostración académica.</strong>
+        Los datos de alumnos, asistencias y cuentas son ficticios. La hora utilizada es la del servidor.
+      </div>
+
+      {% with mensajes = get_flashed_messages(with_categories=true) %}
+        {% if mensajes %}
+          <div class="flash-stack" aria-live="polite">
+            {% for categoria, mensaje in mensajes %}
+              <div class="alert alert-{{ categoria }}" role="status">
+                <span class="alert-text">{{ mensaje }}</span>
+                <button class="alert-close" type="button" data-cerrar-alerta aria-label="Cerrar mensaje">×</button>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <main id="contenido" class="contenido">
+        {% block contenido %}{% endblock %}
+      </main>
+
+      <footer class="app-footer">
+        <span>Colegio Domingo Savio S.A.C. · Sistema de gestión administrativa</span>
+        <span>{{ hora_sistema|fecha_corta }} · {{ hora_sistema|hora_corta }}</span>
+      </footer>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

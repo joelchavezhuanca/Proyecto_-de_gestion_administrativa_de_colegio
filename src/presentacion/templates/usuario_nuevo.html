@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block titulo %}Crear cuenta{% endblock %}
+{% block eyebrow %}PBI-02 · Nueva cuenta{% endblock %}
+{% block encabezado %}Crear cuenta de usuario{% endblock %}
+{% block subtitulo %}
+  <p class="page-subtitle">Asistente de tres pasos: identidad, rol y estado, credencial inicial. Solo se asignan los roles oficiales.</p>
+{% endblock %}
+
+{% block contenido %}
+<section class="card" data-contenedor-wizard-usuario data-paso-inicial="{{ paso }}">
+  {% if error %}
+    <div class="alert alert-error" role="alert">
+      <span class="alert-text">{{ error }}</span>
+    </div>
+  {% endif %}
+
+  <ol class="stepper" aria-label="Pasos de creación de cuenta">
+    <li class="step {{ 'activo' if paso == 1 }}" data-paso-indicador="1"><span>1</span> Identidad</li>
+    <li class="step {{ 'activo' if paso == 2 }}" data-paso-indicador="2"><span>2</span> Rol y estado</li>
+    <li class="step {{ 'activo' if paso == 3 }}" data-paso-indicador="3"><span>3</span> Contraseña</li>
+  </ol>
+
+  <form method="post" action="{{ url_for('usuarios.nuevo_usuario') }}" class="form" data-form-usuario novalidate>
+    <div class="wizard-step" data-paso="1">
+      <div class="field">
+        <label for="nombre_completo">Nombre completo</label>
+        <input id="nombre_completo" name="nombre_completo" type="text" autocomplete="name"
+               value="{{ form.nombre_completo }}" placeholder="Ej. Yhovana Quispe Ccolqquere" required>
+        <p class="field-help">Se mostrará en la barra superior y en la auditoría.</p>
+      </div>
+      <div class="field">
+        <label for="username">Nombre de usuario</label>
+        <input id="username" name="username" type="text" autocomplete="off"
+               value="{{ form.username }}" placeholder="Ej. yquispe_backend" required
+               data-username-disponible aria-describedby="username-estado">
+        <p class="field-message" id="username-estado" data-username-mensaje aria-live="polite"></p>
+        <p class="field-help">Se almacena en minúsculas y debe ser único.</p>
+      </div>
+      <button class="btn btn-primario" type="button" data-ir-paso="2">Siguiente: rol y estado</button>
+    </div>
+
+    <div class="wizard-step" data-paso="2" hidden>
+      <fieldset class="field">
+        <legend>Rol oficial asignado</legend>
+        <div class="radio-cards radio-cards-tres">
+          <label class="radio-card">
+            <input type="radio" name="rol" value="ADMIN" {% if form.rol == 'ADMIN' %}checked{% endif %}>
+            <span><strong>ADMIN</strong><small>Control total de configuración y usuarios.</small></span>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="rol" value="COORDINADOR" {% if form.rol == 'COORDINADOR' %}checked{% endif %}>
+            <span><strong>COORDINADOR</strong><small>Operación de asistencia y consulta de aforo.</small></span>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="rol" value="ADMIN_STAFF" {% if form.rol == 'ADMIN_STAFF' %}checked{% endif %}>
+            <span><strong>ADMIN_STAFF</strong><small>Asistencia, correcciones y justificaciones.</small></span>
+          </label>
+        </div>
+      </fieldset>
+
+      <div class="field">
+        <label class="switch">
+          <input type="checkbox" name="estado_activo" value="si" {% if form.estado != 'INACTIVO' %}checked{% endif %} data-estado-usuario>
+          <span class="switch-track" aria-hidden="true"></span>
+          <span class="switch-label">Cuenta ACTIVA <span class="muted small">(permite iniciar sesión)</span></span>
+        </label>
+        <input type="hidden" name="estado" value="{{ form.estado or 'ACTIVO' }}" data-estado-oculto>
+      </div>
+
+      <div class="wizard-actions">
+        <button class="btn btn-secundario" type="button" data-volver-paso="1">Volver</button>
+        <button class="btn btn-primario" type="button" data-ir-paso="3">Siguiente: contraseña</button>
+      </div>
+    </div>
+
+    <div class="wizard-step" data-paso="3" hidden>
+      <div class="field">
+        <label for="password">Credencial inicial</label>
+        <input id="password" name="password" type="password" autocomplete="new-password"
+               minlength="8" required data-password-usuario aria-describedby="password-requisitos">
+        <div class="strength" aria-hidden="true"><span class="strength-fill" data-fuerza-barra></span></div>
+        <ul class="requisitos" id="password-requisitos">
+          <li data-requisito="longitud">Mínimo 8 caracteres</li>
+          <li data-requisito="mixta">Combina letras y números</li>
+        </ul>
+      </div>
+      <div class="field">
+        <label for="password_confirm">Confirmar credencial</label>
+        <input id="password_confirm" name="password_confirm" type="password" autocomplete="new-password"
+               minlength="8" required data-password-confirmar aria-describedby="confirmar-mensaje">
+        <p class="field-message" id="confirmar-mensaje" data-confirmar-mensaje aria-live="polite"></p>
+      </div>
+      <div class="alert alert-info" role="note">
+        <span class="alert-text">La contraseña se almacena con hash PBKDF2-HMAC-SHA256 y salt; nunca en texto plano.</span>
+      </div>
+      <div class="wizard-actions">
+        <button class="btn btn-secundario" type="button" data-volver-paso="2">Volver</button>
+        <button class="btn btn-primario" type="submit" data-boton-crear-usuario>Finalizar creación</button>
+      </div>
+    </div>
+  </form>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/usuarios.js') }}" defer></script>
+{% endblock %}

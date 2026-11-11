@@ -22,3 +22,8 @@ env/
 *.swo
 Thumbs.db
 Desktop.ini
+
+# Base de datos local de demostración
+instance/
+*.db
+*.sqlite3

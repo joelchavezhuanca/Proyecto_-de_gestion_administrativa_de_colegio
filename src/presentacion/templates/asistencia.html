@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icono, chip_estado %}
+
+{% block titulo %}Registro de asistencia{% endblock %}
+{% block eyebrow %}PBI-01 · Registro unificado{% endblock %}
+{% block encabezado %}Control de asistencia{% endblock %}
+{% block subtitulo %}
+  <p class="page-subtitle">Registre el ingreso por carnet, DNI o búsqueda asistida. La puntualidad y la tardanza las calcula el dominio con la hora del servidor.</p>
+{% endblock %}
+
+{% block contenido %}
+{% if error %}
+  <div class="alert alert-error" role="alert">
+    <span class="alert-text">{{ error }}</span>
+  </div>
+{% endif %}
+
+<section class="card">
+  <div class="card-head">
+    <div>
+      <h2>Modo de operación</h2>
+      <p class="muted">Seleccione el mecanismo de lectura. El operador autenticado queda asociado al registro.</p>
+    </div>
+    <span class="meta-line">{{ icono('reloj') }} {{ fecha|fecha_corta }} · {{ hora_sistema|hora_corta }}</span>
+  </div>
+
+  <div class="segmented" role="radiogroup" aria-label="Modo de registro" data-modo-inicial="{{ form.metodo or 'CARNET' }}">
+    <label class="segmented-option">
+      <input type="radio" name="selector-modo" value="CARNET" checked>
+      <span>1. Escáner de carnet</span>
+    </label>
+    <label class="segmented-option">
+      <input type="radio" name="selector-modo" value="MANUAL_DNI">
+      <span>2. Manual por DNI</span>
+    </label>
+    <label class="segmented-option">
+      <input type="radio" name="selector-modo" value="MANUAL_BUSQUEDA">
+      <span>3. Búsqueda asistida</span>
+    </label>
+  </div>
+
+  <!-- Modo carnet -->
+  <div class="modo-panel" data-modo-panel="CARNET">
+    <form method="post" action="{{ url_for('asistencia.registrar_asistencia') }}" class="form" data-form-carnet>
+      <input type="hidden" name="metodo" value="CARNET">
+      <div class="field field-grande">
+        <label for="carnet">Código del carnet</label>
+        <input id="carnet" name="identificador" type="text" autocomplete="off"
+               placeholder="Ej. CRN-EDU-70000001" value="{{ form.identificador if form.metodo == 'CARNET' else '' }}"
+               autofocus data-foco-modo>
+        <p class="field-help">El escáner físico escribe el código y presiona Enter. También puede escribirlo manualmente.</p>
+      </div>
+      <div class="field">
+        <label for="motivo-carnet">Motivo de corrección <span class="opcional">(opcional)</span></label>
+        <textarea id="motivo-carnet" name="motivo" rows="2"
+                  placeholder="Obligatorio únicamente si el alumno figura AUSENTE">{{ form.motivo if form.metodo == 'CARNET' else '' }}</textarea>
+      </div>
+      <button class="btn btn-primario" type="submit">Registrar ingreso</button>
+    </form>
+  </div>
+
+  <!-- Modo DNI -->
+  <div class="modo-panel" data-modo-panel="MANUAL_DNI" hidden>
+    <form method="post" action="{{ url_for('asistencia.registrar_asistencia') }}" class="form" data-form-dni>
+      <input type="hidden" name="metodo" value="MANUAL_DNI">
+      <input type="hidden" name="identificador" value="" data-identificador-dni>
+
+      <ol class="stepper" aria-label="Pasos del registro manual">
+        <li class="step activo" data-paso-indicador="1"><span>1</span> DNI</li>
+        <li class="step" data-paso-indicador="2"><span>2</span> Alumno</li>
+        <li class="step" data-paso-indicador="3"><span>3</span> Confirmar</li>
+      </ol>
+
+      <div class="wizard-step" data-paso="1">
+        <div class="field field-grande">
+          <label for="dni-manual">DNI del alumno</label>
+          <input id="dni-manual" name="dni_visual" type="text" inputmode="numeric" maxlength="8"
+                 autocomplete="off" placeholder="8 dígitos" aria-describedby="dni-mensaje">
+          <p class="field-message" id="dni-mensaje" data-dni-mensaje aria-live="polite"></p>
+        </div>
+        <button class="btn btn-secundario" type="button" data-verificar-dni>Verificar alumno</button>
+      </div>
+
+      <div class="wizard-step" data-paso="2" hidden>
+        <div class="tarjeta-alumno" data-tarjeta-dni hidden></div>
+        <div class="wizard-actions">
+          <button class="btn btn-secundario" type="button" data-volver-paso="1">Volver</button>
+          <button class="btn btn-primario" type="button" data-ir-paso="3">Continuar</button>
+        </div>
+      </div>
+
+      <div class="wizard-step" data-paso="3" hidden>
+        <div class="field">
+          <label for="motivo-dni">Motivo de corrección <span class="opcional">(obligatorio si está AUSENTE)</span></label>
+          <textarea id="motivo-dni" name="motivo" rows="3"
+                    placeholder="Describa el motivo si va a corregir una ausencia">{{ form.motivo if form.metodo == 'MANUAL_DNI' else '' }}</textarea>
+        </div>
+        <div class="wizard-actions">
+          <button class="btn btn-secundario" type="button" data-volver-paso="2">Volver</button>
+          <button class="btn btn-primario" type="submit">Confirmar asistencia</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- Modo búsqueda -->
+  <div class="modo-panel" data-modo-panel="MANUAL_BUSQUEDA" hidden>
+    <form method="post" action="{{ url_for('asistencia.registrar_asistencia') }}" class="form" data-form-busqueda>
+      <input type="hidden" name="metodo" value="MANUAL_BUSQUEDA">
+      <input type="hidden" name="alumno_id" value="" data-alumno-id-busqueda>
+
+      <ol class="stepper" aria-label="Pasos de la búsqueda asistida">
+        <li class="step activo" data-paso-indicador="1"><span>1</span> Buscar</li>
+        <li class="step" data-paso-indicador="2"><span>2</span> Seleccionar</li>
+        <li class="step" data-paso-indicador="3"><span>3</span> Confirmar</li>
+      </ol>
+
+      <div class="wizard-step" data-paso="1">
+        <div class="field field-grande">
+          <label for="busqueda">Nombres, apellidos, DNI o código</label>
+          <div class="input-with-action">
+            <input id="busqueda" type="search" autocomplete="off" placeholder="Ej. Luna, 70000001 o ALU-2026-001"
+                   aria-describedby="busqueda-ayuda">
+            <button class="input-action" type="button" data-buscar-alumno>Buscar</button>
+          </div>
+          <p class="field-help" id="busqueda-ayuda">Solo se muestran alumnos ACTIVO.</p>
+        </div>
+        <div class="resultados-busqueda" data-resultados-busqueda aria-live="polite"></div>
+      </div>
+
+      <div class="wizard-step" data-paso="2" hidden>
+        <div class="tarjeta-alumno" data-tarjeta-busqueda hidden></div>
+        <div class="wizard-actions">
+          <button class="btn btn-secundario" type="button" data-volver-paso="1">Volver</button>
+          <button class="btn btn-primario" type="button" data-ir-paso="3">Continuar</button>
+        </div>
+      </div>
+
+      <div class="wizard-step" data-paso="3" hidden>
+        <div class="field">
+          <label for="motivo-busqueda">Motivo de corrección <span class="opcional">(obligatorio si está AUSENTE)</span></label>
+          <textarea id="motivo-busqueda" name="motivo" rows="3"
+                    placeholder="Describa el motivo si va a corregir una ausencia">{{ form.motivo if form.metodo == 'MANUAL_BUSQUEDA' else '' }}</textarea>
+        </div>
+        <div class="wizard-actions">
+          <button class="btn btn-secundario" type="button" data-volver-paso="2">Volver</button>
+          <button class="btn btn-primario" type="submit">Confirmar asistencia</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</section>
+
+<section class="grid-dos grid-dos-amplio">
+  <article class="card">
+    <div class="card-head">
+      <div>
+        <h2>Últimos registros de hoy</h2>
+        <p class="muted">Confirmaciones obtenidas del backend, no simuladas en el navegador.</p>
+      </div>
+    </div>
+    {% if recientes %}
+      <div class="tabla-scroll">
+        <table class="tabla">
+          <thead>
+            <tr><th>Hora</th><th>Alumno</th><th>Salón</th><th>Estado</th><th>Tardanza</th></tr>
+          </thead>
+          <tbody>
+            {% for fila in recientes %}
+              <tr>
+                <td class="mono">{{ fila.asistencia.hora_efectiva|hora_corta }}</td>
+                <td>{{ fila.alumno.nombres ~ ' ' ~ fila.alumno.apellidos if fila.alumno else 'Alumno no disponible' }}</td>
+                <td>{{ fila.alumno.nivel ~ ' · ' ~ fila.alumno.grado ~ ' · ' ~ fila.alumno.seccion if fila.alumno else '—' }}</td>
+                <td>{{ chip_estado(fila.asistencia.estado) }}</td>
+                <td>{{ fila.asistencia.minutos_tardanza }} min</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <strong>Aún no hay registros para hoy.</strong>
+        <p>El primer ingreso confirmado aparecerá en esta tabla.</p>
+      </div>
+    {% endif %}
+  </article>
+
+  <aside class="card ayuda-demo">
+    <h2>Ayuda para la demostración</h2>
+    <p class="muted">Alumnos de ejemplo que todavía no tienen registro hoy. Puede usar su carnet o DNI para probar un ingreso nuevo.</p>
+    {% if sugeridos %}
+      <ul class="lista-sugeridos">
+        {% for alumno in sugeridos %}
+          <li>
+            <strong>{{ alumno.nombres }} {{ alumno.apellidos }}</strong>
+            <span class="mono">{{ alumno.carnet_codigo }}</span>
+            <span class="mono">DNI {{ alumno.dni }}</span>
+            <span class="muted small">{{ alumno.nivel }} · {{ alumno.grado }} · Sección {{ alumno.seccion }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted">Todos los alumnos ya tienen un registro en la fecha actual.</p>
+    {% endif %}
+    <p class="nota-demo">Estos datos son ficticios y existen únicamente para la presentación académica.</p>
+  </aside>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/asistencia.js') }}" defer></script>
+{% endblock %}

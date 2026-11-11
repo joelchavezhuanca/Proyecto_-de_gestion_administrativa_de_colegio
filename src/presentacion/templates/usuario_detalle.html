@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% from "_macros.html" import chip_estado %}
+
+{% block titulo %}Cuenta de {{ usuario.username }}{% endblock %}
+{% block eyebrow %}PBI-02 / PBI-15 · Detalle de cuenta{% endblock %}
+{% block encabezado %}{{ usuario.nombre_completo }}{% endblock %}
+{% block subtitulo %}
+  <p class="page-subtitle">Cuenta <span class="mono">{{ usuario.username }}</span> · {{ usuario.rol|rol_legible }} · {{ chip_estado(usuario.estado) }}</p>
+{% endblock %}
+
+{% block contenido %}
+<div class="grid-dos">
+  <section class="card">
+    <div class="card-head">
+      <div>
+        <h2>Datos de la cuenta</h2>
+        <p class="muted">La modificación de rol queda registrada en la auditoría.</p>
+      </div>
+    </div>
+    <form method="post" action="{{ url_for('usuarios.editar_usuario', usuario_id=usuario.id) }}" class="form">
+      <div class="field">
+        <label for="nombre_completo">Nombre completo</label>
+        <input id="nombre_completo" name="nombre_completo" type="text" value="{{ usuario.nombre_completo }}" required>
+      </div>
+      <fieldset class="field">
+        <legend>Rol oficial</legend>
+        <div class="radio-cards radio-cards-tres">
+          {% for rol in roles %}
+            <label class="radio-card">
+              <input type="radio" name="rol" value="{{ rol.value }}" {% if usuario.rol == rol %}checked{% endif %}>
+              <span><strong>{{ rol.value }}</strong><small>{{ rol|rol_legible }}</small></span>
+            </label>
+          {% endfor %}
+        </div>
+      </fieldset>
+      <button class="btn btn-primario" type="submit">Guardar cambios</button>
+    </form>
+  </section>
+
+  <div class="columna-stack">
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <h2>Estado operativo</h2>
+          <p class="muted">Una cuenta INACTIVA no puede iniciar sesión ni operar.</p>
+        </div>
+      </div>
+      <dl class="detalle-lista">
+        <div><dt>Estado actual</dt><dd>{{ chip_estado(usuario.estado) }}</dd></div>
+        <div><dt>Creada</dt><dd>{{ usuario.creado_en|fecha_corta if usuario.creado_en else '—' }}</dd></div>
+      </dl>
+      <form method="post" action="{{ url_for('usuarios.cambiar_estado', usuario_id=usuario.id) }}"
+            data-confirmar="¿Confirma el cambio de estado de esta cuenta?">
+        {% if usuario.estado.value == 'ACTIVO' %}
+          <input type="hidden" name="nuevo_estado" value="INACTIVO">
+          <button class="btn btn-peligro-suave" type="submit">Desactivar cuenta</button>
+        {% else %}
+          <input type="hidden" name="nuevo_estado" value="ACTIVO">
+          <button class="btn btn-secundario" type="submit">Reactivar cuenta</button>
+        {% endif %}
+      </form>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <h2>Restablecer credencial</h2>
+          <p class="muted">El administrador no puede consultar la contraseña anterior.</p>
+        </div>
+      </div>
+      <form method="post" action="{{ url_for('usuarios.restablecer_password', usuario_id=usuario.id) }}" class="form">
+        <div class="field">
+          <label for="password">Nueva contraseña</label>
+          <input id="password" name="password" type="password" autocomplete="new-password" minlength="8" required>
+          <p class="field-help">Mínimo 8 caracteres, combinando letras y números.</p>
+        </div>
+        <div class="field">
+          <label for="password_confirm">Confirmar contraseña</label>
+          <input id="password_confirm" name="password_confirm" type="password" autocomplete="new-password" minlength="8" required>
+        </div>
+        <button class="btn btn-secundario" type="submit">Restablecer credencial</button>
+      </form>
+    </section>
+  </div>
+</div>
+
+<div class="page-actions">
+  <a class="btn btn-secundario" href="{{ url_for('usuarios.listar_usuarios') }}">Volver al listado</a>
+</div>
+{% endblock %}
