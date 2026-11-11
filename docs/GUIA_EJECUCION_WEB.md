@@ -28,8 +28,9 @@ Dependencias declaradas:
 | `SQLAlchemy>=2.0.0` | Persistencia ORM existente y SQLite de demostración |
 | `pytest`, `pytest-cov` | Pruebas automatizadas |
 | `ruff` | Inspección estática |
+| `html5-qrcode` 2.3.8 | Lectura de QR en el navegador, incluida localmente en `src/presentacion/static/js/vendor/` (Apache 2.0) |
 
-No se añadió SQLAlchemy: ya existía. Solo se incorporó Flask, requerido por la especificación de interfaces web.
+No se añadió SQLAlchemy: ya existía. Solo se incorporó Flask, requerido por la especificación de interfaces web. La librería QR se sirve como archivo estático local; no requiere CDN ni envía video al backend.
 
 ## 3. Iniciar la aplicación
 
@@ -110,10 +111,14 @@ La base se vuelve a sembrar con la fecha actual del servidor.
 
 ### 6.2. Registro de asistencia (PBI-01)
 - Tres modos con control segmentado: carnet, manual por DNI y búsqueda asistida.
-- Carnet: admite el escáner físico que escribe el código y presiona Enter.
-- Manual por DNI: asistente DNI → alumno verificado → confirmación/motivo.
+- Carnet: subselector entre **Pistola / Escáner USB** y **Cámara del dispositivo**.
+- Cámara: lectura de QR 100 % en el navegador con `html5-qrcode` 2.3.8 (archivo local). En móviles prioriza la cámara trasera (`environment`); en laptops, la cámara frontal (`user`). Permite elegir entre las cámaras detectadas.
+- Debounce: al leer un QR se detiene la cámara de inmediato y se evita el doble envío. La tarjeta de confirmación incluye botón y cuenta regresiva de 8 segundos para "Escanear siguiente".
+- La cámara se apaga al cambiar de pestaña del navegador, cambiar de modo/lector o abandonar el módulo.
+- Manual por DNI: asistente DNI → alumno verificado → confirmación.
 - Búsqueda: asistente buscar → seleccionar → confirmación; solo muestra alumnos `ACTIVO`.
 - La puntualidad y la tardanza las calcula `registrar_asistencia_unificada()` en `src/dominio/asistencia.py` con la hora del servidor.
+- El campo de motivo de corrección **no** aparece en la vista normal. Solo se despliega si el backend detecta que el alumno figura `AUSENTE` y exige el motivo para actualizar su estado.
 - Errores del dominio (`RegistroDuplicadoException`, `FaltaMotivoCorreccionException`, etc.) se muestran en pantalla y no borran la entrada.
 - Tabla de últimos registros confirmados.
 - La interfaz no calcula estados ni tardanzas.
@@ -130,6 +135,8 @@ La base se vuelve a sembrar con la fecha actual del servidor.
 ### 6.4. Justificaciones (PBI-04)
 - Listado de ausencias y tardanzas de la fecha seleccionada.
 - Asistente de tres pasos: alumno → categoría/motivo → revisión.
+- Tarjeta de contexto del estudiante visible en los pasos 2 y 3: nombre, código/DNI, nivel-grado-sección y estado original (`TARDANZA` con minutos o `AUSENTE` con hora).
+- El botón "Justificar" de la tabla sincroniza el selector, completa la tarjeta y avanza al paso 2.
 - Categorías oficiales: `MEDICA`, `PERMISO_FAMILIAR`, `OTRA`.
 - Fecha limitada al día actual; motivo mínimo de 10 caracteres.
 - Resumen del cambio `AUSENTE`/`TARDANZA` → `JUSTIFICADO`.
@@ -201,15 +208,15 @@ python -m ruff check .
 
 Resultado de la implementación:
 
-- `78 passed` (61 pruebas previas + 17 pruebas de integración web).
+- `84 passed` (61 pruebas previas + 23 pruebas de integración web).
 - `ruff check .` sin errores.
 
-Las pruebas web están en `tests/test_web.py` y verifican login, protección de rutas, registro por carnet, duplicados, RBAC, justificaciones, alta y edición de usuarios, restablecimiento de credencial, cierre diario y rechazo de fechas futuras.
+Las pruebas web están en `tests/test_web.py` y verifican login, protección de rutas, registro por carnet, duplicados, RBAC, justificaciones, alta y edición de usuarios, restablecimiento de credencial, cierre diario, rechazo de fechas futuras, respuesta JSON del flujo QR, exigencia de motivo para corregir `AUSENTE`, ausencia del campo de motivo en la vista normal y tarjeta de contexto del wizard.
 
 ## 9. Decisiones y limitaciones conocidas
 
 1. **Cierre diario reservado a ADMIN.** La especificación reserva la configuración de la hora al ADMIN, pero no detalla el rol del botón de cierre. Se optó por la opción conservadora: una acción irreversible que marca ausencias solo la ejecuta `ADMIN`. La interfaz lo informa.
-2. **Escáner de cámara/QR no implementado.** El modo carnet acepta el código que introduce un escáner físico o la digitación manual. La lectura por cámara del celular requiere una librería adicional y no forma parte de esta primera versión.
+2. **Lectura por cámara sujeta a permisos y hardware.** El modo cámara requiere que el navegador permita el acceso al dispositivo y que el equipo tenga una cámara disponible. La lectura de QR trabaja en el cliente; si la librería local no carga, se informa en pantalla. El escáner USB sigue disponible como alternativa.
 3. **Notificaciones WhatsApp no implementadas.** El dominio genera `EventoAsistenciaConfirmada`, pero no se envía nada. PBI-17 sigue pendiente.
 4. **Auditoría mínima.** Se persiste una bitácora append-only básica en `auditoria_eventos`; no sustituye la implementación completa de PBI-16.
 5. **Sin CSRF explícito.** La aplicación está pensada para ejecución local de demostración. Antes de un despliegue real debe añadirse protección CSRF, cookies seguras y una `SECRET_KEY` propia.

@@ -31,7 +31,7 @@ Los roles oficiales del sistema son **ADMIN**, **COORDINADOR** y **ADMIN_STAFF**
 
 ## Calidad y verificación
 
-El informe original registra **61 pruebas automatizadas**. La versión web añade **17 pruebas de integración Flask**, para un total actual de **78 pruebas en verde**, y `ruff check .` sin errores. El workflow de GitHub Actions ejecuta Ruff y Pytest con cobertura en Python 3.11.
+El informe original registra **61 pruebas automatizadas**. La versión web añade **23 pruebas de integración Flask**, para un total actual de **84 pruebas en verde**, y `ruff check .` sin errores. El workflow de GitHub Actions ejecuta Ruff y Pytest con cobertura en Python 3.11.
 
 ## Interfaz web (demostración)
 
@@ -61,6 +61,7 @@ La guía completa —instalación, reinicio de datos, credenciales, pantallas, d
 - **Aforo (PBI-03):** calcula métricas globales y por salón y contempla el cierre automático de la jornada.
 - **Persistencia:** SQLAlchemy 2.0 con modelos tipados, relaciones 1:N y eliminación en cascada. Las pruebas ORM usan SQLite en memoria con claves foráneas activadas.
 - **Interfaz web:** Flask + Jinja2 con las cinco pantallas solicitadas, navegación por roles, validaciones en línea, datos de demostración y persistencia SQLite local.
+- **Asistencia por cámara:** lectura QR en el navegador con `html5-qrcode` local, cámara trasera/frontal según dispositivo, debounce, cuenta regresiva y liberación de la cámara al cambiar de contexto.
 - **Capacidades en desarrollo:** PBI-04 y PBI-15 cuentan con dominio, pruebas e interfaz web; la auditoría completa (PBI-16) y las notificaciones (PBI-17) siguen pendientes.
 - **Integraciones planificadas:** el envío de notificaciones por WhatsApp está previsto para Sprint 2. El dominio genera el evento, pero no existe un adaptador de envío activo.
 
