@@ -17,9 +17,11 @@ from src.dominio.aforo import (
 )
 from src.dominio.asistencia import (
     Alumno,
+    AlumnoNoEncontradoException,
     AsistenciaException,
     EstadoAsistencia,
     MetodoRegistro,
+    RegistroAsistencia,
     ResultadoRegistroAsistencia,
     UsuarioOperador,
     registrar_asistencia_unificada,
@@ -107,6 +109,26 @@ class ServicioAplicacionColegio:
             return self.repo.obtener_alumno(alumno_id), None, None
 
         raise MetodoRegistroInvalido("El método de registro seleccionado no es válido.")
+
+    def obtener_contexto_alumno(
+        self, metodo: str, identificador: str, alumno_id: int | None
+    ) -> tuple[Alumno, RegistroAsistencia | None]:
+        """Resuelve el alumno y su registro actual para la corrección de AUSENTE.
+
+        Se usa cuando el dominio exige un motivo. No modifica ningún dato.
+        """
+        try:
+            metodo_enum = MetodoRegistro(metodo)
+        except ValueError as error:
+            raise MetodoRegistroInvalido(
+                "El método de registro seleccionado no es válido."
+            ) from error
+
+        alumno, _, _ = self._resolver_alumno(metodo_enum, identificador, alumno_id)
+        if alumno is None:
+            raise AlumnoNoEncontradoException("El alumno indicado no fue encontrado.")
+        asistencia = self.repo.obtener_asistencia(alumno.id, self.ahora().date())
+        return alumno, asistencia
 
     def registrar_asistencia(
         self,

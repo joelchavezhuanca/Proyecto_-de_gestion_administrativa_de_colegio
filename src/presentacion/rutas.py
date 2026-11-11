@@ -17,7 +17,12 @@ from flask import (
 
 from src.aplicacion.casos_uso import MetodoRegistroInvalido
 from src.dominio.aforo import AforoException
-from src.dominio.asistencia import AsistenciaException, EstadoAsistencia
+from src.dominio.asistencia import (
+    AsistenciaException,
+    EstadoAsistencia,
+    FaltaMotivoCorreccionException,
+    RegistroAsistencia,
+)
 from src.dominio.justificaciones import JustificacionException
 from src.dominio.usuarios import (
     CredencialesInvalidasException,
@@ -210,11 +215,49 @@ def _contexto_asistencia(**extra):
         "sugeridos": sugeridos,
         "form": {},
         "error": None,
+        "correccion": None,
         "resultado": None,
         "milisegundos": None,
     }
     contexto.update(extra)
     return contexto
+
+
+def _quiere_json() -> bool:
+    return request.headers.get("X-Requested-With") == "fetch"
+
+
+def _serializar_alumno(alumno) -> dict[str, object]:
+    return {
+        "id": alumno.id,
+        "nombre": f"{alumno.nombres} {alumno.apellidos}",
+        "codigo": alumno.codigo,
+        "dni": alumno.dni,
+        "carnet": alumno.carnet_codigo,
+        "nivel": alumno.nivel,
+        "grado": alumno.grado,
+        "seccion": alumno.seccion,
+        "salon": f"{alumno.nivel} · {alumno.grado} · Sección {alumno.seccion}",
+    }
+
+
+def _serializar_asistencia(registro: RegistroAsistencia | None) -> dict[str, object] | None:
+    if registro is None:
+        return None
+    return {
+        "id": registro.id,
+        "estado": registro.estado.value,
+        "hora": registro.hora_efectiva.strftime("%H:%M:%S"),
+        "minutos_tardanza": registro.minutos_tardanza,
+        "metodo": registro.metodo.value,
+    }
+
+
+def _mensaje_confirmacion(registro: RegistroAsistencia, milisegundos: int) -> str:
+    detalle = registro.estado.value
+    if registro.estado == EstadoAsistencia.TARDANZA:
+        detalle += f" · {registro.minutos_tardanza} min de tardanza"
+    return f"Registro confirmado: {detalle}. Procesado en {milisegundos} ms."
 
 
 @bp_asistencia.route("/asistencia")
@@ -241,26 +284,78 @@ def registrar_asistencia():
             motivo=motivo,
         )
         g.db_sesion.commit()
+    except FaltaMotivoCorreccionException as excepcion:
+        g.db_sesion.rollback()
+        alumno, asistencia = g.servicio.obtener_contexto_alumno(
+            metodo, identificador, alumno_id
+        )
+        if _quiere_json():
+            return (
+                jsonify(
+                    {
+                        "ok": False,
+                        "requiere_motivo": True,
+                        "mensaje": str(excepcion),
+                        "alumno": _serializar_alumno(alumno),
+                        "asistencia": _serializar_asistencia(asistencia),
+                    }
+                ),
+                409,
+            )
+        return (
+            render_template(
+                "asistencia.html",
+                **_contexto_asistencia(
+                    form={"metodo": metodo, "identificador": identificador},
+                    correccion={
+                        "metodo": metodo,
+                        "identificador": identificador,
+                        "alumno_id": alumno.id,
+                        "alumno": alumno,
+                        "asistencia": asistencia,
+                        "mensaje": str(excepcion),
+                    },
+                ),
+            ),
+            200,
+        )
     except (AsistenciaException, MetodoRegistroInvalido, ValueError) as excepcion:
         g.db_sesion.rollback()
+        if _quiere_json():
+            return (
+                jsonify({"ok": False, "requiere_motivo": False, "mensaje": str(excepcion)}),
+                400,
+            )
         return (
             render_template(
                 "asistencia.html",
                 **_contexto_asistencia(
                     error=str(excepcion),
-                    form={"metodo": metodo, "identificador": identificador, "motivo": motivo or ""},
+                    form={"metodo": metodo, "identificador": identificador},
                 ),
             ),
             200,
         )
 
-    estado = resultado.asistencia.estado
-    detalle = f"{estado.value}"
-    if estado == EstadoAsistencia.TARDANZA:
-        detalle += f" · {resultado.asistencia.minutos_tardanza} min de tardanza"
+    mensaje = _mensaje_confirmacion(resultado.asistencia, milisegundos)
+    if _quiere_json():
+        alumno = g.repositorio.obtener_alumno(resultado.asistencia.alumno_id)
+        return jsonify(
+            {
+                "ok": True,
+                "mensaje": mensaje,
+                "alumno": _serializar_alumno(alumno) if alumno else None,
+                "estado": resultado.asistencia.estado.value,
+                "hora": resultado.asistencia.hora_efectiva.strftime("%H:%M:%S"),
+                "minutos_tardanza": resultado.asistencia.minutos_tardanza,
+                "metodo": resultado.asistencia.metodo.value,
+                "milisegundos": milisegundos,
+            }
+        )
+
     flash(
-        f"Registro confirmado: {detalle}. Procesado en {milisegundos} ms.",
-        "success" if estado != EstadoAsistencia.TARDANZA else "warning",
+        mensaje,
+        "success" if resultado.asistencia.estado != EstadoAsistencia.TARDANZA else "warning",
     )
     return redirect(url_for("asistencia.ver_asistencia"))
 

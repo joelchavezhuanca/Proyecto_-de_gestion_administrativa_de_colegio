@@ -105,6 +105,25 @@
     <li class="step" data-paso-indicador="3"><span>3</span> Revisión</li>
   </ol>
 
+  <aside class="tarjeta-contexto-alumno" data-tarjeta-contexto hidden aria-live="polite" aria-label="Datos del estudiante seleccionado">
+    <div class="contexto-icono" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <circle cx="12" cy="8" r="3.5"></circle>
+        <path d="M5 20c0-3.3 3.1-6 7-6s7 2.7 7 6" stroke-linecap="round"></path>
+      </svg>
+    </div>
+    <div class="contexto-datos">
+      <p class="contexto-eyebrow">Estudiante seleccionado</p>
+      <h3 data-contexto-nombre>—</h3>
+      <p class="muted small" data-contexto-codigo>—</p>
+      <p class="contexto-salon" data-contexto-salon>—</p>
+    </div>
+    <div class="contexto-registro">
+      <span class="chip chip-danger" data-contexto-estado>—</span>
+      <p data-contexto-detalle>—</p>
+    </div>
+  </aside>
+
   <form method="post" action="{{ url_for('justificaciones.registrar_justificacion') }}" class="form" data-form-justificacion novalidate>
     <div class="wizard-step" data-paso="1">
       <div class="field">
@@ -113,6 +132,14 @@
           <option value="">Seleccione un alumno de la lista</option>
           {% for fila in justificables if not fila.ya_justificada %}
             <option value="{{ fila.asistencia.id }}"
+                    data-nombre="{{ fila.alumno.nombres ~ ' ' ~ fila.alumno.apellidos if fila.alumno else 'Alumno' }}"
+                    data-codigo="{{ fila.alumno.codigo if fila.alumno else '' }}"
+                    data-dni="{{ fila.alumno.dni if fila.alumno else '' }}"
+                    data-salon="{{ fila.alumno.nivel ~ ' - ' ~ fila.alumno.grado ~ ' ' ~ fila.alumno.seccion if fila.alumno else '' }}"
+                    data-estado="{{ fila.asistencia.estado.value }}"
+                    data-hora="{{ fila.asistencia.hora_efectiva|hora_corta }}"
+                    data-tardanza="{{ fila.asistencia.minutos_tardanza }}"
+                    data-fecha="{{ fila.asistencia.fecha_escolar.isoformat() }}"
                     {% if form.asistencia_id == fila.asistencia.id %}selected{% endif %}>
               {{ fila.alumno.nombres ~ ' ' ~ fila.alumno.apellidos if fila.alumno else 'Alumno' }}
               · {{ fila.alumno.grado if fila.alumno else '' }} {{ fila.alumno.seccion if fila.alumno else '' }}

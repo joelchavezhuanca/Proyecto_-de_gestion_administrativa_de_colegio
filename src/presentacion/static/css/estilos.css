@@ -1732,6 +1732,264 @@ fieldset.field legend {
 }
 
 /* --------------------------------------------------------------------------
+   Tarjeta de contexto del estudiante (justificaciones)
+   -------------------------------------------------------------------------- */
+.tarjeta-contexto-alumno {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid #c1c9ba;
+  border-left: 5px solid var(--verde);
+  border-radius: var(--radio-md);
+  background: #f7faf4;
+}
+
+.tarjeta-contexto-alumno[hidden] {
+  display: none;
+}
+
+.contexto-icono {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #e4efdd;
+  color: var(--verde);
+}
+
+.contexto-icono svg {
+  width: 24px;
+  height: 24px;
+}
+
+.contexto-datos {
+  min-width: 0;
+  flex: 1;
+}
+
+.contexto-eyebrow {
+  color: var(--texto-secundario);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.contexto-datos h3 {
+  font-size: 1.05rem;
+  line-height: 1.25;
+  margin: 2px 0 2px;
+}
+
+.contexto-salon {
+  color: var(--texto-secundario);
+  font-size: 0.8rem;
+  margin-top: 3px;
+}
+
+.contexto-registro {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  text-align: right;
+  flex: 0 0 auto;
+  max-width: 230px;
+}
+
+.contexto-registro p {
+  color: var(--texto-secundario);
+  font-size: 0.74rem;
+}
+
+/* --------------------------------------------------------------------------
+   Lector de carnet: USB y cámara QR
+   -------------------------------------------------------------------------- */
+.segmented-secundario {
+  margin-bottom: 16px;
+  background: #eef3e9;
+}
+
+.segmented-secundario .segmented-option {
+  flex: 1 1 200px;
+}
+
+.lector-panel[hidden] {
+  display: none;
+}
+
+.camara-toolbar {
+  display: flex;
+  align-items: end;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.camara-selector {
+  min-width: 220px;
+  margin-left: auto;
+}
+
+.camara-selector select {
+  min-height: 40px;
+}
+
+.qr-reader {
+  width: 100%;
+  min-height: 280px;
+  padding: 10px;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-md);
+  background: #0d120d;
+  overflow: hidden;
+}
+
+.qr-reader:empty::before {
+  content: "El visor de la cámara aparecerá aquí.";
+  display: grid;
+  place-items: center;
+  min-height: 260px;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.85rem;
+}
+
+.qr-reader video {
+  width: 100% !important;
+  border-radius: var(--radio-sm);
+}
+
+.qr-reader img {
+  display: none;
+}
+
+.texto-error {
+  color: var(--error) !important;
+}
+
+.tarjeta-resultado-asistencia {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid #b9d8bb;
+  border-left: 5px solid var(--exito);
+  border-radius: var(--radio-md);
+  background: #f2f9ee;
+}
+
+.tarjeta-resultado-asistencia[hidden] {
+  display: none;
+}
+
+.tarjeta-resultado-asistencia.resultado-tardanza {
+  border-color: #ecda91;
+  border-left-color: var(--advertencia);
+  background: #fdf8e5;
+}
+
+.tarjeta-resultado-asistencia.resultado-error {
+  border-color: #e8b6b6;
+  border-left-color: var(--error);
+  background: var(--error-suave);
+}
+
+.resultado-icono {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--exito);
+  color: #fff;
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.resultado-tardanza .resultado-icono {
+  background: var(--advertencia);
+  color: #4a3900;
+}
+
+.resultado-error .resultado-icono {
+  background: var(--error);
+}
+
+.resultado-cuerpo {
+  min-width: 0;
+  flex: 1;
+}
+
+.resultado-eyebrow {
+  color: var(--texto-secundario);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.resultado-cuerpo h3 {
+  font-size: 1.25rem;
+  line-height: 1.2;
+  margin: 2px 0 3px;
+}
+
+.resultado-detalle {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px 16px;
+  margin-top: 12px;
+}
+
+.resultado-detalle dt {
+  color: var(--texto-secundario);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.resultado-detalle dd {
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.resultado-acciones {
+  margin-top: 12px;
+}
+
+.correccion-qr {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid #ecda91;
+  border-left: 5px solid var(--advertencia);
+  border-radius: var(--radio-md);
+  background: #fdf8e5;
+}
+
+.correccion-qr[hidden] {
+  display: none;
+}
+
+.correccion-qr h3 {
+  font-size: 1rem;
+  margin-bottom: 4px;
+}
+
+.correccion-qr .tarjeta-alumno {
+  margin: 12px 0;
+}
+
+.correccion-card {
+  border-left: 5px solid var(--advertencia);
+}
+
+/* --------------------------------------------------------------------------
    Responsive
    -------------------------------------------------------------------------- */
 @media (max-width: 1120px) {
@@ -1853,6 +2111,29 @@ fieldset.field legend {
 
   .login-card {
     padding: 20px;
+  }
+
+  .tarjeta-contexto-alumno {
+    flex-wrap: wrap;
+  }
+
+  .contexto-registro {
+    align-items: flex-start;
+    text-align: left;
+    max-width: none;
+  }
+
+  .resultado-detalle {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .camara-selector {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .camara-toolbar .btn {
+    flex: 1 1 auto;
   }
 }
 

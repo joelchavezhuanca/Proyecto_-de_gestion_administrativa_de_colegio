@@ -22,8 +22,71 @@
   const resumenAlumno = formulario.querySelector("[data-resumen-alumno]");
   const resumenCategoria = formulario.querySelector("[data-resumen-categoria]");
   const resumenFecha = formulario.querySelector("[data-resumen-fecha]");
+  const tarjetaContexto = contenedor.querySelector("[data-tarjeta-contexto]");
+  const contextoNombre = contenedor.querySelector("[data-contexto-nombre]");
+  const contextoCodigo = contenedor.querySelector("[data-contexto-codigo]");
+  const contextoSalon = contenedor.querySelector("[data-contexto-salon]");
+  const contextoEstado = contenedor.querySelector("[data-contexto-estado]");
+  const contextoDetalle = contenedor.querySelector("[data-contexto-detalle]");
+  let pasoActual = 1;
+
+  function opcionSeleccionada() {
+    if (!selector || !selector.value) {
+      return null;
+    }
+    return selector.options[selector.selectedIndex] || null;
+  }
+
+  function actualizarContexto() {
+    const opcion = opcionSeleccionada();
+    if (!tarjetaContexto) {
+      return;
+    }
+    if (!opcion || !opcion.value) {
+      tarjetaContexto.hidden = true;
+      return;
+    }
+
+    const datos = opcion.dataset;
+    if (contextoNombre) {
+      contextoNombre.textContent = datos.nombre || "Estudiante";
+    }
+    if (contextoCodigo) {
+      const partes = [];
+      if (datos.codigo) {
+        partes.push("Código: " + datos.codigo);
+      }
+      if (datos.dni) {
+        partes.push("DNI: " + datos.dni);
+      }
+      contextoCodigo.textContent = partes.join(" · ") || "Sin identificador";
+    }
+    if (contextoSalon) {
+      contextoSalon.textContent = datos.salon || "Salón no disponible";
+    }
+    if (contextoEstado) {
+      if (datos.estado === "TARDANZA") {
+        contextoEstado.textContent = "Tardanza de " + (datos.tardanza || "0") + " min";
+        contextoEstado.className = "chip chip-warn";
+      } else {
+        contextoEstado.textContent = "Ausente a las " + (datos.hora || "—");
+        contextoEstado.className = "chip chip-danger";
+      }
+    }
+    if (contextoDetalle) {
+      contextoDetalle.textContent =
+        "Registro original del " +
+        formatearFecha(datos.fecha) +
+        " · " +
+        (datos.estado === "TARDANZA"
+          ? "marcó ingreso a las " + (datos.hora || "—")
+          : "sin ingreso registrado");
+    }
+    tarjetaContexto.hidden = pasoActual === 1;
+  }
 
   function mostrarPaso(numero) {
+    pasoActual = numero;
     formulario.querySelectorAll("[data-paso]").forEach(function (paso) {
       paso.hidden = paso.getAttribute("data-paso") !== String(numero);
     });
@@ -32,6 +95,9 @@
       indicador.classList.toggle("activo", valor === numero);
       indicador.classList.toggle("completado", valor < numero);
     });
+    if (tarjetaContexto) {
+      tarjetaContexto.hidden = numero === 1 || !opcionSeleccionada();
+    }
     if (numero === 3) {
       actualizarResumen();
     }
@@ -47,11 +113,13 @@
   }
 
   function textoSeleccionado() {
-    if (!selector || !selector.value) {
+    const opcion = opcionSeleccionada();
+    if (!opcion || !opcion.value) {
       return "Sin registro seleccionado";
     }
-    const opcion = selector.options[selector.selectedIndex];
-    return opcion ? opcion.textContent.trim() : "Registro seleccionado";
+    const nombre = opcion.dataset.nombre || opcion.textContent.trim();
+    const salon = opcion.dataset.salon ? " · " + opcion.dataset.salon : "";
+    return nombre + salon;
   }
 
   function formatearFecha(valor) {
@@ -146,6 +214,13 @@
     radio.addEventListener("change", actualizarResumen);
   });
 
+  if (selector) {
+    selector.addEventListener("change", function () {
+      actualizarContexto();
+      actualizarResumen();
+    });
+  }
+
   if (fecha) {
     fecha.addEventListener("change", function () {
       const hoy = formulario.getAttribute("data-hoy");
@@ -178,6 +253,7 @@
       if (selector) {
         selector.value = asistenciaId;
       }
+      actualizarContexto();
       mostrarPaso(2);
       contenedor.scrollIntoView({ behavior: "smooth", block: "start" });
       if (motivo) {
@@ -192,5 +268,6 @@
   } else {
     mostrarPaso(1);
   }
+  actualizarContexto();
   actualizarResumen();
 })();

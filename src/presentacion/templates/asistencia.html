@@ -41,22 +41,83 @@
 
   <!-- Modo carnet -->
   <div class="modo-panel" data-modo-panel="CARNET">
-    <form method="post" action="{{ url_for('asistencia.registrar_asistencia') }}" class="form" data-form-carnet>
-      <input type="hidden" name="metodo" value="CARNET">
-      <div class="field field-grande">
-        <label for="carnet">Código del carnet</label>
-        <input id="carnet" name="identificador" type="text" autocomplete="off"
-               placeholder="Ej. CRN-EDU-70000001" value="{{ form.identificador if form.metodo == 'CARNET' else '' }}"
-               autofocus data-foco-modo>
-        <p class="field-help">El escáner físico escribe el código y presiona Enter. También puede escribirlo manualmente.</p>
+    <div class="segmented segmented-secundario" role="radiogroup" aria-label="Tipo de lector de carnet" data-lector-inicial="USB">
+      <label class="segmented-option">
+        <input type="radio" name="selector-lector" value="USB" checked>
+        <span>Pistola / Escáner USB</span>
+      </label>
+      <label class="segmented-option">
+        <input type="radio" name="selector-lector" value="CAMARA">
+        <span>Cámara del dispositivo</span>
+      </label>
+    </div>
+
+    <div class="lector-panel" data-lector-panel="USB">
+      <form method="post" action="{{ url_for('asistencia.registrar_asistencia') }}" class="form" data-form-carnet>
+        <input type="hidden" name="metodo" value="CARNET">
+        <div class="field field-grande">
+          <label for="carnet">Código del carnet</label>
+          <input id="carnet" name="identificador" type="text" autocomplete="off"
+                 placeholder="Ej. CRN-EDU-70000001" value="{{ form.identificador if form.metodo == 'CARNET' else '' }}"
+                 autofocus data-foco-modo>
+          <p class="field-help">El escáner físico escribe el código y presiona Enter. También puede escribirlo manualmente.</p>
+        </div>
+        <button class="btn btn-primario" type="submit">Registrar ingreso</button>
+      </form>
+    </div>
+
+    <div class="lector-panel" data-lector-panel="CAMARA" hidden>
+      <div class="camara-toolbar">
+        <button class="btn btn-primario" type="button" data-iniciar-camara>Iniciar cámara</button>
+        <button class="btn btn-secundario" type="button" data-detener-camara hidden>Detener cámara</button>
+        <div class="field camara-selector">
+          <label for="camara-dispositivo">Cámara</label>
+          <select id="camara-dispositivo" data-camara-select disabled>
+            <option value="">Detección automática</option>
+          </select>
+        </div>
       </div>
-      <div class="field">
-        <label for="motivo-carnet">Motivo de corrección <span class="opcional">(opcional)</span></label>
-        <textarea id="motivo-carnet" name="motivo" rows="2"
-                  placeholder="Obligatorio únicamente si el alumno figura AUSENTE">{{ form.motivo if form.metodo == 'CARNET' else '' }}</textarea>
+
+      <div class="qr-reader" id="lector-qr" data-lector-qr aria-live="polite"></div>
+      <p class="field-help" data-camara-estado aria-live="polite">
+        La decodificación del QR ocurre en el navegador. El video no se envía al servidor.
+      </p>
+
+      <div class="tarjeta-resultado-asistencia" data-resultado-qr hidden aria-live="assertive">
+        <div class="resultado-icono" data-resultado-icono aria-hidden="true">✓</div>
+        <div class="resultado-cuerpo">
+          <p class="resultado-eyebrow" data-resultado-eyebrow>Registro confirmado</p>
+          <h3 data-resultado-titulo>—</h3>
+          <p class="muted" data-resultado-alumno>—</p>
+          <dl class="resultado-detalle">
+            <div><dt>Hora</dt><dd data-resultado-hora>—</dd></div>
+            <div><dt>Estado</dt><dd data-resultado-estado>—</dd></div>
+            <div><dt>Tardanza</dt><dd data-resultado-tardanza>—</dd></div>
+            <div><dt>Método</dt><dd data-resultado-metodo>—</dd></div>
+          </dl>
+          <div class="resultado-acciones">
+            <button class="btn btn-secundario" type="button" data-escanear-siguiente>
+              Escanear siguiente <span data-cuenta-regresiva></span>
+            </button>
+          </div>
+        </div>
       </div>
-      <button class="btn btn-primario" type="submit">Registrar ingreso</button>
-    </form>
+
+      <div class="correccion-qr" data-correccion-qr hidden aria-live="assertive">
+        <h3>Corrección de ausencia</h3>
+        <p class="muted" data-correccion-mensaje>El alumno figura AUSENTE. Ingrese el motivo para actualizar su estado.</p>
+        <div class="tarjeta-alumno" data-correccion-alumno></div>
+        <div class="field">
+          <label for="motivo-qr">Motivo de la corrección</label>
+          <textarea id="motivo-qr" rows="3" data-motivo-qr
+                    placeholder="Describa el motivo por el que el alumno ingresa después del cierre"></textarea>
+        </div>
+        <div class="wizard-actions">
+          <button class="btn btn-secundario" type="button" data-cancelar-correccion-qr>Cancelar</button>
+          <button class="btn btn-primario" type="button" data-confirmar-correccion-qr>Confirmar corrección</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Modo DNI -->
@@ -90,10 +151,8 @@
       </div>
 
       <div class="wizard-step" data-paso="3" hidden>
-        <div class="field">
-          <label for="motivo-dni">Motivo de corrección <span class="opcional">(obligatorio si está AUSENTE)</span></label>
-          <textarea id="motivo-dni" name="motivo" rows="3"
-                    placeholder="Describa el motivo si va a corregir una ausencia">{{ form.motivo if form.metodo == 'MANUAL_DNI' else '' }}</textarea>
+        <div class="alert alert-info" role="note">
+          <span class="alert-text">Si el alumno figura AUSENTE, el sistema solicitará el motivo de corrección después de confirmar. La vista normal de ingreso permanece limpia.</span>
         </div>
         <div class="wizard-actions">
           <button class="btn btn-secundario" type="button" data-volver-paso="2">Volver</button>
@@ -137,10 +196,8 @@
       </div>
 
       <div class="wizard-step" data-paso="3" hidden>
-        <div class="field">
-          <label for="motivo-busqueda">Motivo de corrección <span class="opcional">(obligatorio si está AUSENTE)</span></label>
-          <textarea id="motivo-busqueda" name="motivo" rows="3"
-                    placeholder="Describa el motivo si va a corregir una ausencia">{{ form.motivo if form.metodo == 'MANUAL_BUSQUEDA' else '' }}</textarea>
+        <div class="alert alert-info" role="note">
+          <span class="alert-text">Si el alumno figura AUSENTE, el sistema solicitará el motivo de corrección después de confirmar. La vista normal de ingreso permanece limpia.</span>
         </div>
         <div class="wizard-actions">
           <button class="btn btn-secundario" type="button" data-volver-paso="2">Volver</button>
@@ -150,6 +207,45 @@
     </form>
   </div>
 </section>
+
+{% if correccion %}
+<section class="card correccion-card" id="correccion" aria-labelledby="correccion-titulo">
+  <div class="card-head">
+    <div>
+      <h2 id="correccion-titulo">Corrección de ausencia</h2>
+      <p class="muted">El alumno figura AUSENTE. Para actualizar su estado es obligatorio registrar el motivo de la corrección.</p>
+    </div>
+    <span class="chip chip-danger"><span class="chip-dot"></span>Requiere motivo</span>
+  </div>
+
+  <div class="tarjeta-alumno">
+    <h3>{{ correccion.alumno.nombres }} {{ correccion.alumno.apellidos }}</h3>
+    <p class="muted small">{{ correccion.alumno.nivel }} · {{ correccion.alumno.grado }} · Sección {{ correccion.alumno.seccion }}</p>
+    <dl>
+      <div><dt>Código</dt><dd>{{ correccion.alumno.codigo }}</dd></div>
+      <div><dt>DNI</dt><dd>{{ correccion.alumno.dni }}</dd></div>
+      <div><dt>Estado actual</dt><dd><span class="chip chip-danger"><span class="chip-dot"></span>Ausente</span></dd></div>
+      <div><dt>Hora del registro</dt><dd>{{ correccion.asistencia.hora_efectiva|hora_corta if correccion.asistencia else '—' }}</dd></div>
+    </dl>
+  </div>
+
+  <form method="post" action="{{ url_for('asistencia.registrar_asistencia') }}" class="form">
+    <input type="hidden" name="metodo" value="{{ correccion.metodo }}">
+    <input type="hidden" name="identificador" value="{{ correccion.identificador }}">
+    <input type="hidden" name="alumno_id" value="{{ correccion.alumno_id }}">
+    <div class="field">
+      <label for="motivo-correccion">Motivo de la corrección</label>
+      <textarea id="motivo-correccion" name="motivo" rows="3" required autofocus
+                minlength="5" placeholder="Ej. Olvido de carnet, falla del lector o autorización de dirección"></textarea>
+      <p class="field-help">Mínimo 5 caracteres. Quedará asociado al historial del registro.</p>
+    </div>
+    <div class="wizard-actions">
+      <a class="btn btn-secundario" href="{{ url_for('asistencia.ver_asistencia') }}">Cancelar</a>
+      <button class="btn btn-primario" type="submit">Confirmar corrección</button>
+    </div>
+  </form>
+</section>
+{% endif %}
 
 <section class="grid-dos grid-dos-amplio">
   <article class="card">
@@ -209,5 +305,6 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/vendor/html5-qrcode.min.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/asistencia.js') }}" defer></script>
 {% endblock %}
