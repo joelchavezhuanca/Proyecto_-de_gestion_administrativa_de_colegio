@@ -123,6 +123,95 @@ def test_registro_puntual_por_carnet_persiste_asistencia(client, db) -> None:
     assert registro.metodo == "CARNET"
 
 
+def test_vista_normal_de_asistencia_no_muestra_motivo_de_correccion(client) -> None:
+    iniciar_sesion(client)
+    texto = client.get("/asistencia").get_data(as_text=True)
+    assert 'name="motivo"' not in texto
+    assert "data-camara-select" in texto
+    assert "html5-qrcode.min.js" in texto
+
+
+def test_libreria_qr_se_sirve_localmente(client) -> None:
+    respuesta = client.get("/static/js/vendor/html5-qrcode.min.js")
+    assert respuesta.status_code == 200
+    assert len(respuesta.data) > 100_000
+
+
+def test_registro_por_fetch_devuelve_json_de_confirmacion(client, db) -> None:
+    iniciar_sesion(client)
+    alumno = alumno_sin_asistencia_hoy(db)
+    respuesta = client.post(
+        "/asistencia/registrar",
+        data={"metodo": "CARNET", "identificador": alumno.carnet_codigo},
+        headers={"X-Requested-With": "fetch"},
+    )
+    assert respuesta.status_code == 200
+    datos = respuesta.get_json()
+    assert datos["ok"] is True
+    assert datos["estado"] == "PUNTUAL"
+    assert datos["alumno"]["codigo"] == alumno.codigo
+
+
+def test_correccion_de_ausente_exige_motivo_y_actualiza_estado(client, db) -> None:
+    iniciar_sesion(client)
+    ausencia = db.scalars(
+        select(AsistenciaModel).where(
+            AsistenciaModel.fecha_escolar == FECHA_PRUEBA,
+            AsistenciaModel.estado == "AUSENTE",
+        )
+    ).first()
+    alumno = db.get(EstudianteModel, ausencia.estudiante_id)
+
+    primera = client.post(
+        "/asistencia/registrar",
+        data={"metodo": "CARNET", "identificador": alumno.carnet_codigo},
+        headers={"X-Requested-With": "fetch"},
+    )
+    assert primera.status_code == 409
+    contexto = primera.get_json()
+    assert contexto["requiere_motivo"] is True
+    assert contexto["asistencia"]["estado"] == "AUSENTE"
+
+    correccion = client.post(
+        "/asistencia/registrar",
+        data={
+            "metodo": "CARNET",
+            "identificador": alumno.carnet_codigo,
+            "motivo": "Olvido de carnet al ingresar",
+        },
+        headers={"X-Requested-With": "fetch"},
+    )
+    assert correccion.status_code == 200
+    assert correccion.get_json()["ok"] is True
+
+    db.expire_all()
+    actualizada = db.get(AsistenciaModel, ausencia.id)
+    assert actualizada.estado in ("PUNTUAL", "TARDANZA")
+    assert actualizada.estado_anterior == "AUSENTE"
+    assert actualizada.motivo_correccion == "Olvido de carnet al ingresar"
+
+
+def test_formulario_html_muestra_correccion_solo_para_ausente(client, db) -> None:
+    iniciar_sesion(client)
+    ausencia = db.scalars(
+        select(AsistenciaModel).where(
+            AsistenciaModel.fecha_escolar == FECHA_PRUEBA,
+            AsistenciaModel.estado == "AUSENTE",
+        )
+    ).first()
+    alumno = db.get(EstudianteModel, ausencia.estudiante_id)
+
+    respuesta = client.post(
+        "/asistencia/registrar",
+        data={"metodo": "CARNET", "identificador": alumno.carnet_codigo},
+        follow_redirects=True,
+    )
+    texto = respuesta.get_data(as_text=True)
+    assert respuesta.status_code == 200
+    assert 'id="motivo-correccion"' in texto
+    assert 'name="motivo"' in texto
+
+
 def test_registro_duplicado_muestra_advertencia(client, db) -> None:
     iniciar_sesion(client)
     existente = db.scalars(
@@ -146,6 +235,15 @@ def test_justificaciones_solo_para_roles_gestores(client) -> None:
     iniciar_sesion(client, CREDENCIALES_COORD)
     respuesta = client.get("/justificaciones")
     assert respuesta.status_code == 403
+
+
+def test_wizard_de_justificaciones_incluye_tarjeta_de_contexto(client, db) -> None:
+    iniciar_sesion(client)
+    texto = client.get("/justificaciones?fecha=2026-11-11").get_data(as_text=True)
+    assert "data-tarjeta-contexto" in texto
+    assert "data-nombre=" in texto
+    assert "data-salon=" in texto
+    assert "data-estado=\"AUSENTE\"" in texto
 
 
 def test_admin_registra_justificacion_medica(client, db) -> None:
