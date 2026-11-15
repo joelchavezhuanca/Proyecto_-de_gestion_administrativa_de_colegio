@@ -11,6 +11,7 @@ from src.dominio.usuarios import EstadoUsuario, RolUsuario
 from src.infraestructura.base_datos import crear_engine, crear_fabrica_sesiones
 from src.infraestructura.datos_demo import inicializar_datos_demo
 from src.infraestructura.repositorios import RepositorioColegio
+from src.infraestructura.whatsapp import crear_notificador_desde_entorno
 from src.presentacion.tiempo import hora_institucional
 
 RAIZ_PROYECTO = Path(__file__).resolve().parents[2]
@@ -52,6 +53,10 @@ def create_app(configuracion: dict | None = None) -> Flask:
     fabrica = crear_fabrica_sesiones(engine)
     app.extensions["colegio_engine"] = engine
     app.extensions["colegio_sesiones"] = fabrica
+    # Proveedor de WhatsApp: simulado salvo que el entorno configure Meta o Twilio.
+    app.extensions["whatsapp_notificador"] = (
+        app.config.get("WHATSAPP_NOTIFICADOR") or crear_notificador_desde_entorno()
+    )
 
     if app.config.get("SEED_DEMO", True):
         with fabrica() as sesion:
@@ -78,7 +83,9 @@ def _registrar_ciclo_peticion(app: Flask, fabrica) -> None:
         g.db_sesion = fabrica()
         g.repositorio = RepositorioColegio(g.db_sesion)
         g.servicio = ServicioAplicacionColegio(
-            g.repositorio, reloj_institucional=current_app.config["RELOJ"]
+            g.repositorio,
+            reloj_institucional=current_app.config["RELOJ"],
+            notificador=current_app.extensions["whatsapp_notificador"],
         )
         g.usuario = _usuario_de_sesion(g.repositorio)
 
@@ -118,6 +125,10 @@ def _usuario_de_sesion(repositorio: RepositorioColegio):
 
 
 def _registrar_filtros_y_contexto(app: Flask) -> None:
+    from src.presentacion.rutas import enmascarar_celular
+
+    app.add_template_filter(enmascarar_celular, "celular_enmascarado")
+
     @app.template_filter("fecha_corta")
     def fecha_corta(valor: date | None) -> str:
         return valor.strftime("%d/%m/%Y") if valor else "—"

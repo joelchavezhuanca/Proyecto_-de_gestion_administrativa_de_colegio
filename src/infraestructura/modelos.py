@@ -59,6 +59,9 @@ class EstudianteModel(Base):
     seccion: Mapped[str] = mapped_column(String(5), nullable=False)  # A, B, C
     carnet_codigo: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
     estado: Mapped[str] = mapped_column(String(20), default="ACTIVO", nullable=False)
+    # Contacto del apoderado para el aviso de ingreso por WhatsApp (PBI-17).
+    apoderado_nombre: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    apoderado_celular: Mapped[str | None] = mapped_column(String(20), nullable=True)
     creado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=hora_actual_utc, nullable=False
     )
@@ -212,3 +215,31 @@ class AuditoriaModel(Base):
     entidad_id: Mapped[str] = mapped_column(String(60), nullable=False)
     detalle: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
 
+
+
+class NotificacionWhatsappModel(Base):
+    """Bandeja de avisos de ingreso enviados al apoderado por WhatsApp (PBI-17)."""
+
+    __tablename__ = "notificaciones_whatsapp"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    evento_id: Mapped[str] = mapped_column(String(60), nullable=False, index=True)
+    asistencia_id: Mapped[str] = mapped_column(String(60), nullable=False, index=True)
+    estudiante_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("estudiantes.id"), nullable=False, index=True
+    )
+    fecha_escolar: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    hora_ingreso: Mapped[time] = mapped_column(Time, nullable=False)
+    apoderado_nombre: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    destino: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    mensaje: Mapped[str] = mapped_column(Text, nullable=False)
+    proveedor: Mapped[str] = mapped_column(String(20), nullable=False)
+    # SIMULADO, ENVIADO, ERROR o SIN_CONTACTO
+    estado: Mapped[str] = mapped_column(String(20), nullable=False)
+    referencia: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    detalle: Mapped[str | None] = mapped_column(Text, nullable=True)
+    creado_en: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=hora_actual_utc, nullable=False
+    )
+
+    estudiante: Mapped["EstudianteModel"] = relationship("EstudianteModel")

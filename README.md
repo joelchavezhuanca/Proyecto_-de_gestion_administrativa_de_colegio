@@ -25,7 +25,7 @@ El alcance principal del Sprint 1 comprende los PBI-01, PBI-02 y PBI-03, junto c
 | PBI-04 | Justificaciones escolares, categorías, motivos y reversión; requiere período académico abierto. | Dominio e interfaz web implementados |
 | PBI-15 | Control de acceso basado en roles y validaciones de autorización. | RBAC aplicado en servidor y navegación |
 | PBI-16 | Auditoría inmutable con persistencia append-only. | Planificado para Sprint 2 |
-| PBI-17 | Notificaciones a apoderados mediante un flujo desacoplado. | Planificado para Sprint 2 |
+| PBI-17 | Notificaciones a apoderados mediante un flujo desacoplado. | Aviso de ingreso por WhatsApp implementado (simulado; listo para Meta o Twilio) |
 
 Los roles oficiales del sistema son **ADMIN**, **COORDINADOR** y **ADMIN_STAFF**. ADMIN es el único autorizado para gestionar cuentas y configurar la hora oficial de cierre.
 
@@ -62,8 +62,8 @@ La guía completa —instalación, reinicio de datos, credenciales, pantallas, d
 - **Persistencia:** SQLAlchemy 2.0 con modelos tipados, relaciones 1:N y eliminación en cascada. Las pruebas ORM usan SQLite en memoria con claves foráneas activadas.
 - **Interfaz web:** Flask + Jinja2 con las cinco pantallas solicitadas, navegación por roles, validaciones en línea, datos de demostración y persistencia SQLite local.
 - **Asistencia por cámara:** lectura QR en el navegador con `html5-qrcode` local, cámara trasera/frontal según dispositivo, debounce, cuenta regresiva y liberación de la cámara al cambiar de contexto.
-- **Capacidades en desarrollo:** PBI-04 y PBI-15 cuentan con dominio, pruebas e interfaz web; la auditoría completa (PBI-16) y las notificaciones (PBI-17) siguen pendientes.
-- **Integraciones planificadas:** el envío de notificaciones por WhatsApp está previsto para Sprint 2. El dominio genera el evento, pero no existe un adaptador de envío activo.
+- **Capacidades en desarrollo:** PBI-04 y PBI-15 cuentan con dominio, pruebas e interfaz web; la auditoría completa (PBI-16) sigue pendiente.
+- **Aviso por WhatsApp al apoderado (PBI-17):** cada ingreso confirmado envía al apoderado la hora de entrada del alumno. Funciona en modo simulado por defecto y queda listo para Meta WhatsApp Cloud API o Twilio mediante variables de entorno (ver la guía de ejecución).
 
 ## Estructura del proyecto
 

@@ -5,6 +5,7 @@ La capa de presentación y los casos de uso nunca manipulan modelos ORM ni SQL.
 
 import json
 from collections.abc import Iterable
+from dataclasses import dataclass
 from datetime import date, datetime, time
 
 from sqlalchemy import select
@@ -36,9 +37,32 @@ from src.infraestructura.modelos import (
     ConfiguracionModel,
     EstudianteModel,
     JustificacionModel,
+    NotificacionWhatsappModel,
     PeriodoAcademicoModel,
     UsuarioModel,
 )
+
+
+@dataclass(frozen=True)
+class ContactoApoderado:
+    nombre: str | None
+    celular: str | None
+
+
+@dataclass(frozen=True)
+class AvisoApoderado:
+    """Aviso de ingreso enviado (o intentado) al apoderado por WhatsApp."""
+
+    id: int
+    alumno_id: int
+    alumno_nombre: str
+    apoderado_nombre: str | None
+    destino: str | None
+    hora_ingreso: time
+    mensaje: str
+    proveedor: str
+    estado: str
+    detalle: str | None
 
 
 class RepositorioColegio:
@@ -421,3 +445,78 @@ class RepositorioColegio:
         )
         self.sesion.add(modelo)
         self.sesion.flush()
+
+    # ------------------------------------------------------------------
+    # Avisos al apoderado por WhatsApp (PBI-17)
+    # ------------------------------------------------------------------
+    def obtener_contacto_apoderado(self, alumno_id: int) -> ContactoApoderado:
+        modelo = self.sesion.get(EstudianteModel, alumno_id)
+        if modelo is None:
+            return ContactoApoderado(nombre=None, celular=None)
+        return ContactoApoderado(
+            nombre=modelo.apoderado_nombre, celular=modelo.apoderado_celular
+        )
+
+    @staticmethod
+    def _aviso_dominio(modelo: NotificacionWhatsappModel) -> AvisoApoderado:
+        estudiante = modelo.estudiante
+        return AvisoApoderado(
+            id=modelo.id,
+            alumno_id=modelo.estudiante_id,
+            alumno_nombre=(
+                f"{estudiante.nombres} {estudiante.apellidos}" if estudiante else "—"
+            ),
+            apoderado_nombre=modelo.apoderado_nombre,
+            destino=modelo.destino,
+            hora_ingreso=modelo.hora_ingreso,
+            mensaje=modelo.mensaje,
+            proveedor=modelo.proveedor,
+            estado=modelo.estado,
+            detalle=modelo.detalle,
+        )
+
+    def registrar_aviso_apoderado(
+        self,
+        *,
+        evento_id: str,
+        asistencia_id: str,
+        alumno_id: int,
+        fecha_escolar: date,
+        hora_ingreso: time,
+        apoderado_nombre: str | None,
+        destino: str | None,
+        mensaje: str,
+        proveedor: str,
+        estado: str,
+        referencia: str | None = None,
+        detalle: str | None = None,
+    ) -> AvisoApoderado:
+        modelo = NotificacionWhatsappModel(
+            evento_id=evento_id,
+            asistencia_id=asistencia_id,
+            estudiante_id=alumno_id,
+            fecha_escolar=fecha_escolar,
+            hora_ingreso=hora_ingreso,
+            apoderado_nombre=apoderado_nombre,
+            destino=destino,
+            mensaje=mensaje,
+            proveedor=proveedor,
+            estado=estado,
+            referencia=referencia,
+            detalle=detalle,
+        )
+        self.sesion.add(modelo)
+        self.sesion.flush()
+        return self._aviso_dominio(modelo)
+
+    def listar_avisos_apoderado(
+        self, fecha_escolar: date, limite: int = 10
+    ) -> list[AvisoApoderado]:
+        modelos = self.sesion.scalars(
+            select(NotificacionWhatsappModel)
+            .options(joinedload(NotificacionWhatsappModel.estudiante))
+            .where(NotificacionWhatsappModel.fecha_escolar == fecha_escolar)
+            .order_by(NotificacionWhatsappModel.id.desc())
+            .limit(limite)
+        ).all()
+        return [self._aviso_dominio(m) for m in modelos]

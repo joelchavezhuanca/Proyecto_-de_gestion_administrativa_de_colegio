@@ -9,202 +9,170 @@
 {% endblock %}
 
 {% block contenido %}
-{% if error %}
-  <div class="alert alert-error" role="alert">
-    <span class="alert-text">{{ error }}</span>
-  </div>
-{% endif %}
-
-<section class="card">
-  <div class="card-head">
-    <div>
-      <h2>Modo de operación</h2>
-      <p class="muted">Seleccione el mecanismo de lectura. El operador autenticado queda asociado al registro.</p>
+<section class="card registro-unificado" aria-labelledby="registro-unificado-titulo">
+  <div class="card-head registro-cabecera">
+    <div class="registro-head">
+      <span class="registro-icono" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+          <rect x="4" y="4" width="6" height="6" rx="1.2"/>
+          <rect x="14" y="4" width="6" height="6" rx="1.2"/>
+          <rect x="4" y="14" width="6" height="6" rx="1.2"/>
+          <path d="M14 14h2v2h-2zM18 18h2v2h-2zM14 20h2M20 14h1" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <div class="registro-head-texto">
+        <p class="registro-kicker">Asistencia del día</p>
+        <h2 id="registro-unificado-titulo">Registro unificado</h2>
+        <p class="muted">Escanee el carnet, escriba el DNI o busque por nombre. El sistema detecta el método y registra la asistencia con la hora del servidor.</p>
+      </div>
     </div>
-    <span class="meta-line">{{ icono('reloj') }} {{ fecha|fecha_corta }} · {{ hora_sistema|hora_corta }}</span>
+    <span class="meta-line registro-meta">{{ icono('reloj') }} {{ fecha|fecha_corta }} · {{ hora_sistema|hora_corta }}</span>
   </div>
 
-  <div class="segmented" role="radiogroup" aria-label="Modo de registro" data-modo-inicial="{{ form.metodo or 'CARNET' }}">
-    <label class="segmented-option">
-      <input type="radio" name="selector-modo" value="CARNET" checked>
-      <span>1. Escáner de carnet</span>
-    </label>
-    <label class="segmented-option">
-      <input type="radio" name="selector-modo" value="MANUAL_DNI">
-      <span>2. Manual por DNI</span>
-    </label>
-    <label class="segmented-option">
-      <input type="radio" name="selector-modo" value="MANUAL_BUSQUEDA">
-      <span>3. Búsqueda asistida</span>
-    </label>
+  <div class="registro-pistas" aria-label="Métodos de registro disponibles">
+    <span class="registro-pista"><span class="registro-pista-dot"></span>Carnet</span>
+    <span class="registro-pista"><span class="registro-pista-dot"></span>DNI</span>
+    <span class="registro-pista"><span class="registro-pista-dot"></span>Nombre o código</span>
   </div>
 
-  <!-- Modo carnet -->
-  <div class="modo-panel" data-modo-panel="CARNET">
-    <div class="segmented segmented-secundario" role="radiogroup" aria-label="Tipo de lector de carnet" data-lector-inicial="USB">
-      <label class="segmented-option">
-        <input type="radio" name="selector-lector" value="USB" checked>
-        <span>Pistola / Escáner USB</span>
-      </label>
-      <label class="segmented-option">
-        <input type="radio" name="selector-lector" value="CAMARA">
-        <span>Cámara del dispositivo</span>
-      </label>
+  {% if error %}
+    <div class="alert alert-error" role="alert">
+      <span class="alert-text">{{ error }}</span>
     </div>
+  {% endif %}
 
-    <div class="lector-panel" data-lector-panel="USB">
-      <form method="post" action="{{ url_for('asistencia.registrar_asistencia') }}" class="form" data-form-carnet>
-        <input type="hidden" name="metodo" value="CARNET">
-        <div class="field field-grande">
-          <label for="carnet">Código del carnet</label>
-          <input id="carnet" name="identificador" type="text" autocomplete="off"
-                 placeholder="Ej. CRN-EDU-70000001" value="{{ form.identificador if form.metodo == 'CARNET' else '' }}"
-                 autofocus data-foco-modo>
-          <p class="field-help">El escáner físico escribe el código y presiona Enter. También puede escribirlo manualmente.</p>
+  <div class="registro-paneles" data-registro-paneles>
+    <div class="panel-camara" id="panel-camara" data-panel-camara>
+      <div class="camara-cabecera">
+        <div class="camara-titulo">
+          <p class="registro-kicker">Lector QR</p>
+          <h3>Escanear carnet</h3>
+          <p class="muted small">Apunta el código al centro del recuadro para leerlo.</p>
         </div>
-        <button class="btn btn-primario" type="submit">Registrar ingreso</button>
-      </form>
-    </div>
+        <div class="camara-acciones">
+          <button class="btn btn-secundario" type="button" data-iniciar-camara hidden>
+            Iniciar cámara
+          </button>
+          <button class="btn btn-secundario" type="button" data-detener-camara hidden>
+            Detener cámara
+          </button>
+          <button class="btn btn-secundario" type="button" data-cerrar-camara>
+            Cerrar escáner
+          </button>
+        </div>
+      </div>
 
-    <div class="lector-panel" data-lector-panel="CAMARA" hidden>
-      <div class="camara-toolbar">
-        <button class="btn btn-primario" type="button" data-iniciar-camara>Iniciar cámara</button>
-        <button class="btn btn-secundario" type="button" data-detener-camara hidden>Detener cámara</button>
+      <div class="camara-marco">
+        <div class="qr-reader" id="lector-qr" data-lector-qr aria-live="polite"></div>
+        <span class="camara-linea" aria-hidden="true"></span>
+      </div>
+
+      <div class="camara-pie">
         <div class="field camara-selector">
           <label for="camara-dispositivo">Cámara</label>
           <select id="camara-dispositivo" data-camara-select disabled>
             <option value="">Detección automática</option>
           </select>
         </div>
+        <p class="field-help" data-camara-estado aria-live="polite">
+          La decodificación del QR ocurre en el navegador. El video no se envía al servidor.
+        </p>
+      </div>
+    </div>
+
+    <form method="post" action="{{ url_for('asistencia.registrar_asistencia') }}"
+          class="form" data-form-unificado>
+      <input type="hidden" name="metodo" value="CARNET" data-metodo-unificado>
+      <input type="hidden" name="alumno_id" value="" data-alumno-id-unificado>
+
+      <div class="field field-grande registro-campo">
+        <label for="identificador">Carnet, DNI, código o nombre del alumno</label>
+        <div class="registro-input">
+          <span class="registro-input-icono" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">
+              <circle cx="11" cy="11" r="6"/>
+              <path d="M20 20l-3.5-3.5" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <input id="identificador" name="identificador" type="text" autocomplete="off"
+                 placeholder="Ej. CRN-EDU-70000001, 70000001, ALU-2026-001 o Luna"
+                 value="{{ form.identificador or '' }}"
+                 data-entrada-unificada autofocus
+                 aria-describedby="unificado-ayuda unificado-mensaje">
+          <kbd class="registro-tecla">Enter</kbd>
+        </div>
+        <p class="field-help" id="unificado-ayuda">
+          Carnet: escanee o escriba el código y presione Enter. DNI: 8 dígitos.
+          Nombre o código interno: escriba al menos 2 caracteres y seleccione un resultado.
+        </p>
+        <p class="field-message" id="unificado-mensaje" data-mensaje-unificado
+           aria-live="polite"></p>
       </div>
 
-      <div class="qr-reader" id="lector-qr" data-lector-qr aria-live="polite"></div>
-      <p class="field-help" data-camara-estado aria-live="polite">
-        La decodificación del QR ocurre en el navegador. El video no se envía al servidor.
-      </p>
-
-      <div class="tarjeta-resultado-asistencia" data-resultado-qr hidden aria-live="assertive">
-        <div class="resultado-icono" data-resultado-icono aria-hidden="true">✓</div>
-        <div class="resultado-cuerpo">
-          <p class="resultado-eyebrow" data-resultado-eyebrow>Registro confirmado</p>
-          <h3 data-resultado-titulo>—</h3>
-          <p class="muted" data-resultado-alumno>—</p>
-          <dl class="resultado-detalle">
-            <div><dt>Hora</dt><dd data-resultado-hora>—</dd></div>
-            <div><dt>Estado</dt><dd data-resultado-estado>—</dd></div>
-            <div><dt>Tardanza</dt><dd data-resultado-tardanza>—</dd></div>
-            <div><dt>Método</dt><dd data-resultado-metodo>—</dd></div>
-          </dl>
-          <div class="resultado-acciones">
-            <button class="btn btn-secundario" type="button" data-escanear-siguiente>
-              Escanear siguiente <span data-cuenta-regresiva></span>
-            </button>
-          </div>
-        </div>
+      <div class="registro-atajos">
+        <button class="btn btn-secundario btn-camara" type="button" data-abrir-camara
+                aria-expanded="true" aria-controls="panel-camara">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M4 8h3l1.5-2h7L17 8h3v11H4z" stroke-linejoin="round"/>
+            <circle cx="12" cy="13" r="3.2"/>
+          </svg>
+          <span>Escanear con cámara</span>
+        </button>
+        <button class="btn btn-secundario btn-limpiar" type="button" data-limpiar-unificado>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/>
+          </svg>
+          <span>Limpiar</span>
+        </button>
       </div>
 
-      <div class="correccion-qr" data-correccion-qr hidden aria-live="assertive">
-        <h3>Corrección de ausencia</h3>
-        <p class="muted" data-correccion-mensaje>El alumno figura AUSENTE. Ingrese el motivo para actualizar su estado.</p>
-        <div class="tarjeta-alumno" data-correccion-alumno></div>
-        <div class="field">
-          <label for="motivo-qr">Motivo de la corrección</label>
-          <textarea id="motivo-qr" rows="3" data-motivo-qr
-                    placeholder="Describa el motivo por el que el alumno ingresa después del cierre"></textarea>
-        </div>
-        <div class="wizard-actions">
-          <button class="btn btn-secundario" type="button" data-cancelar-correccion-qr>Cancelar</button>
-          <button class="btn btn-primario" type="button" data-confirmar-correccion-qr>Confirmar corrección</button>
-        </div>
+      <div class="resultados-busqueda" data-resultados-unificados aria-live="polite"></div>
+      <div class="tarjeta-alumno" data-tarjeta-unificada hidden></div>
+
+      <button class="btn btn-primario btn-bloque registro-btn-principal" type="submit">
+        <span>Registrar ingreso</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M5 12h14M13 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </form>
+  </div>
+
+  <div class="tarjeta-resultado-asistencia" data-resultado-qr hidden aria-live="assertive">
+    <div class="resultado-icono" data-resultado-icono aria-hidden="true">✓</div>
+    <div class="resultado-cuerpo">
+      <p class="resultado-eyebrow" data-resultado-eyebrow>Registro confirmado</p>
+      <h3 data-resultado-titulo>—</h3>
+      <p class="muted" data-resultado-alumno>—</p>
+      <dl class="resultado-detalle">
+        <div><dt>Hora</dt><dd data-resultado-hora>—</dd></div>
+        <div><dt>Estado</dt><dd data-resultado-estado>—</dd></div>
+        <div><dt>Tardanza</dt><dd data-resultado-tardanza>—</dd></div>
+        <div><dt>Método</dt><dd data-resultado-metodo>—</dd></div>
+      </dl>
+      <p class="resultado-whatsapp" data-resultado-whatsapp hidden aria-live="polite"></p>
+      <div class="resultado-acciones">
+        <button class="btn btn-secundario" type="button" data-escanear-siguiente>
+          Registrar siguiente <span data-cuenta-regresiva></span>
+        </button>
       </div>
     </div>
   </div>
 
-  <!-- Modo DNI -->
-  <div class="modo-panel" data-modo-panel="MANUAL_DNI" hidden>
-    <form method="post" action="{{ url_for('asistencia.registrar_asistencia') }}" class="form" data-form-dni>
-      <input type="hidden" name="metodo" value="MANUAL_DNI">
-      <input type="hidden" name="identificador" value="" data-identificador-dni>
-
-      <ol class="stepper" aria-label="Pasos del registro manual">
-        <li class="step activo" data-paso-indicador="1"><span>1</span> DNI</li>
-        <li class="step" data-paso-indicador="2"><span>2</span> Alumno</li>
-        <li class="step" data-paso-indicador="3"><span>3</span> Confirmar</li>
-      </ol>
-
-      <div class="wizard-step" data-paso="1">
-        <div class="field field-grande">
-          <label for="dni-manual">DNI del alumno</label>
-          <input id="dni-manual" name="dni_visual" type="text" inputmode="numeric" maxlength="8"
-                 autocomplete="off" placeholder="8 dígitos" aria-describedby="dni-mensaje">
-          <p class="field-message" id="dni-mensaje" data-dni-mensaje aria-live="polite"></p>
-        </div>
-        <button class="btn btn-secundario" type="button" data-verificar-dni>Verificar alumno</button>
-      </div>
-
-      <div class="wizard-step" data-paso="2" hidden>
-        <div class="tarjeta-alumno" data-tarjeta-dni hidden></div>
-        <div class="wizard-actions">
-          <button class="btn btn-secundario" type="button" data-volver-paso="1">Volver</button>
-          <button class="btn btn-primario" type="button" data-ir-paso="3">Continuar</button>
-        </div>
-      </div>
-
-      <div class="wizard-step" data-paso="3" hidden>
-        <div class="alert alert-info" role="note">
-          <span class="alert-text">Si el alumno figura AUSENTE, el sistema solicitará el motivo de corrección después de confirmar. La vista normal de ingreso permanece limpia.</span>
-        </div>
-        <div class="wizard-actions">
-          <button class="btn btn-secundario" type="button" data-volver-paso="2">Volver</button>
-          <button class="btn btn-primario" type="submit">Confirmar asistencia</button>
-        </div>
-      </div>
-    </form>
-  </div>
-
-  <!-- Modo búsqueda -->
-  <div class="modo-panel" data-modo-panel="MANUAL_BUSQUEDA" hidden>
-    <form method="post" action="{{ url_for('asistencia.registrar_asistencia') }}" class="form" data-form-busqueda>
-      <input type="hidden" name="metodo" value="MANUAL_BUSQUEDA">
-      <input type="hidden" name="alumno_id" value="" data-alumno-id-busqueda>
-
-      <ol class="stepper" aria-label="Pasos de la búsqueda asistida">
-        <li class="step activo" data-paso-indicador="1"><span>1</span> Buscar</li>
-        <li class="step" data-paso-indicador="2"><span>2</span> Seleccionar</li>
-        <li class="step" data-paso-indicador="3"><span>3</span> Confirmar</li>
-      </ol>
-
-      <div class="wizard-step" data-paso="1">
-        <div class="field field-grande">
-          <label for="busqueda">Nombres, apellidos, DNI o código</label>
-          <div class="input-with-action">
-            <input id="busqueda" type="search" autocomplete="off" placeholder="Ej. Luna, 70000001 o ALU-2026-001"
-                   aria-describedby="busqueda-ayuda">
-            <button class="input-action" type="button" data-buscar-alumno>Buscar</button>
-          </div>
-          <p class="field-help" id="busqueda-ayuda">Solo se muestran alumnos ACTIVO.</p>
-        </div>
-        <div class="resultados-busqueda" data-resultados-busqueda aria-live="polite"></div>
-      </div>
-
-      <div class="wizard-step" data-paso="2" hidden>
-        <div class="tarjeta-alumno" data-tarjeta-busqueda hidden></div>
-        <div class="wizard-actions">
-          <button class="btn btn-secundario" type="button" data-volver-paso="1">Volver</button>
-          <button class="btn btn-primario" type="button" data-ir-paso="3">Continuar</button>
-        </div>
-      </div>
-
-      <div class="wizard-step" data-paso="3" hidden>
-        <div class="alert alert-info" role="note">
-          <span class="alert-text">Si el alumno figura AUSENTE, el sistema solicitará el motivo de corrección después de confirmar. La vista normal de ingreso permanece limpia.</span>
-        </div>
-        <div class="wizard-actions">
-          <button class="btn btn-secundario" type="button" data-volver-paso="2">Volver</button>
-          <button class="btn btn-primario" type="submit">Confirmar asistencia</button>
-        </div>
-      </div>
-    </form>
+  <div class="correccion-qr" data-correccion-qr hidden aria-live="assertive">
+    <h3>Corrección de ausencia</h3>
+    <p class="muted" data-correccion-mensaje>El alumno figura AUSENTE. Ingrese el motivo para actualizar su estado.</p>
+    <div class="tarjeta-alumno" data-correccion-alumno></div>
+    <div class="field">
+      <label for="motivo-qr">Motivo de la corrección</label>
+      <textarea id="motivo-qr" rows="3" data-motivo-qr
+                placeholder="Describa el motivo por el que el alumno ingresa después del cierre"></textarea>
+      <p class="field-message" data-correccion-error aria-live="polite"></p>
+    </div>
+    <div class="wizard-actions">
+      <button class="btn btn-secundario" type="button" data-cancelar-correccion-qr>Cancelar</button>
+      <button class="btn btn-primario" type="button" data-confirmar-correccion-qr>Confirmar corrección</button>
+    </div>
   </div>
 </section>
 
@@ -301,6 +269,40 @@
     {% endif %}
     <p class="nota-demo">Estos datos son ficticios y existen únicamente para la presentación académica.</p>
   </aside>
+</section>
+
+{% set chip_aviso = {'SIMULADO': 'info', 'ENVIADO': 'ok', 'ERROR': 'danger', 'SIN_CONTACTO': 'warn'} %}
+{% set texto_aviso = {'SIMULADO': 'Enviado (simulado)', 'ENVIADO': 'Enviado', 'ERROR': 'No enviado', 'SIN_CONTACTO': 'Sin celular'} %}
+<section class="card avisos-whatsapp" aria-labelledby="avisos-whatsapp-titulo">
+  <div class="card-head">
+    <div>
+      <h2 id="avisos-whatsapp-titulo">Avisos por WhatsApp a apoderados</h2>
+      <p class="muted">Cada ingreso confirmado envía al apoderado la hora de entrada del alumno.</p>
+    </div>
+    {% if avisos_whatsapp and avisos_whatsapp[0].proveedor == 'SIMULADO' %}
+      <span class="chip chip-info"><span class="chip-dot" aria-hidden="true"></span>Modo simulado</span>
+    {% endif %}
+  </div>
+  <ul class="lista-avisos" data-lista-avisos>
+    {% for aviso in avisos_whatsapp %}
+      <li class="aviso-item">
+        <div class="aviso-cabecera">
+          <span class="mono">{{ aviso.hora_ingreso|hora_corta }}</span>
+          <strong>{{ aviso.alumno_nombre }}</strong>
+          <span class="chip chip-{{ chip_aviso.get(aviso.estado, 'neutral') }}"><span class="chip-dot" aria-hidden="true"></span>{{ texto_aviso.get(aviso.estado, aviso.estado) }}</span>
+        </div>
+        <p class="aviso-destino">Para: {{ aviso.apoderado_nombre or 'Apoderado' }} · <span class="mono">{{ aviso.destino|celular_enmascarado }}</span></p>
+        <p class="aviso-burbuja">{{ aviso.mensaje }}</p>
+        {% if aviso.estado == 'ERROR' and aviso.detalle %}
+          <p class="aviso-error">{{ aviso.detalle }}</p>
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+  <div class="empty-state" data-avisos-vacio {% if avisos_whatsapp %}hidden{% endif %}>
+    <strong>Todavía no se enviaron avisos hoy.</strong>
+    <p>Al registrar un ingreso, el mensaje al apoderado aparecerá aquí.</p>
+  </div>
 </section>
 {% endblock %}
 

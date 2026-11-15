@@ -8,6 +8,7 @@ cierre) pertenecen a ``src/dominio``.
 import time as reloj
 from datetime import date, datetime, time
 
+from src.aplicacion.mensajes_apoderado import construir_mensaje_ingreso
 from src.dominio.aforo import (
     CierreYaEjecutadoException,
     EventoCierreDiario,
@@ -45,16 +46,30 @@ from src.dominio.usuarios import (
     Usuario,
     UsuarioException,
 )
-from src.infraestructura.repositorios import RepositorioColegio
+from src.infraestructura.repositorios import AvisoApoderado, RepositorioColegio
+from src.infraestructura.whatsapp import (
+    MensajeWhatsApp,
+    NotificadorSimulado,
+    NotificadorWhatsApp,
+)
 from src.presentacion.tiempo import hora_institucional
+
+ESTADO_SIN_CONTACTO = "SIN_CONTACTO"
+
 
 
 class ServicioAplicacionColegio:
     """Fachada de casos de uso para Flask."""
 
-    def __init__(self, repositorio: RepositorioColegio, reloj_institucional=hora_institucional):
+    def __init__(
+        self,
+        repositorio: RepositorioColegio,
+        reloj_institucional=hora_institucional,
+        notificador: NotificadorWhatsApp | None = None,
+    ):
         self.repo = repositorio
         self._reloj = reloj_institucional
+        self._notificador = notificador or NotificadorSimulado()
 
     def ahora(self) -> datetime:
         return self._reloj()
@@ -192,6 +207,59 @@ class ServicioAplicacionColegio:
         )
         milisegundos = int((reloj.perf_counter() - inicio) * 1000)
         return resultado, milisegundos
+
+    def notificar_ingreso_apoderado(
+        self, resultado: ResultadoRegistroAsistencia
+    ) -> AvisoApoderado | None:
+        """Envía por WhatsApp el aviso de ingreso al apoderado y lo deja registrado.
+
+        Solo actúa cuando el dominio emitió ``evento_whatsapp`` (ingreso PUNTUAL o
+        con TARDANZA). Un fallo del proveedor queda como estado ERROR y nunca
+        anula la asistencia ya registrada.
+        """
+        evento = resultado.evento_whatsapp
+        if evento is None:
+            return None
+        alumno = self.repo.obtener_alumno(evento.alumno_id)
+        if alumno is None:
+            return None
+
+        contacto = self.repo.obtener_contacto_apoderado(alumno.id)
+        texto, variables = construir_mensaje_ingreso(
+            alumno,
+            contacto.nombre,
+            evento.fecha_escolar,
+            evento.hora_efectiva,
+            evento.estado,
+            evento.minutos_tardanza,
+        )
+        if contacto.celular:
+            envio = self._notificador.enviar(
+                MensajeWhatsApp(destino=contacto.celular, texto=texto, variables=variables)
+            )
+            proveedor, estado = envio.proveedor, envio.estado
+            referencia, detalle = envio.referencia, envio.detalle
+        else:
+            proveedor, estado = self._notificador.proveedor, ESTADO_SIN_CONTACTO
+            referencia, detalle = None, "El alumno no tiene celular de apoderado registrado."
+
+        return self.repo.registrar_aviso_apoderado(
+            evento_id=evento.id,
+            asistencia_id=evento.asistencia_id,
+            alumno_id=alumno.id,
+            fecha_escolar=evento.fecha_escolar,
+            hora_ingreso=evento.hora_efectiva,
+            apoderado_nombre=contacto.nombre,
+            destino=contacto.celular,
+            mensaje=texto,
+            proveedor=proveedor,
+            estado=estado,
+            referencia=referencia,
+            detalle=detalle,
+        )
+
+    def listar_avisos_apoderado(self, limite: int = 10) -> list[AvisoApoderado]:
+        return self.repo.listar_avisos_apoderado(self.ahora().date(), limite)
 
     def buscar_alumnos(self, criterio: str) -> list[Alumno]:
         return self.repo.buscar_alumnos(criterio)

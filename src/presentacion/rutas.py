@@ -1,5 +1,6 @@
 """Rutas Flask delgadas: validan entrada web y delegan en los casos de uso."""
 
+import logging
 from datetime import date
 
 from flask import (
@@ -33,6 +34,15 @@ from src.dominio.usuarios import (
 )
 from src.infraestructura.datos_demo import CREDENCIALES_DEMO
 from src.presentacion.seguridad import login_requerido, roles_requeridos
+
+logger = logging.getLogger(__name__)
+
+_ESTADOS_AVISO = {
+    "SIMULADO": "Enviado (simulado)",
+    "ENVIADO": "Enviado",
+    "ERROR": "No enviado",
+    "SIN_CONTACTO": "Sin celular",
+}
 
 bp_auth = Blueprint("auth", __name__)
 bp_principal = Blueprint("main", __name__)
@@ -213,6 +223,7 @@ def _contexto_asistencia(**extra):
             for registro in asistencias[:8]
         ],
         "sugeridos": sugeridos,
+        "avisos_whatsapp": g.servicio.listar_avisos_apoderado(),
         "form": {},
         "error": None,
         "correccion": None,
@@ -250,6 +261,46 @@ def _serializar_asistencia(registro: RegistroAsistencia | None) -> dict[str, obj
         "hora": registro.hora_efectiva.strftime("%H:%M:%S"),
         "minutos_tardanza": registro.minutos_tardanza,
         "metodo": registro.metodo.value,
+    }
+
+
+def enmascarar_celular(celular: str | None) -> str:
+    """Muestra solo el inicio y los 3 últimos dígitos: +51 912 *** 345."""
+    if not celular:
+        return "—"
+    digitos = celular.lstrip("+")
+    if len(digitos) < 9:
+        return celular
+    nacional = digitos[-9:]
+    prefijo = digitos[:-9]
+    inicio = f"+{prefijo} " if prefijo else ""
+    return f"{inicio}{nacional[:3]} *** {nacional[-3:]}"
+
+
+def _notificar_apoderado(resultado):
+    """Envía el aviso de WhatsApp tras confirmar la asistencia, sin poner en riesgo el registro."""
+    try:
+        aviso = g.servicio.notificar_ingreso_apoderado(resultado)
+        g.db_sesion.commit()
+        return aviso
+    except Exception:  # noqa: BLE001 - la asistencia ya quedó confirmada
+        g.db_sesion.rollback()
+        logger.exception("No se pudo registrar el aviso de WhatsApp al apoderado.")
+        return None
+
+
+def _serializar_aviso(aviso) -> dict[str, object] | None:
+    if aviso is None:
+        return None
+    return {
+        "estado": aviso.estado,
+        "estado_texto": _ESTADOS_AVISO.get(aviso.estado, aviso.estado),
+        "proveedor": aviso.proveedor,
+        "apoderado": aviso.apoderado_nombre,
+        "destino": enmascarar_celular(aviso.destino),
+        "mensaje": aviso.mensaje,
+        "hora": aviso.hora_ingreso.strftime("%H:%M"),
+        "alumno": aviso.alumno_nombre,
     }
 
 
@@ -338,6 +389,7 @@ def registrar_asistencia():
         )
 
     mensaje = _mensaje_confirmacion(resultado.asistencia, milisegundos)
+    aviso = _notificar_apoderado(resultado)
     if _quiere_json():
         alumno = g.repositorio.obtener_alumno(resultado.asistencia.alumno_id)
         return jsonify(
@@ -350,8 +402,12 @@ def registrar_asistencia():
                 "minutos_tardanza": resultado.asistencia.minutos_tardanza,
                 "metodo": resultado.asistencia.metodo.value,
                 "milisegundos": milisegundos,
+                "whatsapp": _serializar_aviso(aviso),
             }
         )
+
+    if aviso is not None:
+        mensaje += f" WhatsApp al apoderado: {_ESTADOS_AVISO.get(aviso.estado, aviso.estado)}."
 
     flash(
         mensaje,

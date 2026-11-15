@@ -217,7 +217,10 @@ Las pruebas web están en `tests/test_web.py` y verifican login, protección de 
 
 1. **Cierre diario reservado a ADMIN.** La especificación reserva la configuración de la hora al ADMIN, pero no detalla el rol del botón de cierre. Se optó por la opción conservadora: una acción irreversible que marca ausencias solo la ejecuta `ADMIN`. La interfaz lo informa.
 2. **Lectura por cámara sujeta a permisos y hardware.** El modo cámara requiere que el navegador permita el acceso al dispositivo y que el equipo tenga una cámara disponible. La lectura de QR trabaja en el cliente; si la librería local no carga, se informa en pantalla. El escáner USB sigue disponible como alternativa.
-3. **Notificaciones WhatsApp no implementadas.** El dominio genera `EventoAsistenciaConfirmada`, pero no se envía nada. PBI-17 sigue pendiente.
+3. **Aviso por WhatsApp al apoderado (PBI-17), simulado por defecto.** Cada ingreso confirmado (PUNTUAL o TARDANZA, por carnet, DNI o búsqueda) genera un mensaje al apoderado con el nombre del alumno, la fecha y la hora de ingreso. Se guarda en `notificaciones_whatsapp` y se ve en la sección *Avisos por WhatsApp a apoderados* de la pantalla de asistencia. Sin configuración no sale a internet (modo simulado). Para el envío real se definen variables de entorno antes de `python run.py`:
+   - Meta: `WHATSAPP_PROVEEDOR=meta`, `META_WHATSAPP_TOKEN`, `META_WHATSAPP_PHONE_NUMBER_ID` y `META_WHATSAPP_PLANTILLA` (plantilla aprobada con 4 variables: alumno, fecha, hora, estado), opcional `META_WHATSAPP_IDIOMA` (por defecto `es`).
+   - Twilio: `WHATSAPP_PROVEEDOR=twilio`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` y `TWILIO_WHATSAPP_FROM`.
+   Si el proveedor falla, la asistencia igual queda registrada y el aviso figura como *No enviado*. Los apoderados y celulares sembrados son ficticios.
 4. **Auditoría mínima.** Se persiste una bitácora append-only básica en `auditoria_eventos`; no sustituye la implementación completa de PBI-16.
 5. **Sin CSRF explícito.** La aplicación está pensada para ejecución local de demostración. Antes de un despliegue real debe añadirse protección CSRF, cookies seguras y una `SECRET_KEY` propia.
 6. **SQLite de demostración.** No se migra ni reemplaza una persistencia productiva. La base es local y desechable.

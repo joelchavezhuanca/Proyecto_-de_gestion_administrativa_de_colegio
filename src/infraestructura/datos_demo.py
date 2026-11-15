@@ -118,6 +118,34 @@ _APELLIDOS = [
     "Palacios",
 ]
 
+_NOMBRES_APODERADOS = [
+    "Rosa",
+    "Carlos",
+    "Elena",
+    "Javier",
+    "Marisol",
+    "Héctor",
+    "Gladys",
+    "Raúl",
+    "Patricia",
+    "Wilber",
+    "Nélida",
+    "Óscar",
+]
+
+
+def contacto_apoderado_demo(indice: int, apellidos: str) -> tuple[str, str]:
+    """Apoderado y celular ficticios, deterministas a partir del índice del alumno.
+
+    Los números siguen el formato de celular peruano (+51 9XXXXXXXX) pero son
+    inventados para la demostración.
+    """
+    nombre = _NOMBRES_APODERADOS[(indice - 1) % len(_NOMBRES_APODERADOS)]
+    primer_apellido = apellidos.split()[0]
+    celular = f"+519{(10_000_000 + indice * 7_919) % 100_000_000:08d}"
+    return f"{nombre} {primer_apellido}", celular
+
+
 _GRUPOS = [
     ("Primaria", "1ro", "A", 10),
     ("Primaria", "3ro", "A", 10),
@@ -150,16 +178,20 @@ def _crear_estudiantes(sesion: Session) -> list[EstudianteModel]:
         for _ in range(cantidad):
             contador += 1
             dni = f"{70000000 + contador:08d}"
+            apellidos = _APELLIDOS[(contador * 3) % len(_APELLIDOS)]
+            apoderado, celular = contacto_apoderado_demo(contador, apellidos)
             estudiante = EstudianteModel(
                 codigo=f"ALU-2026-{contador:03d}",
                 dni=dni,
                 nombres=_NOMBRES[(contador - 1) % len(_NOMBRES)],
-                apellidos=_APELLIDOS[(contador * 3) % len(_APELLIDOS)],
+                apellidos=apellidos,
                 nivel=nivel,
                 grado=grado,
                 seccion=seccion,
                 carnet_codigo=f"CRN-EDU-{dni}",
                 estado="ACTIVO",
+                apoderado_nombre=apoderado,
+                apoderado_celular=celular,
             )
             sesion.add(estudiante)
             estudiantes.append(estudiante)
@@ -239,6 +271,7 @@ def inicializar_datos_demo(sesion: Session, ahora=None) -> bool:
     ahora = ahora or hora_institucional()
     total_usuarios = sesion.scalar(select(func.count(UsuarioModel.id))) or 0
     if total_usuarios:
+        completar_apoderados_demo(sesion)
         return False
 
     _crear_usuarios(sesion)
@@ -286,3 +319,17 @@ def inicializar_datos_demo(sesion: Session, ahora=None) -> bool:
 
     sesion.commit()
     return True
+
+
+def completar_apoderados_demo(sesion: Session) -> int:
+    """Asigna apoderado ficticio a los alumnos de una base anterior que no lo tienen."""
+    pendientes = sesion.scalars(
+        select(EstudianteModel).where(EstudianteModel.apoderado_celular.is_(None))
+    ).all()
+    for estudiante in pendientes:
+        apoderado, celular = contacto_apoderado_demo(estudiante.id, estudiante.apellidos)
+        estudiante.apoderado_nombre = estudiante.apoderado_nombre or apoderado
+        estudiante.apoderado_celular = celular
+    if pendientes:
+        sesion.commit()
+    return len(pendientes)
