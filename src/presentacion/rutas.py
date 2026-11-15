@@ -600,12 +600,12 @@ def editar_usuario(usuario_id: int):
     except UsuarioException as excepcion:
         flash(str(excepcion), "error")
         return redirect(url_for("usuarios.detalle_usuario", usuario_id=usuario_id))
-    else:
-        flash(
-            f"La cuenta '{actualizado.username}' se actualizó correctamente.",
-            "modal_success",
-        )
-        return redirect(url_for("usuarios.listar_usuarios"))
+
+    flash(
+        f"La cuenta '{actualizado.username}' se actualizó correctamente.",
+        "modal_success",
+    )
+    return redirect(url_for("usuarios.listar_usuarios"))
 
 
 @bp_usuarios.route("/usuarios/<int:usuario_id>/estado", methods=["POST"])
@@ -620,13 +620,13 @@ def cambiar_estado(usuario_id: int):
     except UsuarioException as excepcion:
         flash(str(excepcion), "error")
         return redirect(url_for("usuarios.detalle_usuario", usuario_id=usuario_id))
-    else:
-        flash(
-            f"El estado de la cuenta '{actualizado.username}' cambió a "
-            f"{actualizado.estado.value}.",
-            "modal_success",
-        )
-        return redirect(url_for("usuarios.listar_usuarios"))
+
+    flash(
+        f"El estado de la cuenta '{actualizado.username}' cambió a "
+        f"{actualizado.estado.value}.",
+        "modal_success",
+    )
+    return redirect(url_for("usuarios.listar_usuarios"))
 
 
 @bp_usuarios.route("/usuarios/<int:usuario_id>/password", methods=["POST"])
@@ -642,13 +642,13 @@ def restablecer_password(usuario_id: int):
     except UsuarioException as excepcion:
         flash(str(excepcion), "error")
         return redirect(url_for("usuarios.detalle_usuario", usuario_id=usuario_id))
-    else:
-        flash(
-            f"La credencial de la cuenta '{actualizado.username}' "
-            "se restableció correctamente.",
-            "modal_success",
-        )
-        return redirect(url_for("usuarios.listar_usuarios"))
+
+    flash(
+        f"La credencial de la cuenta '{actualizado.username}' "
+        "se restableció correctamente.",
+        "modal_success",
+    )
+    return redirect(url_for("usuarios.listar_usuarios"))
 
 
 @bp_usuarios.route("/api/usuarios/disponible")
