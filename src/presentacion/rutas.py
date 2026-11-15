@@ -556,8 +556,11 @@ def nuevo_usuario():
                 200,
             )
 
-        flash(f"La cuenta '{creado.username}' se creó correctamente.", "success")
-        return redirect(url_for("usuarios.detalle_usuario", usuario_id=creado.id))
+        flash(
+            f"La cuenta '{creado.username}' se creó correctamente.",
+            "modal_success",
+        )
+        return redirect(url_for("usuarios.listar_usuarios"))
 
     return render_template(
         "usuario_nuevo.html",
@@ -592,13 +595,17 @@ def editar_usuario(usuario_id: int):
         return redirect(url_for("usuarios.detalle_usuario", usuario_id=usuario_id))
 
     try:
-        g.servicio.modificar_usuario(g.usuario, usuario_id, nombre, rol)
+        actualizado = g.servicio.modificar_usuario(g.usuario, usuario_id, nombre, rol)
         g.db_sesion.commit()
     except UsuarioException as excepcion:
         flash(str(excepcion), "error")
+        return redirect(url_for("usuarios.detalle_usuario", usuario_id=usuario_id))
     else:
-        flash("Los datos de la cuenta se actualizaron.", "success")
-    return redirect(url_for("usuarios.detalle_usuario", usuario_id=usuario_id))
+        flash(
+            f"La cuenta '{actualizado.username}' se actualizó correctamente.",
+            "modal_success",
+        )
+        return redirect(url_for("usuarios.listar_usuarios"))
 
 
 @bp_usuarios.route("/usuarios/<int:usuario_id>/estado", methods=["POST"])
@@ -606,13 +613,20 @@ def editar_usuario(usuario_id: int):
 def cambiar_estado(usuario_id: int):
     nuevo_estado = (request.form.get("nuevo_estado") or "").strip()
     try:
-        g.servicio.cambiar_estado_usuario(g.usuario, usuario_id, nuevo_estado)
+        actualizado = g.servicio.cambiar_estado_usuario(
+            g.usuario, usuario_id, nuevo_estado
+        )
         g.db_sesion.commit()
     except UsuarioException as excepcion:
         flash(str(excepcion), "error")
+        return redirect(url_for("usuarios.detalle_usuario", usuario_id=usuario_id))
     else:
-        flash(f"El estado de la cuenta cambió a {nuevo_estado}.", "success")
-    return redirect(url_for("usuarios.detalle_usuario", usuario_id=usuario_id))
+        flash(
+            f"El estado de la cuenta '{actualizado.username}' cambió a "
+            f"{actualizado.estado.value}.",
+            "modal_success",
+        )
+        return redirect(url_for("usuarios.listar_usuarios"))
 
 
 @bp_usuarios.route("/usuarios/<int:usuario_id>/password", methods=["POST"])
@@ -623,13 +637,18 @@ def restablecer_password(usuario_id: int):
     try:
         if password != password_confirm:
             raise UsuarioException("Las contraseñas no coinciden.")
-        g.servicio.restablecer_password(g.usuario, usuario_id, password)
+        actualizado = g.servicio.restablecer_password(g.usuario, usuario_id, password)
         g.db_sesion.commit()
     except UsuarioException as excepcion:
         flash(str(excepcion), "error")
+        return redirect(url_for("usuarios.detalle_usuario", usuario_id=usuario_id))
     else:
-        flash("La credencial se restableció correctamente.", "success")
-    return redirect(url_for("usuarios.detalle_usuario", usuario_id=usuario_id))
+        flash(
+            f"La credencial de la cuenta '{actualizado.username}' "
+            "se restableció correctamente.",
+            "modal_success",
+        )
+        return redirect(url_for("usuarios.listar_usuarios"))
 
 
 @bp_usuarios.route("/api/usuarios/disponible")

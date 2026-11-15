@@ -49,4 +49,28 @@
       });
     });
   });
+
+  const modalConfirmacion = document.querySelector("[data-modal-confirmacion]");
+  if (modalConfirmacion) {
+    const cerrarModal = function () {
+      modalConfirmacion.hidden = true;
+    };
+
+    modalConfirmacion
+      .querySelectorAll("[data-cerrar-modal-confirmacion]")
+      .forEach(function (control) {
+        control.addEventListener("click", cerrarModal);
+      });
+
+    document.addEventListener("keydown", function (evento) {
+      if (evento.key === "Escape" && !modalConfirmacion.hidden) {
+        cerrarModal();
+      }
+    });
+
+    const botonEntendido = modalConfirmacion.querySelector("[data-foco-modal]");
+    if (botonEntendido) {
+      botonEntendido.focus();
+    }
+  }
 })();

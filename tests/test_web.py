@@ -4,6 +4,7 @@ Verifican que la presentación reutiliza los servicios de dominio y que las
 operaciones protegidas respetan la matriz RBAC existente.
 """
 
+import html as html_lib
 from datetime import date, datetime
 
 import pytest
@@ -380,9 +381,8 @@ def test_admin_restablece_password_sin_ver_la_anterior(client, db) -> None:
         follow_redirects=True,
     )
     assert respuesta.status_code == 200
-    assert "credencial de la cuenta 'jluna_qa' se restableció" in (
-        respuesta.get_data(as_text=True).lower()
-    )
+    texto = html_lib.unescape(respuesta.get_data(as_text=True)).lower()
+    assert "credencial de la cuenta 'jluna_qa' se restableció" in texto
 
     db.expire_all()
     usuario = db.get(UsuarioModel, 3)
@@ -397,8 +397,9 @@ def assert_modal_confirmacion(html: str, mensaje: str) -> None:
     assert 'aria-modal="true"' in html
     assert 'aria-labelledby="modal-confirmacion-titulo"' in html
     assert "Entendido" in html
-    assert mensaje in html
-    assert html.count(mensaje) == 1
+    texto_visible = html_lib.unescape(html)
+    assert mensaje in texto_visible
+    assert texto_visible.count(mensaje) == 1
 
 
 def test_crear_usuario_redirige_al_listado_y_muestra_modal(client) -> None:

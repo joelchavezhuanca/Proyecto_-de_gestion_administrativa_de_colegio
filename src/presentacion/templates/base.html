@@ -86,18 +86,48 @@
         Los datos de alumnos, asistencias y cuentas son ficticios. La hora utilizada es la del servidor.
       </div>
 
-      {% with mensajes = get_flashed_messages(with_categories=true) %}
-        {% if mensajes %}
-          <div class="flash-stack" aria-live="polite">
-            {% for categoria, mensaje in mensajes %}
+      {% set mensajes = get_flashed_messages(with_categories=true) %}
+      {% set modal_confirmacion = namespace(texto=None) %}
+      {% set alertas_normales = namespace(total=0) %}
+      {% for categoria, mensaje in mensajes %}
+        {% if categoria == "modal_success" %}
+          {% set modal_confirmacion.texto = mensaje %}
+        {% else %}
+          {% set alertas_normales.total = alertas_normales.total + 1 %}
+        {% endif %}
+      {% endfor %}
+
+      {% if alertas_normales.total %}
+        <div class="flash-stack" aria-live="polite">
+          {% for categoria, mensaje in mensajes %}
+            {% if categoria != "modal_success" %}
               <div class="alert alert-{{ categoria }}" role="status">
                 <span class="alert-text">{{ mensaje }}</span>
                 <button class="alert-close" type="button" data-cerrar-alerta aria-label="Cerrar mensaje">×</button>
               </div>
-            {% endfor %}
+            {% endif %}
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      {% if modal_confirmacion.texto %}
+        <div class="modal" id="modal-confirmacion" role="dialog" aria-modal="true"
+             aria-labelledby="modal-confirmacion-titulo" data-modal-confirmacion>
+          <div class="modal-backdrop" data-cerrar-modal-confirmacion></div>
+          <div class="modal-card">
+            <div class="modal-head">
+              <h2 id="modal-confirmacion-titulo">Operación completada</h2>
+              <button class="icon-button" type="button" data-cerrar-modal-confirmacion
+                      aria-label="Cerrar confirmación">×</button>
+            </div>
+            <p class="modal-confirmacion-texto">{{ modal_confirmacion.texto }}</p>
+            <div class="modal-actions">
+              <button class="btn btn-primario" type="button" data-cerrar-modal-confirmacion
+                      data-foco-modal>Entendido</button>
+            </div>
           </div>
-        {% endif %}
-      {% endwith %}
+        </div>
+      {% endif %}
 
       <main id="contenido" class="contenido">
         {% block contenido %}{% endblock %}

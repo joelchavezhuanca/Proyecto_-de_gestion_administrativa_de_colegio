@@ -1107,6 +1107,17 @@ fieldset.field legend {
   flex-wrap: wrap;
 }
 
+.modal-confirmacion-texto {
+  margin: 0;
+  padding: 12px 14px;
+  border-left: 4px solid var(--exito);
+  border-radius: var(--radio-sm);
+  background: var(--exito-suave);
+  color: #1d5222;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
 .checkbox-card {
   display: flex;
   gap: 10px;
