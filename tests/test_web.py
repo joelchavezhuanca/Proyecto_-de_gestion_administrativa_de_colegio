@@ -380,12 +380,149 @@ def test_admin_restablece_password_sin_ver_la_anterior(client, db) -> None:
         follow_redirects=True,
     )
     assert respuesta.status_code == 200
-    assert "credencial se restableció" in respuesta.get_data(as_text=True).lower()
+    assert "credencial de la cuenta 'jluna_qa' se restableció" in (
+        respuesta.get_data(as_text=True).lower()
+    )
 
     db.expire_all()
     usuario = db.get(UsuarioModel, 3)
     assert usuario is not None
     assert verificar_password("NuevaClave2026", usuario.password_hash, usuario.salt or "")
+
+
+def assert_modal_confirmacion(html: str, mensaje: str) -> None:
+    """Comprueba el modal de confirmación y que el mensaje no se duplique como alerta."""
+    assert "data-modal-confirmacion" in html
+    assert 'role="dialog"' in html
+    assert 'aria-modal="true"' in html
+    assert 'aria-labelledby="modal-confirmacion-titulo"' in html
+    assert "Entendido" in html
+    assert mensaje in html
+    assert html.count(mensaje) == 1
+
+
+def test_crear_usuario_redirige_al_listado_y_muestra_modal(client) -> None:
+    iniciar_sesion(client)
+    respuesta = client.post(
+        "/usuarios/nuevo",
+        data={
+            "nombre_completo": "Cuenta Modal",
+            "username": "cuenta_modal",
+            "rol": "ADMIN_STAFF",
+            "password": "ClaveSegura123",
+            "password_confirm": "ClaveSegura123",
+            "estado": "ACTIVO",
+        },
+    )
+    assert respuesta.status_code == 302
+    assert respuesta.headers["Location"].endswith("/usuarios")
+
+    html = client.get("/usuarios").get_data(as_text=True)
+    assert_modal_confirmacion(html, "La cuenta 'cuenta_modal' se creó correctamente.")
+
+
+def test_crear_usuario_con_error_conserva_el_formulario(client) -> None:
+    iniciar_sesion(client)
+    respuesta = client.post(
+        "/usuarios/nuevo",
+        data={
+            "nombre_completo": "Cuenta Fallida",
+            "username": "cuenta_fallida",
+            "rol": "ADMIN_STAFF",
+            "password": "ClaveSegura123",
+            "password_confirm": "OtraClave456",
+            "estado": "ACTIVO",
+        },
+    )
+    assert respuesta.status_code == 200
+    html = respuesta.get_data(as_text=True)
+    assert "Las contraseñas no coinciden." in html
+    assert 'value="Cuenta Fallida"' in html
+    assert 'value="cuenta_fallida"' in html
+    assert "data-modal-confirmacion" not in html
+
+
+def test_editar_usuario_redirige_al_listado_y_muestra_modal(client) -> None:
+    iniciar_sesion(client)
+    respuesta = client.post(
+        "/usuarios/2/editar",
+        data={"nombre_completo": "Coordinación Modal", "rol": "COORDINADOR"},
+    )
+    assert respuesta.status_code == 302
+    assert respuesta.headers["Location"].endswith("/usuarios")
+
+    html = client.get("/usuarios").get_data(as_text=True)
+    assert_modal_confirmacion(
+        html, "La cuenta 'coord_secundaria' se actualizó correctamente."
+    )
+
+
+def test_editar_usuario_con_nombre_vacio_permanece_en_detalle(client) -> None:
+    iniciar_sesion(client)
+    respuesta = client.post(
+        "/usuarios/2/editar",
+        data={"nombre_completo": "   ", "rol": "COORDINADOR"},
+    )
+    assert respuesta.status_code == 302
+    assert respuesta.headers["Location"].endswith("/usuarios/2")
+
+
+def test_editar_usuario_con_rol_invalido_permanece_en_detalle(client) -> None:
+    iniciar_sesion(client)
+    respuesta = client.post(
+        "/usuarios/2/editar",
+        data={"nombre_completo": "Coordinación Académica", "rol": "SUPERADMIN"},
+    )
+    assert respuesta.status_code == 302
+    assert respuesta.headers["Location"].endswith("/usuarios/2")
+
+
+def test_cambiar_estado_redirige_al_listado_y_muestra_modal(client) -> None:
+    iniciar_sesion(client)
+    respuesta = client.post("/usuarios/3/estado", data={"nuevo_estado": "INACTIVO"})
+    assert respuesta.status_code == 302
+    assert respuesta.headers["Location"].endswith("/usuarios")
+
+    html = client.get("/usuarios").get_data(as_text=True)
+    assert_modal_confirmacion(html, "El estado de la cuenta 'jluna_qa' cambió a INACTIVO.")
+
+
+def test_cambiar_estado_invalido_permanece_en_detalle(client) -> None:
+    iniciar_sesion(client)
+    respuesta = client.post("/usuarios/3/estado", data={"nuevo_estado": "SUSPENDIDO"})
+    assert respuesta.status_code == 302
+    assert respuesta.headers["Location"].endswith("/usuarios/3")
+
+
+def test_restablecer_password_redirige_al_listado_y_muestra_modal(client) -> None:
+    iniciar_sesion(client)
+    respuesta = client.post(
+        "/usuarios/3/password",
+        data={"password": "NuevaClave2026", "password_confirm": "NuevaClave2026"},
+    )
+    assert respuesta.status_code == 302
+    assert respuesta.headers["Location"].endswith("/usuarios")
+
+    html = client.get("/usuarios").get_data(as_text=True)
+    assert_modal_confirmacion(
+        html, "La credencial de la cuenta 'jluna_qa' se restableció correctamente."
+    )
+
+
+def test_restablecer_password_con_error_permanece_en_detalle(client) -> None:
+    iniciar_sesion(client)
+    respuesta = client.post(
+        "/usuarios/3/password",
+        data={"password": "NuevaClave2026", "password_confirm": "OtraClave2026"},
+    )
+    assert respuesta.status_code == 302
+    assert respuesta.headers["Location"].endswith("/usuarios/3")
+
+
+def test_mensajes_normales_siguen_apareciendo_en_el_flash_stack(client) -> None:
+    html = iniciar_sesion(client).get_data(as_text=True)
+    assert "Bienvenido(a), admin_general." in html
+    assert "data-modal-confirmacion" not in html
 
 
 def test_anular_justificacion_restaura_estado_anterior(client, db) -> None:
