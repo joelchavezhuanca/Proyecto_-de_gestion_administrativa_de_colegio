@@ -150,6 +150,22 @@ def _registrar(
     return ServicioJustificaciones.registrar_y_aprobar_justificacion(**datos)
 
 
+def _justificacion_compat(**cambios: object) -> Justificacion:
+    datos = {
+        "id": "just-compat",
+        "asistencia_id": "ast-compat",
+        "alumno_id": 101,
+        "fecha_solicitud": FECHA_SOLICITUD,
+        "categoria": CategoriaJustificacion.OTRA,
+        "motivo": "Compatibilidad",
+        "estado": EstadoJustificacion.APROBADA,
+        "usuario_id": 1,
+        "rol_usuario": RolUsuario.ADMIN,
+    }
+    datos.update(cambios)
+    return Justificacion(**datos)
+
+
 # ----------------------------------------------------------------------
 # Registro y anulación
 # ----------------------------------------------------------------------
@@ -664,3 +680,314 @@ def test_fecha_futura_sigue_siendo_rechazada(
             periodo,
             fecha_solicitud=date(2026, 11, 10),
         )
+
+
+# ----------------------------------------------------------------------
+# Cobertura de validaciones defensivas (REFACTOR)
+# ----------------------------------------------------------------------
+@pytest.mark.parametrize(
+    ("nombre", "tamano"),
+    [
+        ("", 100),
+        ("documento.pdf", "100"),
+        ("documento.pdf", True),
+    ],
+)
+def test_adjunto_rechaza_nombre_vacio_o_tamano_no_entero(
+    nombre: str, tamano: object
+) -> None:
+    with pytest.raises(AdjuntoInvalidoException):
+        AdjuntoJustificacion(nombre, tamano)  # type: ignore[arg-type]
+
+
+def test_justificacion_rechaza_adjuntos_no_sequence_o_item_invalido() -> None:
+    with pytest.raises(AdjuntoInvalidoException, match="colección"):
+        _justificacion_compat(adjuntos="archivo.pdf")
+
+    with pytest.raises(AdjuntoInvalidoException, match="AdjuntoJustificacion"):
+        _justificacion_compat(adjuntos=(object(),))
+
+
+def test_periodo_rechaza_nombre_vacio_anio_negativo_y_orden_invalido() -> None:
+    with pytest.raises(PeriodoInvalidoException):
+        PeriodoAcademico(
+            id=1,
+            nombre="",
+            fecha_inicio=date(2026, 3, 1),
+            fecha_fin=date(2026, 12, 20),
+        )
+
+    with pytest.raises(PeriodoInvalidoException):
+        PeriodoAcademico(
+            id=1,
+            nombre="Periodo",
+            fecha_inicio=date(2026, 3, 1),
+            fecha_fin=date(2026, 12, 20),
+            anio_lectivo=-1,
+        )
+
+    with pytest.raises(PeriodoInvalidoException):
+        PeriodoAcademico(
+            id=1,
+            nombre="Periodo",
+            fecha_inicio=date(2026, 3, 1),
+            fecha_fin=date(2026, 12, 20),
+            orden=0,
+        )
+
+
+def test_periodo_convierte_tipo_y_rechaza_tipo_invalido() -> None:
+    periodo = PeriodoAcademico(
+        id=1,
+        nombre="Trimestre I",
+        fecha_inicio=date(2026, 3, 1),
+        fecha_fin=date(2026, 7, 31),
+        tipo_periodo="trimestre",  # type: ignore[arg-type]
+    )
+    assert periodo.tipo_periodo == TipoPeriodo.TRIMESTRE
+
+    with pytest.raises(PeriodoInvalidoException):
+        PeriodoAcademico(
+            id=2,
+            nombre="Periodo inválido",
+            fecha_inicio=date(2026, 3, 1),
+            fecha_fin=date(2026, 7, 31),
+            tipo_periodo="ANUAL",  # type: ignore[arg-type]
+        )
+
+
+def test_justificacion_rechaza_minutos_negativos() -> None:
+    with pytest.raises(JustificacionException):
+        _justificacion_compat(minutos_tardanza_original=-1)
+
+
+def test_justificacion_denegada_sin_permiso_personalizado(
+    alumno: Alumno,
+    asistencia_ausente: RegistroAsistencia,
+    periodo: PeriodoAcademico,
+) -> None:
+    rol = Rol(
+        codigo="SOLO_LECTURA",
+        nombre="Solo lectura",
+        descripcion="Rol sin permiso para justificar",
+        permisos=frozenset({PermisoOperacion.CONSULTAR_HISTORIAL_ASISTENCIA}),
+    )
+    operador = UsuarioOperador(
+        id=70,
+        username="lector",
+        rol="SOLO_LECTURA",  # type: ignore[arg-type]
+    )
+
+    with pytest.raises(PermisoJustificacionException, match="no está autorizado"):
+        _registrar(
+            operador,
+            alumno,
+            asistencia_ausente,
+            periodo,
+            roles=[rol],
+        )
+
+
+def test_anular_rechaza_fecha_fuera_del_periodo(
+    coord_op: UsuarioOperador,
+    alumno: Alumno,
+    asistencia_ausente: RegistroAsistencia,
+    periodo: PeriodoAcademico,
+) -> None:
+    resultado = _registrar(coord_op, alumno, asistencia_ausente, periodo)
+    periodo_otro = replace(
+        periodo,
+        fecha_inicio=date(2027, 1, 1),
+        fecha_fin=date(2027, 2, 28),
+        fecha_limite_notas=date(2027, 2, 15),
+    )
+
+    with pytest.raises(JustificacionException, match="fuera del período"):
+        ServicioJustificaciones.anular_justificacion(
+            operador=coord_op,
+            justificacion=resultado.justificacion,
+            asistencia=resultado.asistencia_actualizada,
+            periodo=periodo_otro,
+        )
+
+
+def test_modificar_rechaza_fecha_fuera_del_periodo(
+    coord_op: UsuarioOperador,
+    alumno: Alumno,
+    asistencia_ausente: RegistroAsistencia,
+    periodo: PeriodoAcademico,
+) -> None:
+    resultado = _registrar(coord_op, alumno, asistencia_ausente, periodo)
+    periodo_otro = replace(
+        periodo,
+        fecha_inicio=date(2027, 1, 1),
+        fecha_fin=date(2027, 2, 28),
+        fecha_limite_notas=date(2027, 2, 15),
+    )
+
+    with pytest.raises(JustificacionException, match="fuera del período"):
+        ServicioJustificaciones.modificar_justificacion(
+            operador=coord_op,
+            justificacion=resultado.justificacion,
+            asistencia=resultado.asistencia_actualizada,
+            periodo=periodo_otro,
+        )
+
+
+def test_modificar_rechaza_asistencia_no_justificada(
+    coord_op: UsuarioOperador,
+    alumno: Alumno,
+    asistencia_ausente: RegistroAsistencia,
+    periodo: PeriodoAcademico,
+) -> None:
+    resultado = _registrar(coord_op, alumno, asistencia_ausente, periodo)
+    asistencia_original = replace(
+        resultado.asistencia_actualizada,
+        estado=EstadoAsistencia.AUSENTE,
+        estado_anterior=None,
+    )
+
+    with pytest.raises(JustificacionException, match="JUSTIFICADO"):
+        ServicioJustificaciones.modificar_justificacion(
+            operador=coord_op,
+            justificacion=resultado.justificacion,
+            asistencia=asistencia_original,
+            periodo=periodo,
+        )
+
+
+def test_modificar_rechaza_justificacion_no_aprobada(
+    coord_op: UsuarioOperador,
+    alumno: Alumno,
+    asistencia_ausente: RegistroAsistencia,
+    periodo: PeriodoAcademico,
+) -> None:
+    resultado = _registrar(coord_op, alumno, asistencia_ausente, periodo)
+    pendiente = replace(resultado.justificacion, estado=EstadoJustificacion.PENDIENTE)
+
+    with pytest.raises(JustificacionException, match="aprobadas"):
+        ServicioJustificaciones.modificar_justificacion(
+            operador=coord_op,
+            justificacion=pendiente,
+            asistencia=resultado.asistencia_actualizada,
+            periodo=periodo,
+        )
+
+
+def test_modificar_acepta_categoria_como_texto_y_rechaza_invalida(
+    coord_op: UsuarioOperador,
+    alumno: Alumno,
+    asistencia_ausente: RegistroAsistencia,
+    periodo: PeriodoAcademico,
+) -> None:
+    resultado = _registrar(coord_op, alumno, asistencia_ausente, periodo)
+
+    modificada = ServicioJustificaciones.modificar_justificacion(
+        operador=coord_op,
+        justificacion=resultado.justificacion,
+        asistencia=resultado.asistencia_actualizada,
+        periodo=periodo,
+        categoria="otra",  # type: ignore[arg-type]
+    )
+    assert modificada.justificacion.categoria == CategoriaJustificacion.OTRA
+
+    with pytest.raises(JustificacionException, match="inválida"):
+        ServicioJustificaciones.modificar_justificacion(
+            operador=coord_op,
+            justificacion=resultado.justificacion,
+            asistencia=resultado.asistencia_actualizada,
+            periodo=periodo,
+            categoria="INVALIDA",  # type: ignore[arg-type]
+        )
+
+
+def test_modificar_rechaza_motivo_vacio(
+    coord_op: UsuarioOperador,
+    alumno: Alumno,
+    asistencia_ausente: RegistroAsistencia,
+    periodo: PeriodoAcademico,
+) -> None:
+    resultado = _registrar(coord_op, alumno, asistencia_ausente, periodo)
+
+    with pytest.raises(JustificacionException, match="motivo"):
+        ServicioJustificaciones.modificar_justificacion(
+            operador=coord_op,
+            justificacion=resultado.justificacion,
+            asistencia=resultado.asistencia_actualizada,
+            periodo=periodo,
+            motivo="   ",
+        )
+
+
+def test_consultar_excluye_por_grado_seccion_categoria_estado_y_fecha_hasta(
+    coord_op: UsuarioOperador,
+    alumno: Alumno,
+    asistencia_ausente: RegistroAsistencia,
+    periodo: PeriodoAcademico,
+) -> None:
+    justificacion = _registrar(
+        coord_op, alumno, asistencia_ausente, periodo
+    ).justificacion
+    criterios = [
+        FiltroJustificaciones(grado="9no"),
+        FiltroJustificaciones(seccion="Z"),
+        FiltroJustificaciones(categoria=CategoriaJustificacion.OTRA),
+        FiltroJustificaciones(estado=EstadoJustificacion.RECHAZADA),
+        FiltroJustificaciones(fecha_hasta=date(2026, 1, 1)),
+    ]
+
+    for criterio in criterios:
+        assert (
+            ServicioJustificaciones.consultar_justificaciones(
+                [justificacion],
+                criterio,
+                operador=coord_op,
+            )
+            == []
+        )
+
+
+def test_servicio_periodos_rechaza_operador_inactivo(
+    admin_op: UsuarioOperador, periodo: PeriodoAcademico
+) -> None:
+    inactivo = replace(admin_op, activo=False)
+
+    with pytest.raises(PermisoJustificacionException, match="cuenta activa"):
+        ServicioPeriodosAcademicos.crear_periodo(inactivo, periodo, [])
+
+
+def test_servicio_periodos_rechaza_anio_cero_y_limite_notas_none(
+    admin_op: UsuarioOperador, periodo: PeriodoAcademico
+) -> None:
+    with pytest.raises(PeriodoInvalidoException, match="año lectivo"):
+        ServicioPeriodosAcademicos.crear_periodo(
+            admin_op,
+            replace(periodo, anio_lectivo=0),
+            [],
+        )
+
+    with pytest.raises(PeriodoInvalidoException, match="fecha límite"):
+        ServicioPeriodosAcademicos.crear_periodo(
+            admin_op,
+            replace(periodo, fecha_limite_notas=None),
+            [],
+        )
+
+
+def test_modificar_periodo_cambia_fechas_limite_y_estado(
+    admin_op: UsuarioOperador, periodo: PeriodoAcademico
+) -> None:
+    modificado = ServicioPeriodosAcademicos.modificar_periodo(
+        admin_op,
+        periodo,
+        [periodo],
+        fecha_inicio=date(2026, 3, 2),
+        fecha_fin=date(2026, 12, 19),
+        fecha_limite_notas=date(2026, 7, 1),
+        cerrado=True,
+    )
+
+    assert modificado.fecha_inicio == date(2026, 3, 2)
+    assert modificado.fecha_fin == date(2026, 12, 19)
+    assert modificado.fecha_limite_notas == date(2026, 7, 1)
+    assert modificado.cerrado is True
