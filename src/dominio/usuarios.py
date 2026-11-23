@@ -26,6 +26,8 @@ class PermisoOperacion(StrEnum):
     ASIGNAR_ROLES = "ASIGNAR_ROLES"
     CONFIGURAR_CIERRE_ASISTENCIA = "CONFIGURAR_CIERRE_ASISTENCIA"
     ADMINISTRAR_PERIODOS = "ADMINISTRAR_PERIODOS"
+    CONSULTAR_AUDITORIA = "CONSULTAR_AUDITORIA"
+    VERIFICAR_INTEGRIDAD_AUDITORIA = "VERIFICAR_INTEGRIDAD_AUDITORIA"
 
 
 # Matriz oficial de permisos de la especificación (Sección 15.3)
@@ -39,6 +41,8 @@ MATRIZ_PERMISOS: dict[RolUsuario, set[PermisoOperacion]] = {
         PermisoOperacion.ASIGNAR_ROLES,
         PermisoOperacion.CONFIGURAR_CIERRE_ASISTENCIA,
         PermisoOperacion.ADMINISTRAR_PERIODOS,
+        PermisoOperacion.CONSULTAR_AUDITORIA,
+        PermisoOperacion.VERIFICAR_INTEGRIDAD_AUDITORIA,
     },
     RolUsuario.COORDINADOR: {
         PermisoOperacion.REGISTRAR_ASISTENCIA,

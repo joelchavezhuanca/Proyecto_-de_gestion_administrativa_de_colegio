@@ -15,6 +15,7 @@ from src.dominio.asistencia import (
 )
 from src.dominio.auditoria import (
     HASH_GENESIS,
+    ZONA_HORARIA_LIMA,
     ContextoAcademicoAuditoria,
     DatoSensibleAuditoriaException,
     ErrorRegistroAuditoriaException,
@@ -25,7 +26,6 @@ from src.dominio.auditoria import (
     ResultadoVerificacionIntegridad,
     ServicioAuditoria,
     TipoOperacionAuditoria,
-    ZONA_HORARIA_LIMA,
 )
 from src.dominio.usuarios import (
     EstadoUsuario,
