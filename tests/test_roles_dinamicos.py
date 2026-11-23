@@ -713,3 +713,118 @@ def test_tiene_permiso_por_rol_base_personalizado_y_desconocido(
     assert not ServicioAutenticacionYPermisos.tiene_permiso(
         "DESCONOCIDO", PermisoOperacion.REGISTRAR_ASISTENCIA
     )
+
+
+# ----------------------------------------------------------------------
+# Cobertura de validaciones defensivas y revocación (REFACTOR)
+# ----------------------------------------------------------------------
+def test_normalizar_codigo_rol_rechaza_no_texto() -> None:
+    with pytest.raises(RolInvalidoException, match="texto"):
+        Rol(
+            codigo=123,  # type: ignore[arg-type]
+            nombre="Docente",
+            descripcion="Rol de docentes",
+            permisos=frozenset({PermisoOperacion.REGISTRAR_ASISTENCIA}),
+        )
+
+
+def test_rol_rechaza_permisos_no_iterables() -> None:
+    with pytest.raises(RolInvalidoException, match="colección"):
+        Rol(
+            codigo="DOCENTE",
+            nombre="Docente",
+            descripcion="Rol de docentes",
+            permisos="REGISTRAR_ASISTENCIA",  # type: ignore[arg-type]
+        )
+
+
+def test_rol_rechaza_permiso_de_tipo_invalido() -> None:
+    with pytest.raises(RolInvalidoException, match="catálogo"):
+        Rol(
+            codigo="DOCENTE",
+            nombre="Docente",
+            descripcion="Rol de docentes",
+            permisos=frozenset({123}),  # type: ignore[arg-type]
+        )
+
+
+def test_rol_rechaza_indicadores_no_booleanos() -> None:
+    with pytest.raises(RolInvalidoException, match="booleanos"):
+        Rol(
+            codigo="DOCENTE",
+            nombre="Docente",
+            descripcion="Rol de docentes",
+            permisos=frozenset({PermisoOperacion.REGISTRAR_ASISTENCIA}),
+            es_sistema="si",  # type: ignore[arg-type]
+        )
+
+
+def test_no_se_asigna_rol_personalizado_inactivo(
+    admin_user: Usuario, staff_user: Usuario, docente_rol: Rol
+) -> None:
+    with pytest.raises(RolInactivoException):
+        ServicioGestionUsuarios.modificar_usuario(
+            operador=admin_user,
+            usuario_target=staff_user,
+            nuevo_rol="DOCENTE",  # type: ignore[arg-type]
+            roles=[replace(docente_rol, activo=False)],
+        )
+
+
+def test_tiene_permiso_deny_by_default_para_permiso_invalido() -> None:
+    assert not ServicioAutenticacionYPermisos.tiene_permiso(
+        RolUsuario.ADMIN,
+        "NO_EXISTE",  # type: ignore[arg-type]
+    )
+
+
+def test_tiene_permiso_con_objeto_rol(docente_rol: Rol) -> None:
+    assert ServicioAutenticacionYPermisos.tiene_permiso(
+        docente_rol, PermisoOperacion.REGISTRAR_CALIFICACIONES
+    )
+    assert not ServicioAutenticacionYPermisos.tiene_permiso(
+        replace(docente_rol, activo=False),
+        PermisoOperacion.REGISTRAR_CALIFICACIONES,
+    )
+
+
+def test_tiene_permiso_con_codigo_de_rol_base() -> None:
+    assert ServicioAutenticacionYPermisos.tiene_permiso(
+        "ADMIN", PermisoOperacion.GESTIONAR_ROLES
+    )
+    assert not ServicioAutenticacionYPermisos.tiene_permiso(
+        "COORDINADOR", PermisoOperacion.GESTIONAR_ROLES
+    )
+
+
+def test_sesion_revocada_por_usuario_distinto(
+    docente_user: Usuario, docente_rol: Rol
+) -> None:
+    sesion = ServicioAutenticacionYPermisos.iniciar_sesion(
+        "docente_uno", "DocentePass123!", [docente_user], roles=[docente_rol]
+    )
+    otro_usuario = replace(docente_user, id=99)
+
+    with pytest.raises(SesionInvalidaException, match="revocada"):
+        ServicioAutenticacionYPermisos.validar_permiso(
+            sesion,
+            PermisoOperacion.REGISTRAR_CALIFICACIONES,
+            usuario_actual=otro_usuario,
+            roles=[docente_rol],
+        )
+
+
+def test_validar_permiso_rechaza_rol_actual_inactivo(
+    docente_user: Usuario, docente_rol: Rol
+) -> None:
+    sesion = ServicioAutenticacionYPermisos.iniciar_sesion(
+        "docente_uno", "DocentePass123!", [docente_user], roles=[docente_rol]
+    )
+
+    with pytest.raises(AccesoDenegadoException, match="activo"):
+        ServicioAutenticacionYPermisos.validar_permiso(
+            sesion,
+            PermisoOperacion.REGISTRAR_CALIFICACIONES,
+            rol_actual=replace(docente_rol, activo=False),
+            roles=[docente_rol],
+        )
