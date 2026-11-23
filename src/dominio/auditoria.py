@@ -11,7 +11,7 @@ import hashlib
 import json
 import uuid
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from enum import StrEnum
 from types import MappingProxyType
@@ -218,6 +218,12 @@ def _normalizar_fecha_hora(fecha_hora: datetime) -> datetime:
 
 
 def _a_jsonable(valor: object) -> object:
+    if isinstance(valor, ContextoAcademicoAuditoria):
+        return {
+            "nivel": valor.nivel,
+            "grado": valor.grado,
+            "seccion": valor.seccion,
+        }
     if isinstance(valor, Mapping):
         return {str(clave): _a_jsonable(item) for clave, item in valor.items()}
     if isinstance(valor, (list, tuple, set, frozenset)):
@@ -540,6 +546,4 @@ class ServicioAuditoria:
 
 def _reemplazar_hash(registro: RegistroAuditoria, hash_integridad: str) -> RegistroAuditoria:
     """Devuelve una copia con el hash calculado sin mutar el objeto original."""
-    from dataclasses import replace
-
     return replace(registro, hash_integridad=hash_integridad)

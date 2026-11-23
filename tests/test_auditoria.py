@@ -16,6 +16,7 @@ from src.dominio.asistencia import (
 from src.dominio.auditoria import (
     HASH_GENESIS,
     ZONA_HORARIA_LIMA,
+    AuditoriaException,
     ContextoAcademicoAuditoria,
     DatoSensibleAuditoriaException,
     ErrorRegistroAuditoriaException,
@@ -77,6 +78,23 @@ def _evento(**cambios) -> RegistroAuditoria:
     }
     datos.update(cambios)
     return ServicioAuditoria.registrar_evento(**datos)
+
+
+def _registro_invalido(**cambios) -> RegistroAuditoria:
+    datos = {
+        "id": "aud-invalido",
+        "secuencia": 1,
+        "fecha_hora": FECHA,
+        "usuario_id": 1,
+        "rol_ejecutante": "ADMIN",
+        "operacion": TipoOperacionAuditoria.REGISTRO_ASISTENCIA,
+        "entidad": "ASISTENCIA",
+        "entidad_id": "ast-001",
+        "resultado": ResultadoAuditoria.CONFIRMADA,
+        "detalle": {},
+    }
+    datos.update(cambios)
+    return RegistroAuditoria(**datos)
 
 
 # ----------------------------------------------------------------------
@@ -457,3 +475,101 @@ def test_fecha_utc_se_convierte_a_zona_lima() -> None:
 
     assert evento.fecha_hora.hour == 7
     assert evento.fecha_hora.utcoffset() == timedelta(hours=-5)
+
+
+# ----------------------------------------------------------------------
+# Cobertura de validaciones defensivas y caminos alternativos (REFACTOR)
+# ----------------------------------------------------------------------
+@pytest.mark.parametrize("campo", ["nivel", "grado", "seccion"])
+def test_contexto_academico_rechaza_campos_vacios(campo: str) -> None:
+    valores = {"nivel": "Secundaria", "grado": "3ro", "seccion": "A"}
+    valores[campo] = " "
+
+    with pytest.raises(AuditoriaException, match="contexto"):
+        ContextoAcademicoAuditoria(**valores)
+
+
+@pytest.mark.parametrize(
+    "cambios",
+    [
+        {"id": ""},
+        {"secuencia": 0},
+        {"fecha_hora": None},
+        {"usuario_id": -1},
+        {"rol_ejecutante": ""},
+        {"operacion": "NO_EXISTE"},
+        {"resultado": "NO_EXISTE"},
+        {"entidad": ""},
+        {"entidad_id": ""},
+        {"hash_integridad": "corto"},
+        {"detalle": ["no-mapa"]},
+    ],
+)
+def test_registro_rechaza_campos_invalidos(cambios: dict[str, object]) -> None:
+    with pytest.raises(AuditoriaException):
+        _registro_invalido(**cambios)
+
+
+def test_registro_acepta_operacion_y_resultado_como_texto() -> None:
+    registro = _registro_invalido(operacion="registro_asistencia", resultado="confirmada")
+
+    assert registro.operacion == TipoOperacionAuditoria.REGISTRO_ASISTENCIA
+    assert registro.resultado == ResultadoAuditoria.CONFIRMADA
+
+
+@pytest.mark.parametrize("cambios", [{"usuario_id": -1}, {"alumno_id": 0}])
+def test_filtro_rechaza_identificadores_invalidos(cambios: dict[str, int]) -> None:
+    with pytest.raises(AuditoriaException):
+        FiltroAuditoria(**cambios)
+
+
+def test_detalle_con_tipos_compuestos_genera_hash_estable() -> None:
+    evento = _evento(
+        detalle={
+            "lista": [1, 2],
+            "tupla": (3, 4),
+            "conjunto": {5},
+            "operacion": TipoOperacionAuditoria.CREAR_USUARIO,
+            "fecha": FECHA,
+        }
+    )
+
+    assert len(evento.hash_integridad) == 64
+
+
+def test_rechaza_claves_sensibles_dentro_de_listas() -> None:
+    with pytest.raises(DatoSensibleAuditoriaException):
+        _evento(detalle={"eventos": [{"token": "x"}]})
+
+
+def test_rechaza_evento_anterior_sin_hash() -> None:
+    evento = _evento()
+    sin_hash = replace(evento, hash_integridad="")
+
+    with pytest.raises(AuditoriaException, match="hash"):
+        _evento(eventos_existentes=[sin_hash])
+
+
+def test_consultar_eventos_filtra_por_rol_y_fecha_hasta(admin_user: Usuario) -> None:
+    eventos = _tres_eventos()
+
+    por_rol = ServicioAuditoria.consultar_eventos(
+        eventos, FiltroAuditoria(rol="admin_staff"), operador=admin_user
+    )
+    por_hasta = ServicioAuditoria.consultar_eventos(
+        eventos,
+        FiltroAuditoria(
+            fecha_hasta=datetime(2026, 11, 23, 7, 30, tzinfo=ZONA_HORARIA_LIMA)
+        ),
+        operador=admin_user,
+    )
+
+    assert [evento.id for evento in por_rol] == ["aud-002"]
+    assert [evento.id for evento in por_hasta] == ["aud-001"]
+
+
+def test_operador_inactivo_no_puede_consultar(admin_user: Usuario) -> None:
+    inactivo = replace(admin_user, estado=EstadoUsuario.INACTIVO)
+
+    with pytest.raises(PermisoAuditoriaException, match="activa"):
+        ServicioAuditoria.consultar_eventos([], operador=inactivo)
