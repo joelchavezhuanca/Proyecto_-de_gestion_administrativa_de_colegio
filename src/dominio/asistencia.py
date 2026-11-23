@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from datetime import date, datetime, time
 from enum import StrEnum
 
+from src.dominio.usuarios import RolUsuario
+
 
 class EstadoAsistencia(StrEnum):
     PUNTUAL = "PUNTUAL"
@@ -17,12 +19,6 @@ class MetodoRegistro(StrEnum):
     CARNET = "CARNET"
     MANUAL_DNI = "MANUAL_DNI"
     MANUAL_BUSQUEDA = "MANUAL_BUSQUEDA"
-
-
-class RolUsuario(StrEnum):
-    ADMIN = "ADMIN"
-    COORDINADOR = "COORDINADOR"
-    ADMIN_STAFF = "ADMIN_STAFF"
 
 
 class EstadoAlumno(StrEnum):

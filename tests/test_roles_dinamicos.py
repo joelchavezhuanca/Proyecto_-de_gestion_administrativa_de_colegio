@@ -6,10 +6,10 @@ from datetime import UTC, datetime
 import pytest
 
 from src.dominio.usuarios import (
+    MATRIZ_PERMISOS,
     AccesoDenegadoException,
     CuentaInactivaException,
     EstadoUsuario,
-    MATRIZ_PERMISOS,
     PermisoOperacion,
     Rol,
     RolInactivoException,
