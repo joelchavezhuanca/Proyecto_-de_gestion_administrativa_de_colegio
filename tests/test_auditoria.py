@@ -31,6 +31,8 @@ from src.dominio.auditoria import (
 from src.dominio.usuarios import (
     EstadoUsuario,
     EventoAuditoriaUsuario,
+    PermisoOperacion,
+    Rol,
     RolUsuario,
     Usuario,
 )
@@ -573,3 +575,86 @@ def test_operador_inactivo_no_puede_consultar(admin_user: Usuario) -> None:
 
     with pytest.raises(PermisoAuditoriaException, match="activa"):
         ServicioAuditoria.consultar_eventos([], operador=inactivo)
+
+
+# ----------------------------------------------------------------------
+# Compatibilidad con roles personalizados de PBI-15
+# ----------------------------------------------------------------------
+def _rol_auditor(permisos: frozenset[PermisoOperacion]) -> Rol:
+    return Rol(
+        codigo="AUDITOR_INTERNO",
+        nombre="Auditor Interno",
+        descripcion="Rol personalizado para consultar la auditoría",
+        permisos=permisos,
+    )
+
+
+def _operador_auditor() -> Usuario:
+    return Usuario(
+        id=7,
+        username="auditor_interno",
+        password_hash="hash-auditor",
+        salt="salt-auditor",
+        nombre_completo="Auditor Interno",
+        rol="AUDITOR_INTERNO",
+        estado=EstadoUsuario.ACTIVO,
+    )
+
+
+def test_rol_personalizado_con_permisos_consulta_y_verifica_auditoria() -> None:
+    rol = _rol_auditor(
+        frozenset(
+            {
+                PermisoOperacion.CONSULTAR_AUDITORIA,
+                PermisoOperacion.VERIFICAR_INTEGRIDAD_AUDITORIA,
+            }
+        )
+    )
+    operador = _operador_auditor()
+    primero = _evento()
+    segundo = _evento(eventos_existentes=[primero])
+
+    consultados = ServicioAuditoria.consultar_eventos(
+        [primero, segundo], operador=operador, roles=[rol]
+    )
+    verificacion = ServicioAuditoria.verificar_integridad(
+        [primero, segundo], operador=operador, roles=[rol]
+    )
+
+    assert [evento.id for evento in consultados] == [primero.id, segundo.id]
+    assert verificacion.integra is True
+
+
+def test_rol_personalizado_sin_permisos_lanza_permiso_auditoria() -> None:
+    rol = _rol_auditor(frozenset({PermisoOperacion.REGISTRAR_ASISTENCIA}))
+    operador = _operador_auditor()
+
+    with pytest.raises(PermisoAuditoriaException, match="AUDITOR_INTERNO"):
+        ServicioAuditoria.consultar_eventos([], operador=operador, roles=[rol])
+
+    with pytest.raises(PermisoAuditoriaException, match="AUDITOR_INTERNO"):
+        ServicioAuditoria.verificar_integridad([], operador=operador, roles=[rol])
+
+
+def test_desde_evento_asistencia_acepta_rol_personalizado() -> None:
+    evento_dominio = EventoAuditoria(
+        id="aud-ast-rol-custom",
+        evento_tipo="ASISTENCIA_REGISTRADA",
+        usuario_id=7,
+        rol="AUDITOR_INTERNO",
+        fecha_hora=FECHA,
+        operacion="REGISTRO_ASISTENCIA",
+        metodo=MetodoRegistro.CARNET,
+        alumno_id=10,
+        estado_anterior=None,
+        estado_nuevo=EstadoAsistencia.PUNTUAL,
+        motivo=None,
+    )
+
+    registro = ServicioAuditoria.desde_evento_asistencia(
+        evento_dominio,
+        asistencia_id="ast-rol-custom",
+        contexto=ContextoAcademicoAuditoria("Secundaria", "3ro", "A"),
+    )
+
+    assert registro.rol_ejecutante == "AUDITOR_INTERNO"
