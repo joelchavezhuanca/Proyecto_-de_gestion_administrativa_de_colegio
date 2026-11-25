@@ -525,12 +525,12 @@ def test_justificacion_anulacion_sin_estado_anterior_usa_ausente(
     assert restaurada.estado == EstadoAsistencia.AUSENTE
 
 
-def test_justificacion_denegada_coordinador_u_operador_inactivo(
+def test_justificacion_permitida_coordinador_y_denegada_operador_inactivo(
     coord_op: UsuarioOperador,
     alumnos_muestra: list[Alumno],
     periodo_activo: PeriodoAcademico,
 ) -> None:
-    """COORDINADOR no tiene permiso de gestión de justificaciones en esta versión."""
+    """COORDINADOR puede gestionar justificaciones; un operador inactivo no."""
     ast = RegistroAsistencia(
         id="ast-test",
         alumno_id=101,
@@ -542,17 +542,17 @@ def test_justificacion_denegada_coordinador_u_operador_inactivo(
         usuario_id=coord_op.id,
         rol_usuario=coord_op.rol,
     )
-    with pytest.raises(PermisoJustificacionException, match="no está autorizado"):
-        ServicioJustificaciones.registrar_y_aprobar_justificacion(
-            operador=coord_op,
-            alumno=alumnos_muestra[0],
-            asistencia=ast,
-            fecha_solicitud=date(2026, 11, 2),
-            fecha_actual=date(2026, 11, 2),
-            categoria=CategoriaJustificacion.MEDICA,
-            motivo="Prueba",
-            periodo=periodo_activo,
-        )
+    resultado = ServicioJustificaciones.registrar_y_aprobar_justificacion(
+        operador=coord_op,
+        alumno=alumnos_muestra[0],
+        asistencia=ast,
+        fecha_solicitud=date(2026, 11, 2),
+        fecha_actual=date(2026, 11, 2),
+        categoria=CategoriaJustificacion.MEDICA,
+        motivo="Prueba de coordinador",
+        periodo=periodo_activo,
+    )
+    assert resultado.asistencia_actualizada.estado == EstadoAsistencia.JUSTIFICADO
 
     op_inactivo = UsuarioOperador(
         id=99, username="staff_inac", rol=RolUsuario.ADMIN_STAFF, activo=False
