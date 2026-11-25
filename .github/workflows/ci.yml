@@ -2,7 +2,7 @@ name: Continuous Integration - Domingo Savio S.A.C.
 
 on:
   push:
-    branches: [ main, dev, 'feature/**' ]
+    branches: [ main, dev, 'feature/**', 'improvement/**', 'refactor/**', 'integration/**' ]
   pull_request:
     branches: [ main, dev ]
   workflow_dispatch:
