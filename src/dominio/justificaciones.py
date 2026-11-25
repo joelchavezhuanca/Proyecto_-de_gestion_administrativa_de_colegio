@@ -153,11 +153,14 @@ class PeriodoAcademico:
             except ValueError as error:
                 raise PeriodoInvalidoException("Tipo de período inválido.") from error
 
-        if self.fecha_limite_notas is not None and not (
-            self.fecha_inicio <= self.fecha_limite_notas <= self.fecha_fin
+        # La fecha límite de notas puede ser posterior a ``fecha_fin`` para que los
+        # docentes regularicen calificaciones al cierre del bimestre/trimestre.
+        if (
+            self.fecha_limite_notas is not None
+            and self.fecha_limite_notas < self.fecha_inicio
         ):
             raise PeriodoInvalidoException(
-                "La fecha límite de notas debe estar dentro del período."
+                "La fecha límite de notas no puede ser anterior al inicio del período."
             )
 
         object.__setattr__(self, "nombre", self.nombre.strip())
