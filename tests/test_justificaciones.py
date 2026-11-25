@@ -619,7 +619,7 @@ def test_rol_personalizado_con_permiso_puede_gestionar_justificaciones(
 # ----------------------------------------------------------------------
 # Validaciones de período y compatibilidad
 # ----------------------------------------------------------------------
-def test_periodo_rechaza_fechas_invertidas_y_limite_fuera_de_rango() -> None:
+def test_periodo_rechaza_fechas_invertidas_y_limite_antes_del_inicio() -> None:
     with pytest.raises(PeriodoInvalidoException):
         PeriodoAcademico(
             id=1,
@@ -634,8 +634,20 @@ def test_periodo_rechaza_fechas_invertidas_y_limite_fuera_de_rango() -> None:
             nombre="Periodo inválido",
             fecha_inicio=date(2026, 3, 1),
             fecha_fin=date(2026, 12, 20),
-            fecha_limite_notas=date(2027, 1, 10),
+            fecha_limite_notas=date(2026, 2, 28),
         )
+
+
+def test_periodo_permite_limite_notas_posterior_al_fin() -> None:
+    periodo = PeriodoAcademico(
+        id=1,
+        nombre="Cierre de bimestre",
+        fecha_inicio=date(2026, 3, 1),
+        fecha_fin=date(2026, 12, 20),
+        fecha_limite_notas=date(2027, 1, 10),
+    )
+
+    assert periodo.fecha_limite_notas == date(2027, 1, 10)
 
 
 def test_filtro_rechaza_rango_invertido() -> None:
