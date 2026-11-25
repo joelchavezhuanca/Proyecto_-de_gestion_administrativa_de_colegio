@@ -18,10 +18,12 @@ from types import MappingProxyType
 
 from src.dominio.asistencia import EventoAuditoria
 from src.dominio.usuarios import (
-    MATRIZ_PERMISOS,
     EstadoUsuario,
     EventoAuditoriaUsuario,
     PermisoOperacion,
+    Rol,
+    RolUsuario,
+    ServicioAutenticacionYPermisos,
     Usuario,
 )
 
@@ -340,10 +342,11 @@ class ServicioAuditoria:
         *,
         operador: Usuario,
         total_esperado: int | None = None,
+        roles: Sequence[Rol] | None = None,
     ) -> ResultadoVerificacionIntegridad:
         """Recalcula la cadena y detecta alteraciones, reordenamientos o borrados."""
         ServicioAuditoria._validar_permiso(
-            operador, PermisoOperacion.VERIFICAR_INTEGRIDAD_AUDITORIA
+            operador, PermisoOperacion.VERIFICAR_INTEGRIDAD_AUDITORIA, roles
         )
 
         alterados: list[str] = []
@@ -386,9 +389,12 @@ class ServicioAuditoria:
         filtro: FiltroAuditoria | None = None,
         *,
         operador: Usuario,
+        roles: Sequence[Rol] | None = None,
     ) -> list[RegistroAuditoria]:
         """Consulta la bitácora aplicando filtros y validando el permiso del operador."""
-        ServicioAuditoria._validar_permiso(operador, PermisoOperacion.CONSULTAR_AUDITORIA)
+        ServicioAuditoria._validar_permiso(
+            operador, PermisoOperacion.CONSULTAR_AUDITORIA, roles
+        )
         criterio = filtro or FiltroAuditoria()
 
         resultados = []
@@ -432,9 +438,12 @@ class ServicioAuditoria:
     ) -> RegistroAuditoria:
         """Adapta el DTO de auditoría de asistencia al registro inmutable del PBI-16."""
         estado_anterior = evento.estado_anterior.value if evento.estado_anterior else None
+        rol_ejecutante = (
+            evento.rol.value if isinstance(evento.rol, RolUsuario) else str(evento.rol)
+        )
         return ServicioAuditoria.registrar_evento(
             usuario_id=evento.usuario_id,
-            rol_ejecutante=evento.rol.value,
+            rol_ejecutante=rol_ejecutante,
             operacion=evento.operacion,
             entidad="ASISTENCIA",
             entidad_id=asistencia_id,
@@ -533,14 +542,23 @@ class ServicioAuditoria:
         return hashlib.sha256(f"{canonico}{registro.hash_anterior}".encode()).hexdigest()
 
     @staticmethod
-    def _validar_permiso(operador: Usuario, permiso: PermisoOperacion) -> None:
+    def _validar_permiso(
+        operador: Usuario,
+        permiso: PermisoOperacion,
+        roles: Sequence[Rol] | None = None,
+    ) -> None:
         if operador.estado != EstadoUsuario.ACTIVO:
             raise PermisoAuditoriaException(
                 "La cuenta del operador no se encuentra activa para consultar auditoría."
             )
-        if permiso not in MATRIZ_PERMISOS.get(operador.rol, set()):
+        if not ServicioAutenticacionYPermisos.tiene_permiso(operador.rol, permiso, roles=roles):
+            rol_texto = (
+                operador.rol.value
+                if isinstance(operador.rol, RolUsuario)
+                else str(operador.rol)
+            )
             raise PermisoAuditoriaException(
-                f"El rol {operador.rol.value} no tiene permiso para la operación '{permiso.value}'."
+                f"El rol {rol_texto} no tiene permiso para la operación '{permiso.value}'."
             )
 
 
