@@ -83,6 +83,12 @@ MATRIZ_PERMISOS: dict[RolUsuario, set[PermisoOperacion]] = {
 }
 
 
+# Claves que nunca deben viajar en un evento de auditoría (RN-13, PBI-16)
+_CLAVES_AUDITORIA_PROHIBIDAS = frozenset(
+    {"password", "password_plana", "password_hash", "salt", "token"}
+)
+
+
 class UsuarioException(Exception):
     """Excepción base para el módulo de usuarios y seguridad."""
 
@@ -301,9 +307,8 @@ class EventoAuditoriaUsuario:
     detalle: dict[str, str]
 
     def __post_init__(self) -> None:
-        claves_prohibidas = {"password", "password_plana", "password_hash", "salt", "token"}
         for clave in self.detalle:
-            if str(clave).strip().lower() in claves_prohibidas:
+            if str(clave).strip().lower() in _CLAVES_AUDITORIA_PROHIBIDAS:
                 raise UsuarioException(
                     "El detalle de auditoría no puede incluir el campo "
                     f"sensible '{clave}'."
