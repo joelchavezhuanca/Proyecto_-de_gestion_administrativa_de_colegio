@@ -1,10 +1,22 @@
+from __future__ import annotations
+
 import math
 import uuid
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, time
 from enum import StrEnum
+from typing import TYPE_CHECKING
 
-from src.dominio.usuarios import RolUsuario
+from src.dominio.usuarios import (
+    PermisoOperacion,
+    Rol,
+    RolUsuario,
+    ServicioAutenticacionYPermisos,
+)
+
+if TYPE_CHECKING:  # pragma: no cover - solo para anotaciones (evita import circular)
+    from src.dominio.auditoria import RegistroAuditoria
 
 
 class EstadoAsistencia(StrEnum):
@@ -80,7 +92,7 @@ class Alumno:
 class UsuarioOperador:
     id: int
     username: str
-    rol: RolUsuario
+    rol: RolUsuario | str
     activo: bool = True
 
 
@@ -94,10 +106,13 @@ class RegistroAsistencia:
     minutos_tardanza: int
     metodo: MetodoRegistro
     usuario_id: int
-    rol_usuario: RolUsuario
+    rol_usuario: RolUsuario | str
     estado_anterior: EstadoAsistencia | None = None
     motivo_correccion: str | None = None
     auditoria_id: str | None = None
+    nivel: str | None = None
+    grado: str | None = None
+    seccion: str | None = None
 
 
 @dataclass(frozen=True)
@@ -105,7 +120,7 @@ class EventoAuditoria:
     id: str
     evento_tipo: str
     usuario_id: int
-    rol: RolUsuario
+    rol: RolUsuario | str
     fecha_hora: datetime
     operacion: str
     metodo: MetodoRegistro
@@ -133,6 +148,7 @@ class ResultadoRegistroAsistencia:
     asistencia: RegistroAsistencia
     auditoria: EventoAuditoria
     evento_whatsapp: EventoAsistenciaConfirmada | None
+    registro_auditoria_pbi16: RegistroAuditoria | None = None
 
 
 HORA_OFICIAL_INGRESO = time(7, 0, 0)
@@ -151,14 +167,19 @@ def calcular_estado_y_tardanza(hora_ingreso: time) -> tuple[EstadoAsistencia, in
     return EstadoAsistencia.TARDANZA, minutos
 
 
-def validar_operador(operador: UsuarioOperador) -> None:
-    """Verifica autenticación, estado activo y rol oficial autorizado."""
+def validar_operador(
+    operador: UsuarioOperador,
+    permiso: PermisoOperacion = PermisoOperacion.REGISTRAR_ASISTENCIA,
+    roles: Sequence[Rol] | None = None,
+) -> None:
+    """Verifica cuenta activa y permiso en servidor (roles base y personalizados, PBI-15)."""
     if not operador.activo:
         raise RolNoAutorizadoException("El operador no cuenta con una cuenta activa.")
 
-    roles_permitidos = {RolUsuario.ADMIN, RolUsuario.COORDINADOR, RolUsuario.ADMIN_STAFF}
-    if operador.rol not in roles_permitidos:
-        raise RolNoAutorizadoException(f"El rol {operador.rol} no está autorizado.")
+    if not ServicioAutenticacionYPermisos.tiene_permiso(operador.rol, permiso, roles=roles):
+        raise RolNoAutorizadoException(
+            f"El rol {operador.rol} no está autorizado para {permiso.value}."
+        )
 
 
 def validar_alumno(alumno: Alumno | None) -> None:
@@ -208,9 +229,18 @@ def registrar_asistencia_unificada(
     codigo_carnet: str | None = None,
     dni_manual: str | None = None,
     timestamp_servidor: datetime | None = None,
+    roles: Sequence[Rol] | None = None,
+    persistir_auditoria: Callable[[RegistroAuditoria], None] | None = None,
+    eventos_auditoria_existentes: Sequence[RegistroAuditoria] = (),
 ) -> ResultadoRegistroAsistencia:
-    """Ejecuta el registro unificado de asistencia cumpliendo las reglas RN-01 a RN-30."""
-    validar_operador(operador)
+    """Ejecuta el registro unificado de asistencia cumpliendo las reglas RN-01 a RN-30.
+
+    La auditoría PBI-16 se construye siempre; si ``persistir_auditoria`` falla se
+    propaga ``ErrorRegistroAuditoriaException`` y no se devuelve resultado (RN-29).
+    """
+    from src.dominio.auditoria import ContextoAcademicoAuditoria, ServicioAuditoria
+
+    validar_operador(operador, roles=roles)
     validar_alumno(alumno)
     assert alumno is not None
 
@@ -246,6 +276,7 @@ def registrar_asistencia_unificada(
             )
 
         if asistencia_existente.estado == EstadoAsistencia.AUSENTE:
+            validar_operador(operador, PermisoOperacion.CORREGIR_AUSENTE, roles=roles)
             if not motivo_correccion or not motivo_correccion.strip():
                 raise FaltaMotivoCorreccionException(
                     "Debe especificar el motivo de corrección para un estado AUSENTE."
@@ -255,6 +286,8 @@ def registrar_asistencia_unificada(
     # Cálculo oficial de puntualidad y minutos de tardanza
     nuevo_estado, minutos_tardanza = calcular_estado_y_tardanza(hora_servidor)
 
+    es_correccion = estado_anterior is not None
+    motivo_registrado: str | None = motivo_correccion if es_correccion else None
     id_auditoria = f"aud-{uuid.uuid4().hex[:12]}"
     id_asistencia = (
         asistencia_existente.id if asistencia_existente else f"ast-{uuid.uuid4().hex[:12]}"
@@ -271,22 +304,36 @@ def registrar_asistencia_unificada(
         usuario_id=operador.id,
         rol_usuario=operador.rol,
         estado_anterior=estado_anterior,
-        motivo_correccion=motivo_correccion if estado_anterior else None,
+        motivo_correccion=motivo_registrado,
         auditoria_id=id_auditoria,
+        nivel=alumno.nivel,
+        grado=alumno.grado,
+        seccion=alumno.seccion,
     )
 
     auditoria = EventoAuditoria(
         id=id_auditoria,
-        evento_tipo="ASISTENCIA_REGISTRADA" if not estado_anterior else "ASISTENCIA_CORREGIDA",
+        evento_tipo="ASISTENCIA_CORREGIDA" if es_correccion else "ASISTENCIA_REGISTRADA",
         usuario_id=operador.id,
         rol=operador.rol,
         fecha_hora=timestamp_servidor,
-        operacion="CORRECCION_AUSENTE" if estado_anterior else "REGISTRO_ASISTENCIA",
+        operacion="CORRECCION_AUSENTE" if es_correccion else "REGISTRO_ASISTENCIA",
         metodo=metodo,
         alumno_id=alumno.id,
         estado_anterior=estado_anterior,
         estado_nuevo=nuevo_estado,
-        motivo=motivo_correccion if estado_anterior else None,
+        motivo=motivo_registrado,
+    )
+
+    # RN-29: auditoría atómica; si la persistencia falla no se confirma el registro.
+    registro_auditoria_pbi16 = ServicioAuditoria.desde_evento_asistencia(
+        auditoria,
+        asistencia_id=asistencia.id,
+        contexto=ContextoAcademicoAuditoria(
+            nivel=alumno.nivel, grado=alumno.grado, seccion=alumno.seccion
+        ),
+        eventos_existentes=eventos_auditoria_existentes,
+        persistir=persistir_auditoria,
     )
 
     evento_whatsapp = None
@@ -307,4 +354,5 @@ def registrar_asistencia_unificada(
         asistencia=asistencia,
         auditoria=auditoria,
         evento_whatsapp=evento_whatsapp,
+        registro_auditoria_pbi16=registro_auditoria_pbi16,
     )
