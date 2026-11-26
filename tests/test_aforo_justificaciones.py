@@ -829,6 +829,13 @@ def test_aforo_consultar_historial_modificaciones_filtros_y_permisos(
     )
     assert [r.id for r in por_alumno] == ["ast-h2"]
 
+    solo_por_alumno = ServicioAforo.consultar_historial_modificaciones(
+        staff_op,
+        registros,
+        alumno_id=101,
+    )
+    assert [r.id for r in solo_por_alumno] == ["ast-h2"]
+
     # Rol personalizado con permiso CONSULTAR_HISTORIAL_ASISTENCIA
     rol_hist = Rol(
         codigo="AUDITOR_ASISTENCIA",

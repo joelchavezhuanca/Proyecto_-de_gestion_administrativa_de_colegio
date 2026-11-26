@@ -128,6 +128,18 @@ class ServicioAforo:
         RolUsuario.ADMIN_STAFF,
     }
 
+    @staticmethod
+    def _validar_permiso_operador(
+        operador: UsuarioOperador,
+        permiso: PermisoOperacion,
+        mensaje_denegado: str,
+        roles: Sequence[Rol] | None = None,
+    ) -> None:
+        if not operador.activo:
+            raise PermisoAforoException("El operador no tiene una cuenta activa.")
+        if not ServicioAutenticacionYPermisos.tiene_permiso(operador.rol, permiso, roles=roles):
+            raise PermisoAforoException(mensaje_denegado)
+
     @classmethod
     def validar_acceso_consulta(
         cls,
@@ -135,14 +147,12 @@ class ServicioAforo:
         roles: Sequence[Rol] | None = None,
     ) -> None:
         """Valida cuenta activa y permiso CONSULTAR_DASHBOARD_AFORO (roles base y dinámicos)."""
-        if not operador.activo:
-            raise PermisoAforoException("El operador no tiene una cuenta activa.")
-        if not ServicioAutenticacionYPermisos.tiene_permiso(
-            operador.rol, PermisoOperacion.CONSULTAR_DASHBOARD_AFORO, roles=roles
-        ):
-            raise PermisoAforoException(
-                f"El rol {_texto_rol(operador.rol)} no está autorizado para acceder al dashboard."
-            )
+        cls._validar_permiso_operador(
+            operador,
+            PermisoOperacion.CONSULTAR_DASHBOARD_AFORO,
+            f"El rol {_texto_rol(operador.rol)} no está autorizado para acceder al dashboard.",
+            roles=roles,
+        )
 
     @classmethod
     def configurar_hora_cierre(
@@ -152,15 +162,15 @@ class ServicioAforo:
         roles: Sequence[Rol] | None = None,
     ) -> time:
         """Valida cuenta activa y permiso CONFIGURAR_CIERRE_ASISTENCIA."""
-        if not operador.activo:
-            raise PermisoAforoException("El operador no tiene una cuenta activa.")
-        if not ServicioAutenticacionYPermisos.tiene_permiso(
-            operador.rol, PermisoOperacion.CONFIGURAR_CIERRE_ASISTENCIA, roles=roles
-        ):
-            raise PermisoAforoException(
+        cls._validar_permiso_operador(
+            operador,
+            PermisoOperacion.CONFIGURAR_CIERRE_ASISTENCIA,
+            (
                 "Únicamente el rol ADMIN o un rol con permiso CONFIGURAR_CIERRE_ASISTENCIA "
                 "puede configurar la hora de cierre."
-            )
+            ),
+            roles=roles,
+        )
         return nueva_hora_cierre
 
     @classmethod
@@ -176,25 +186,23 @@ class ServicioAforo:
             raise PermisoAforoException(
                 f"El actor '{operador_o_sistema}' no está autorizado para ejecutar el cierre."
             )
-        if not operador_o_sistema.activo:
-            raise PermisoAforoException("El operador no tiene una cuenta activa.")
-        if not ServicioAutenticacionYPermisos.tiene_permiso(
-            operador_o_sistema.rol,
+        cls._validar_permiso_operador(
+            operador_o_sistema,
             PermisoOperacion.EJECUTAR_CIERRE_ASISTENCIA,
-            roles=roles,
-        ):
-            raise PermisoAforoException(
+            (
                 f"El rol {_texto_rol(operador_o_sistema.rol)} no está autorizado "
                 "para ejecutar el cierre diario."
-            )
+            ),
+            roles=roles,
+        )
         return operador_o_sistema.id, operador_o_sistema.rol
 
     @classmethod
     def calcular_metricas(
         cls,
         operador: UsuarioOperador,
-        alumnos: list[Alumno],
-        asistencias_dia: list[RegistroAsistencia],
+        alumnos: Sequence[Alumno],
+        asistencias_dia: Sequence[RegistroAsistencia],
         fecha_escolar: date,
         hora_consulta: time,
         hora_cierre: time = time(9, 0, 0),
@@ -314,8 +322,8 @@ class ServicioAforo:
     def obtener_detalle_salon(
         cls,
         operador: UsuarioOperador,
-        alumnos: list[Alumno],
-        asistencias_dia: list[RegistroAsistencia],
+        alumnos: Sequence[Alumno],
+        asistencias_dia: Sequence[RegistroAsistencia],
         nivel: str,
         grado: str,
         seccion: str,
@@ -392,17 +400,15 @@ class ServicioAforo:
         roles: Sequence[Rol] | None = None,
     ) -> list[RegistroAsistencia]:
         """Consulta registros de asistencia modificados/corregidos/justificados (RN-05)."""
-        if not operador.activo:
-            raise PermisoAforoException("El operador no tiene una cuenta activa.")
-        if not ServicioAutenticacionYPermisos.tiene_permiso(
-            operador.rol,
+        cls._validar_permiso_operador(
+            operador,
             PermisoOperacion.CONSULTAR_HISTORIAL_ASISTENCIA,
-            roles=roles,
-        ):
-            raise PermisoAforoException(
+            (
                 f"El rol {_texto_rol(operador.rol)} no está autorizado "
                 "para consultar el historial de asistencia."
-            )
+            ),
+            roles=roles,
+        )
 
         if fecha_desde is not None and fecha_hasta is not None and fecha_desde > fecha_hasta:
             raise AforoException("El rango de fechas del historial es inválido.")
@@ -426,8 +432,8 @@ class ServicioAforo:
     def ejecutar_cierre_automatico(
         cls,
         operador_o_sistema: UsuarioOperador | str,
-        alumnos: list[Alumno],
-        asistencias_existentes: list[RegistroAsistencia],
+        alumnos: Sequence[Alumno],
+        asistencias_existentes: Sequence[RegistroAsistencia],
         fecha_escolar: date,
         hora_cierre: time,
         fechas_ya_cerradas: Collection[date] | None = None,
