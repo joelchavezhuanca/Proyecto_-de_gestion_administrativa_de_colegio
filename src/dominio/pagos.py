@@ -175,7 +175,8 @@ class ServicioPagos:
             raise PagoInvalidoException("La fecha y hora del pago debe ser un datetime válido.")
         if obligacion.estado in (EstadoObligacion.PAGADO, EstadoObligacion.EXONERADO):
             raise PagoInvalidoException(
-                f"No se puede registrar pago para una obligación en estado {obligacion.estado.value}."
+                "No se puede registrar pago para una obligación en estado "
+                f"{obligacion.estado.value}."
             )
         return replace(
             obligacion,

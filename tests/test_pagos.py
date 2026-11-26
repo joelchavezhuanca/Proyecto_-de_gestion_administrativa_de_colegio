@@ -211,7 +211,12 @@ def test_registrar_obligacion_permisos_y_creacion(
     )
     assert obligacion_rol.alumno_id == 102
 
-    for op_sin_permiso in (staff_op, coord_op, UsuarioOperador(1, "inactivo", RolUsuario.ADMIN, False)):
+    operadores_sin_permiso = (
+        staff_op,
+        coord_op,
+        UsuarioOperador(1, "inactivo", RolUsuario.ADMIN, False),
+    )
+    for op_sin_permiso in operadores_sin_permiso:
         with pytest.raises(PermisoPagosException):
             ServicioPagos.registrar_obligacion(
                 operador=op_sin_permiso,
@@ -474,7 +479,11 @@ def test_escenario_4_pago_de_obligacion_vencida_deja_de_generar_alertas(
 
     dia_siguiente = FECHA_HOY + timedelta(days=1)
     alerta_dia_2 = ServicioPagos.evaluar_alerta_silenciosa(
-        evento=_evento_asistencia(alumno_id=101, fecha_escolar=dia_siguiente, asistencia_id="ast-2"),
+        evento=_evento_asistencia(
+            alumno_id=101,
+            fecha_escolar=dia_siguiente,
+            asistencia_id="ast-2",
+        ),
         obligaciones=[pagada],
         alertas_existentes=[alerta_dia_1],
         ahora=AHORA_LIMA + timedelta(days=1),
