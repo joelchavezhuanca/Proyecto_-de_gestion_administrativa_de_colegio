@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -8,16 +9,20 @@ try:
         CredencialesInvalidasException,
         CuentaInactivaException,
         EstadoUsuario,
+        EventoAuditoriaUsuario,
         PermisoOperacion,
+        Rol,
         RolInvalidoException,
         RolUsuario,
         ServicioAutenticacionYPermisos,
         ServicioGestionUsuarios,
         SesionInvalidaException,
+        UltimoAdminException,
         Usuario,
         UsuarioDuplicadoException,
         UsuarioException,
         hashear_password,
+        validar_politica_password,
         verificar_password,
     )
 except ImportError:
@@ -26,16 +31,20 @@ except ImportError:
         CredencialesInvalidasException,
         CuentaInactivaException,
         EstadoUsuario,
+        EventoAuditoriaUsuario,
         PermisoOperacion,
+        Rol,
         RolInvalidoException,
         RolUsuario,
         ServicioAutenticacionYPermisos,
         ServicioGestionUsuarios,
         SesionInvalidaException,
+        UltimoAdminException,
         Usuario,
         UsuarioDuplicadoException,
         UsuarioException,
         hashear_password,
+        validar_politica_password,
         verificar_password,
     )
 
@@ -109,7 +118,7 @@ def test_escenario_02_impedir_creacion_por_no_admin(
     coordinador_user: Usuario, admin_user: Usuario
 ) -> None:
     """Escenario 2: COORDINADOR o ADMIN_STAFF no pueden crear cuentas."""
-    with pytest.raises(AccesoDenegadoException, match="Solo usuarios con rol ADMIN"):
+    with pytest.raises(AccesoDenegadoException, match="GESTIONAR_USUARIOS"):
         ServicioGestionUsuarios.crear_usuario(
             operador=coordinador_user,
             username="intruso",
@@ -256,8 +265,8 @@ def test_escenario_08_restablecer_password(admin_user: Usuario, staff_user: Usua
 def test_escenario_08_restablecer_password_corta(
     admin_user: Usuario, staff_user: Usuario
 ) -> None:
-    """Rechazar restablecimiento si la nueva contraseña tiene menos de 6 caracteres."""
-    with pytest.raises(UsuarioException, match="al menos 6 caracteres"):
+    """Rechazar restablecimiento si la nueva contraseña tiene menos de 8 caracteres."""
+    with pytest.raises(UsuarioException, match="al menos 8 caracteres"):
         ServicioGestionUsuarios.restablecer_password(
             operador=admin_user,
             usuario_target=staff_user,
@@ -277,7 +286,7 @@ def test_validacion_creacion_errores(admin_user: Usuario) -> None:
             usuarios_existentes=[],
         )
 
-    with pytest.raises(UsuarioException, match="al menos 6 caracteres"):
+    with pytest.raises(UsuarioException, match="al menos 8 caracteres"):
         ServicioGestionUsuarios.crear_usuario(
             operador=admin_user,
             username="valido",
@@ -424,4 +433,290 @@ def test_rbac_sesion_cerrada_o_expirada(staff_user: Usuario) -> None:
         ServicioAutenticacionYPermisos.validar_permiso(
             sesion, PermisoOperacion.REGISTRAR_ASISTENCIA, tiempo_actual=tiempo_futuro
         )
+
+
+# --- PRUEBAS PBI-02: ROLES DINÁMICOS, ÚLTIMO ADMIN Y REVOCACIÓN DE SESIONES ---
+
+
+def _rol_personalizado(codigo: str, *permisos: PermisoOperacion) -> Rol:
+    return Rol(
+        codigo=codigo,
+        nombre=f"Rol {codigo}",
+        descripcion=f"Rol personalizado {codigo}",
+        permisos=frozenset(permisos),
+    )
+
+
+def _usuario_con_rol(codigo_rol: str) -> Usuario:
+    pwd_hash, salt = hashear_password("OperadorPass2026")
+    return Usuario(
+        id=10,
+        username=f"operador_{codigo_rol.lower()}",
+        password_hash=pwd_hash,
+        salt=salt,
+        nombre_completo=f"Operador {codigo_rol}",
+        rol=codigo_rol,
+        estado=EstadoUsuario.ACTIVO,
+    )
+
+
+def test_pbi02_rol_personalizado_con_permisos_crea_usuario(admin_user: Usuario) -> None:
+    """RN-01/RN-02: un rol personalizado activo con permisos administra cuentas."""
+    rol_gestor = _rol_personalizado(
+        "GESTOR_USUARIOS",
+        PermisoOperacion.GESTIONAR_USUARIOS,
+        PermisoOperacion.ASIGNAR_ROLES,
+    )
+    operador = _usuario_con_rol("GESTOR_USUARIOS")
+
+    nuevo, aud = ServicioGestionUsuarios.crear_usuario(
+        operador=operador,
+        username="nuevo_gestor",
+        password_plana="Segura2026",
+        nombre_completo="Nuevo Gestor",
+        rol=RolUsuario.ADMIN_STAFF,
+        usuarios_existentes=[admin_user],
+        roles=[rol_gestor],
+    )
+
+    assert nuevo.username == "nuevo_gestor"
+    assert nuevo.rol == RolUsuario.ADMIN_STAFF
+    assert aud.operacion == "CREAR_USUARIO"
+
+
+def test_pbi02_rol_personalizado_sin_asignar_roles_no_crea_usuario(
+    admin_user: Usuario,
+) -> None:
+    """RN-01: GESTIONAR_USUARIOS sin ASIGNAR_ROLES no permite crear cuentas."""
+    rol_gestor = _rol_personalizado("GESTOR_USUARIOS", PermisoOperacion.GESTIONAR_USUARIOS)
+    operador = _usuario_con_rol("GESTOR_USUARIOS")
+
+    with pytest.raises(AccesoDenegadoException, match="ASIGNAR_ROLES"):
+        ServicioGestionUsuarios.crear_usuario(
+            operador=operador,
+            username="sin_permiso",
+            password_plana="Segura2026",
+            nombre_completo="Sin Permiso",
+            rol=RolUsuario.ADMIN_STAFF,
+            usuarios_existentes=[admin_user],
+            roles=[rol_gestor],
+        )
+
+
+def test_pbi02_modificar_rol_sin_asignar_roles_no_permite(
+    staff_user: Usuario,
+) -> None:
+    """RN-01: cambiar el rol de una cuenta exige ASIGNAR_ROLES."""
+    rol_gestor = _rol_personalizado("GESTOR_USUARIOS", PermisoOperacion.GESTIONAR_USUARIOS)
+    operador = _usuario_con_rol("GESTOR_USUARIOS")
+
+    with pytest.raises(AccesoDenegadoException, match="ASIGNAR_ROLES"):
+        ServicioGestionUsuarios.modificar_usuario(
+            operador=operador,
+            usuario_target=staff_user,
+            nuevo_rol=RolUsuario.COORDINADOR,
+            roles=[rol_gestor],
+        )
+
+
+def test_pbi02_sin_gestionar_usuarios_no_cambia_estado(
+    staff_user: Usuario,
+) -> None:
+    """RN-01: un rol personalizado sin GESTIONAR_USUARIOS no administra cuentas."""
+    rol_consulta = _rol_personalizado(
+        "CONSULTA_USUARIOS", PermisoOperacion.CONSULTAR_HISTORIAL_ASISTENCIA
+    )
+    operador = _usuario_con_rol("CONSULTA_USUARIOS")
+
+    with pytest.raises(AccesoDenegadoException, match="GESTIONAR_USUARIOS"):
+        ServicioGestionUsuarios.cambiar_estado(
+            operador=operador,
+            usuario_target=staff_user,
+            nuevo_estado=EstadoUsuario.INACTIVO,
+            roles=[rol_consulta],
+        )
+
+
+def test_pbi02_no_desactiva_ultimo_admin_activo(admin_user: Usuario) -> None:
+    """RN-10: no se puede desactivar al último ADMIN activo del sistema."""
+    with pytest.raises(UltimoAdminException, match="último administrador"):
+        ServicioGestionUsuarios.cambiar_estado(
+            operador=admin_user,
+            usuario_target=admin_user,
+            nuevo_estado=EstadoUsuario.INACTIVO,
+            usuarios_existentes=[admin_user],
+        )
+
+
+def test_pbi02_permite_desactivar_admin_si_hay_otro_activo(admin_user: Usuario) -> None:
+    """RN-10: con otro ADMIN activo la desactivación está permitida."""
+    segundo_admin = replace(admin_user, id=99, username="admin_secundario")
+
+    desactivado, aud = ServicioGestionUsuarios.cambiar_estado(
+        operador=admin_user,
+        usuario_target=segundo_admin,
+        nuevo_estado=EstadoUsuario.INACTIVO,
+        usuarios_existentes=[admin_user, segundo_admin],
+    )
+
+    assert desactivado.estado == EstadoUsuario.INACTIVO
+    assert aud.operacion == "DESACTIVAR_CUENTA"
+
+
+def test_pbi02_permite_desactivar_usuario_no_admin(
+    admin_user: Usuario, staff_user: Usuario
+) -> None:
+    """RN-10: la protección solo aplica a cuentas con rol ADMIN."""
+    desactivado, _ = ServicioGestionUsuarios.cambiar_estado(
+        operador=admin_user,
+        usuario_target=staff_user,
+        nuevo_estado=EstadoUsuario.INACTIVO,
+        usuarios_existentes=[admin_user, staff_user],
+    )
+
+    assert desactivado.estado == EstadoUsuario.INACTIVO
+
+
+def test_pbi02_admin_inactivo_no_cuenta_como_ultimo_activo(admin_user: Usuario) -> None:
+    """RN-10: un ADMIN ya inactivo no bloquea la operación."""
+    admin_inactivo = replace(
+        admin_user,
+        id=50,
+        username="admin_viejo",
+        estado=EstadoUsuario.INACTIVO,
+    )
+
+    desactivado, _ = ServicioGestionUsuarios.cambiar_estado(
+        operador=admin_user,
+        usuario_target=admin_inactivo,
+        nuevo_estado=EstadoUsuario.INACTIVO,
+        usuarios_existentes=[admin_user, admin_inactivo],
+    )
+
+    assert desactivado.estado == EstadoUsuario.INACTIVO
+
+
+def test_pbi02_no_degrada_ultimo_admin(admin_user: Usuario) -> None:
+    """RN-10: tampoco se puede cambiar de rol al último ADMIN activo."""
+    with pytest.raises(UltimoAdminException, match="último administrador"):
+        ServicioGestionUsuarios.modificar_usuario(
+            operador=admin_user,
+            usuario_target=admin_user,
+            nuevo_rol=RolUsuario.COORDINADOR,
+            usuarios_existentes=[admin_user],
+        )
+
+
+def test_pbi02_desactivar_cuenta_revoca_sesiones(
+    admin_user: Usuario, staff_user: Usuario
+) -> None:
+    """RN-09: desactivar una cuenta revoca de inmediato sus sesiones activas."""
+    sesion = ServicioAutenticacionYPermisos.iniciar_sesion(
+        "jluna_qa", "StaffPass123!", [staff_user]
+    )
+
+    actualizado, aud, sesiones = ServicioGestionUsuarios.desactivar_y_revocar_sesiones(
+        operador=admin_user,
+        usuario_target=staff_user,
+        sesiones=[sesion],
+    )
+
+    assert actualizado.estado == EstadoUsuario.INACTIVO
+    assert aud.operacion == "DESACTIVAR_CUENTA"
+    assert sesiones[0].activa is False
+
+
+def test_pbi02_restablecer_password_revoca_sesiones(
+    admin_user: Usuario, staff_user: Usuario
+) -> None:
+    """RN-09/RN-12: restablecer la credencial revoca las sesiones vigentes."""
+    sesion = ServicioAutenticacionYPermisos.iniciar_sesion(
+        "jluna_qa", "StaffPass123!", [staff_user]
+    )
+
+    actualizado, aud, sesiones = (
+        ServicioGestionUsuarios.restablecer_password_y_revocar_sesiones(
+            operador=admin_user,
+            usuario_target=staff_user,
+            nueva_password_plana="NuevaClave2026",
+            sesiones=[sesion],
+        )
+    )
+
+    assert actualizado.password_hash != staff_user.password_hash
+    assert verificar_password(
+        "NuevaClave2026", actualizado.password_hash, actualizado.salt
+    )
+    assert aud.operacion == "RESTABLECER_CREDENCIAL"
+    assert sesiones[0].activa is False
+
+
+def test_pbi02_politica_password_unificada() -> None:
+    """RN-05: política mínima de 8 caracteres y opción alfanumérica."""
+    with pytest.raises(UsuarioException, match="al menos 8 caracteres"):
+        validar_politica_password("Corta1")
+
+    validar_politica_password("Segura2026")
+
+    with pytest.raises(UsuarioException, match="letras y números"):
+        validar_politica_password("sololetras", exigir_alfanumerico=True)
+
+    validar_politica_password("Segura2026", exigir_alfanumerico=True)
+
+
+def test_pbi02_crear_usuario_aplica_longitud_minima_configurable(
+    admin_user: Usuario,
+) -> None:
+    """RN-05: la longitud mínima puede ajustarse de forma explícita."""
+    with pytest.raises(UsuarioException, match="al menos 10 caracteres"):
+        ServicioGestionUsuarios.crear_usuario(
+            operador=admin_user,
+            username="clave_corta",
+            password_plana="Corta2026",
+            nombre_completo="Clave Corta",
+            rol=RolUsuario.ADMIN_STAFF,
+            usuarios_existentes=[admin_user],
+            longitud_minima=10,
+        )
+
+
+def test_pbi02_auditoria_no_expone_credenciales(admin_user: Usuario) -> None:
+    """RN-13: los eventos de auditoría nunca incluyen contraseñas, hashes ni salts."""
+    _, aud = ServicioGestionUsuarios.crear_usuario(
+        operador=admin_user,
+        username="auditado",
+        password_plana="Segura2026",
+        nombre_completo="Auditado",
+        rol=RolUsuario.ADMIN_STAFF,
+        usuarios_existentes=[admin_user],
+    )
+
+    prohibidas = {"password", "password_plana", "password_hash", "salt", "token"}
+    assert not prohibidas.intersection(aud.detalle)
+
+    with pytest.raises(UsuarioException, match="sensible"):
+        EventoAuditoriaUsuario(
+            id="aud-usr-test",
+            admin_id=admin_user.id,
+            admin_username=admin_user.username,
+            fecha_hora=datetime.now(UTC),
+            operacion="CREAR_USUARIO",
+            usuario_afectado_id=2,
+            usuario_afectado_username="auditado",
+            detalle={"password": "secreto"},
+        )
+
+
+def test_pbi02_validar_admin_retrocompatible(
+    admin_user: Usuario, coordinador_user: Usuario
+) -> None:
+    """Mantiene el contrato previo de validar_admin para código existente."""
+    ServicioGestionUsuarios.validar_admin(admin_user)
+
+    with pytest.raises(AccesoDenegadoException, match="Solo usuarios con rol ADMIN"):
+        ServicioGestionUsuarios.validar_admin(coordinador_user)
+
+    admin_inactivo = replace(admin_user, estado=EstadoUsuario.INACTIVO)
+    with pytest.raises(CuentaInactivaException, match="no cuenta con una cuenta activa"):
+        ServicioGestionUsuarios.validar_admin(admin_inactivo)
 
