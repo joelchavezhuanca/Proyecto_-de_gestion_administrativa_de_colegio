@@ -62,6 +62,10 @@ class NotificacionDuplicadaException(NotificacionException):
     """Lanzada cuando ya existe una notificación con la misma clave de idempotencia."""
 
 
+_ESTADOS_YA_ENVIADOS = frozenset({EstadoNotificacion.ENVIADO, EstadoNotificacion.ENTREGADO})
+_ESTADOS_WEBHOOK = frozenset({EstadoNotificacion.ENTREGADO, EstadoNotificacion.FALLIDO})
+
+
 @dataclass(frozen=True)
 class ContactoApoderado:
     alumno_id: int
@@ -410,7 +414,7 @@ class ServicioNotificacionesWhatsApp:
         max_intentos: int = MAX_INTENTOS_DEFECTO,
     ) -> NotificacionWhatsApp:
         """RN-13 a RN-16: envía con reintentos limitados y aislamiento total de fallos."""
-        if notificacion.estado in (EstadoNotificacion.ENVIADO, EstadoNotificacion.ENTREGADO):
+        if notificacion.estado in _ESTADOS_YA_ENVIADOS:
             return notificacion
 
         if notificacion.intentos >= max_intentos:
@@ -474,7 +478,7 @@ class ServicioNotificacionesWhatsApp:
         detalle_error: str | None = None,
     ) -> NotificacionWhatsApp:
         """RN-18: webhook ``ENVIADO -> ENTREGADO | FALLIDO`` conservando la referencia."""
-        if estado not in (EstadoNotificacion.ENTREGADO, EstadoNotificacion.FALLIDO):
+        if estado not in _ESTADOS_WEBHOOK:
             raise NotificacionException("El webhook solo admite los estados ENTREGADO o FALLIDO.")
         if notificacion.estado == estado:
             return notificacion
