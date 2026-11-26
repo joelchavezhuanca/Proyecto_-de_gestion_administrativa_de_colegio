@@ -3,6 +3,9 @@ from datetime import date, time
 
 import pytest
 
+from src.dominio.auditoria import ErrorRegistroAuditoriaException, RegistroAuditoria
+from src.dominio.usuarios import PermisoOperacion, Rol
+
 try:
     from src.dominio.asistencia import (
         Alumno,
@@ -23,6 +26,7 @@ try:
         buscar_alumnos_activos,
         calcular_estado_y_tardanza,
         registrar_asistencia_unificada,
+        validar_operador,
     )
 except ImportError:
     from asistencia_dominio import (  # type: ignore
@@ -44,6 +48,7 @@ except ImportError:
         buscar_alumnos_activos,
         calcular_estado_y_tardanza,
         registrar_asistencia_unificada,
+        validar_operador,
     )
 
 
@@ -499,3 +504,290 @@ def test_carnet_invalido_lanza_excepcion(
             fecha_escolar=date(2026, 11, 2),
             codigo_carnet="CRN-EQUIVOCADO-999",
         )
+
+
+# ---------------------------------------------------------------------------
+# PBI-01 Cierre de brechas: RBAC dinámico, snapshot académico y auditoría atómica
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def rol_auxiliar_registro() -> Rol:
+    """Rol personalizado con REGISTRAR_ASISTENCIA pero sin CORREGIR_AUSENTE."""
+    return Rol(
+        codigo="AUXILIAR",
+        nombre="Auxiliar de puerta",
+        descripcion="Registra ingresos por carnet",
+        permisos=frozenset({PermisoOperacion.REGISTRAR_ASISTENCIA}),
+    )
+
+
+@pytest.fixture
+def rol_tesoreria() -> Rol:
+    """Rol personalizado sin permisos de asistencia."""
+    return Rol(
+        codigo="TESORERIA",
+        nombre="Tesorería",
+        descripcion="Gestión de pagos",
+        permisos=frozenset({PermisoOperacion.GESTIONAR_PAGOS}),
+    )
+
+
+def _ausencia_previa(alumno: Alumno, operador: UsuarioOperador) -> RegistroAsistencia:
+    return RegistroAsistencia(
+        id="ast-ausente-brecha",
+        alumno_id=alumno.id,
+        fecha_escolar=date(2026, 11, 2),
+        hora_efectiva=time(9, 0, 0),
+        estado=EstadoAsistencia.AUSENTE,
+        minutos_tardanza=0,
+        metodo=MetodoRegistro.MANUAL_DNI,
+        usuario_id=operador.id,
+        rol_usuario=operador.rol,
+    )
+
+
+def test_brecha_rol_personalizado_con_permiso_registra_asistencia(
+    alumno_activo: Alumno, rol_auxiliar_registro: Rol
+) -> None:
+    """Escenario 3: un rol personalizado con REGISTRAR_ASISTENCIA puede registrar."""
+    operador = UsuarioOperador(id=50, username="aux_puerta", rol="AUXILIAR")
+    res = registrar_asistencia_unificada(
+        operador=operador,
+        alumno=alumno_activo,
+        metodo=MetodoRegistro.CARNET,
+        hora_servidor=time(7, 10, 0),
+        fecha_escolar=date(2026, 11, 2),
+        codigo_carnet="CRN-EDU-7294",
+        roles=[rol_auxiliar_registro],
+    )
+    assert res.asistencia.estado == EstadoAsistencia.PUNTUAL
+    assert res.asistencia.rol_usuario == "AUXILIAR"
+    assert res.auditoria.rol == "AUXILIAR"
+    assert res.registro_auditoria_pbi16 is not None
+    assert res.registro_auditoria_pbi16.rol_ejecutante == "AUXILIAR"
+
+
+def test_brecha_rol_personalizado_sin_permiso_es_rechazado(
+    alumno_activo: Alumno, rol_tesoreria: Rol
+) -> None:
+    """Escenario 3: un rol personalizado sin REGISTRAR_ASISTENCIA es rechazado."""
+    operador = UsuarioOperador(id=51, username="tesorero", rol="TESORERIA")
+    with pytest.raises(RolNoAutorizadoException, match="no está autorizado"):
+        registrar_asistencia_unificada(
+            operador=operador,
+            alumno=alumno_activo,
+            metodo=MetodoRegistro.CARNET,
+            hora_servidor=time(7, 10, 0),
+            fecha_escolar=date(2026, 11, 2),
+            roles=[rol_tesoreria],
+        )
+
+
+def test_brecha_rol_personalizado_sin_catalogo_es_rechazado(alumno_activo: Alumno) -> None:
+    """Deny-by-default: un rol personalizado sin catálogo de roles es rechazado."""
+    operador = UsuarioOperador(id=52, username="aux_sin_catalogo", rol="AUXILIAR")
+    with pytest.raises(RolNoAutorizadoException):
+        registrar_asistencia_unificada(
+            operador=operador,
+            alumno=alumno_activo,
+            metodo=MetodoRegistro.CARNET,
+            hora_servidor=time(7, 10, 0),
+            fecha_escolar=date(2026, 11, 2),
+        )
+
+
+def test_brecha_rol_personalizado_sin_corregir_ausente_no_corrige(
+    alumno_activo: Alumno, rol_auxiliar_registro: Rol
+) -> None:
+    """Escenario 7: corregir AUSENTE exige CORREGIR_AUSENTE además de REGISTRAR."""
+    operador = UsuarioOperador(id=50, username="aux_puerta", rol="AUXILIAR")
+    with pytest.raises(RolNoAutorizadoException, match="CORREGIR_AUSENTE"):
+        registrar_asistencia_unificada(
+            operador=operador,
+            alumno=alumno_activo,
+            metodo=MetodoRegistro.MANUAL_DNI,
+            hora_servidor=time(7, 25, 0),
+            fecha_escolar=date(2026, 11, 2),
+            asistencia_existente=_ausencia_previa(alumno_activo, operador),
+            motivo_correccion="Llegó con autorización",
+            dni_manual="72945734",
+            roles=[rol_auxiliar_registro],
+        )
+
+
+def test_brecha_rol_personalizado_con_corregir_ausente_corrige(alumno_activo: Alumno) -> None:
+    """Un rol personalizado con ambos permisos corrige un AUSENTE."""
+    rol_supervisor = Rol(
+        codigo="SUPERVISOR_ASISTENCIA",
+        nombre="Supervisor",
+        descripcion="Registra y corrige asistencias",
+        permisos=frozenset(
+            {PermisoOperacion.REGISTRAR_ASISTENCIA, PermisoOperacion.CORREGIR_AUSENTE}
+        ),
+    )
+    operador = UsuarioOperador(id=53, username="supervisor", rol="SUPERVISOR_ASISTENCIA")
+    res = registrar_asistencia_unificada(
+        operador=operador,
+        alumno=alumno_activo,
+        metodo=MetodoRegistro.MANUAL_DNI,
+        hora_servidor=time(7, 25, 0),
+        fecha_escolar=date(2026, 11, 2),
+        asistencia_existente=_ausencia_previa(alumno_activo, operador),
+        motivo_correccion="Llegó con autorización",
+        dni_manual="72945734",
+        roles=[rol_supervisor],
+    )
+    assert res.asistencia.estado_anterior == EstadoAsistencia.AUSENTE
+    assert res.auditoria.operacion == "CORRECCION_AUSENTE"
+
+
+def test_brecha_validar_operador_por_permiso_explicito(rol_auxiliar_registro: Rol) -> None:
+    """validar_operador delega en ServicioAutenticacionYPermisos.tiene_permiso."""
+    operador = UsuarioOperador(id=50, username="aux_puerta", rol="AUXILIAR")
+    validar_operador(operador, roles=[rol_auxiliar_registro])
+    validar_operador(operador, PermisoOperacion.REGISTRAR_ASISTENCIA, [rol_auxiliar_registro])
+    with pytest.raises(RolNoAutorizadoException):
+        validar_operador(
+            operador, PermisoOperacion.CORREGIR_AUSENTE, roles=[rol_auxiliar_registro]
+        )
+    validar_operador(
+        UsuarioOperador(id=1, username="admin", rol=RolUsuario.ADMIN),
+        PermisoOperacion.CORREGIR_AUSENTE,
+    )
+
+
+def test_brecha_snapshot_academico_en_registro(
+    operador_staff: UsuarioOperador, alumno_activo: Alumno
+) -> None:
+    """RN-25: el registro conserva nivel, grado y sección del día."""
+    res = registrar_asistencia_unificada(
+        operador=operador_staff,
+        alumno=alumno_activo,
+        metodo=MetodoRegistro.CARNET,
+        hora_servidor=time(7, 10, 0),
+        fecha_escolar=date(2026, 11, 2),
+    )
+    assert (res.asistencia.nivel, res.asistencia.grado, res.asistencia.seccion) == (
+        "Secundaria",
+        "5to",
+        "A",
+    )
+    assert res.registro_auditoria_pbi16 is not None
+    contexto = res.registro_auditoria_pbi16.contexto_academico
+    assert contexto is not None
+    assert (contexto.nivel, contexto.grado, contexto.seccion) == ("Secundaria", "5to", "A")
+
+
+def test_brecha_snapshot_academico_en_correccion(
+    operador_staff: UsuarioOperador, alumno_activo: Alumno
+) -> None:
+    """RN-25: la corrección de AUSENTE también registra el snapshot académico."""
+    res = registrar_asistencia_unificada(
+        operador=operador_staff,
+        alumno=alumno_activo,
+        metodo=MetodoRegistro.MANUAL_DNI,
+        hora_servidor=time(7, 25, 0),
+        fecha_escolar=date(2026, 11, 2),
+        asistencia_existente=_ausencia_previa(alumno_activo, operador_staff),
+        motivo_correccion="Llegó con autorización",
+        dni_manual="72945734",
+    )
+    assert (res.asistencia.nivel, res.asistencia.grado, res.asistencia.seccion) == (
+        "Secundaria",
+        "5to",
+        "A",
+    )
+
+
+def test_brecha_snapshot_por_defecto_es_none() -> None:
+    """Retrocompatibilidad: los campos snapshot son opcionales con default None."""
+    registro = RegistroAsistencia(
+        id="ast-legacy",
+        alumno_id=1,
+        fecha_escolar=date(2026, 11, 2),
+        hora_efectiva=time(7, 0, 0),
+        estado=EstadoAsistencia.PUNTUAL,
+        minutos_tardanza=0,
+        metodo=MetodoRegistro.CARNET,
+        usuario_id=1,
+        rol_usuario=RolUsuario.ADMIN,
+    )
+    assert (registro.nivel, registro.grado, registro.seccion) == (None, None, None)
+
+
+def test_brecha_auditoria_atomica_persiste_registro_pbi16(
+    operador_staff: UsuarioOperador, alumno_activo: Alumno
+) -> None:
+    """RN-29: la auditoría PBI-16 se persiste y queda encadenada al historial."""
+    bitacora: list[RegistroAuditoria] = []
+    primero = registrar_asistencia_unificada(
+        operador=operador_staff,
+        alumno=alumno_activo,
+        metodo=MetodoRegistro.CARNET,
+        hora_servidor=time(7, 10, 0),
+        fecha_escolar=date(2026, 11, 2),
+        persistir_auditoria=bitacora.append,
+    )
+    assert primero.registro_auditoria_pbi16 is not None
+    assert bitacora == [primero.registro_auditoria_pbi16]
+    assert primero.registro_auditoria_pbi16.id == primero.auditoria.id
+    assert primero.registro_auditoria_pbi16.entidad_id == primero.asistencia.id
+    assert primero.registro_auditoria_pbi16.secuencia == 1
+
+    segundo = registrar_asistencia_unificada(
+        operador=operador_staff,
+        alumno=alumno_activo,
+        metodo=MetodoRegistro.CARNET,
+        hora_servidor=time(7, 11, 0),
+        fecha_escolar=date(2026, 11, 3),
+        persistir_auditoria=bitacora.append,
+        eventos_auditoria_existentes=tuple(bitacora),
+    )
+    assert segundo.registro_auditoria_pbi16 is not None
+    assert segundo.registro_auditoria_pbi16.secuencia == 2
+    assert (
+        segundo.registro_auditoria_pbi16.hash_anterior
+        == primero.registro_auditoria_pbi16.hash_integridad
+    )
+
+
+def test_brecha_auditoria_atomica_falla_y_no_confirma(
+    operador_staff: UsuarioOperador, alumno_activo: Alumno
+) -> None:
+    """Escenario 9: si la persistencia de auditoría falla, no se confirma el registro."""
+    confirmaciones: list[object] = []
+
+    def persistir_fallido(_registro: RegistroAuditoria) -> None:
+        raise RuntimeError("bitácora no disponible")
+
+    with pytest.raises(ErrorRegistroAuditoriaException):
+        confirmaciones.append(
+            registrar_asistencia_unificada(
+                operador=operador_staff,
+                alumno=alumno_activo,
+                metodo=MetodoRegistro.CARNET,
+                hora_servidor=time(7, 10, 0),
+                fecha_escolar=date(2026, 11, 2),
+                persistir_auditoria=persistir_fallido,
+            )
+        )
+    assert confirmaciones == []
+
+
+def test_brecha_rendimiento_con_auditoria_menor_200ms(
+    operador_staff: UsuarioOperador, alumno_activo: Alumno
+) -> None:
+    """RN-07: el registro con auditoría PBI-16 se mantiene por debajo de 200 ms."""
+    bitacora: list[RegistroAuditoria] = []
+    inicio = pytime.perf_counter()
+    registrar_asistencia_unificada(
+        operador=operador_staff,
+        alumno=alumno_activo,
+        metodo=MetodoRegistro.CARNET,
+        hora_servidor=time(7, 10, 0),
+        fecha_escolar=date(2026, 11, 2),
+        persistir_auditoria=bitacora.append,
+    )
+    duracion_ms = (pytime.perf_counter() - inicio) * 1000
+    assert duracion_ms < 200, f"El tiempo fue {duracion_ms:.2f} ms (debe ser < 200 ms)"
