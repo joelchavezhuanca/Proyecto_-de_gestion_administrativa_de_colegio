@@ -286,6 +286,8 @@ def registrar_asistencia_unificada(
     # Cálculo oficial de puntualidad y minutos de tardanza
     nuevo_estado, minutos_tardanza = calcular_estado_y_tardanza(hora_servidor)
 
+    es_correccion = estado_anterior is not None
+    motivo_registrado: str | None = motivo_correccion if es_correccion else None
     id_auditoria = f"aud-{uuid.uuid4().hex[:12]}"
     id_asistencia = (
         asistencia_existente.id if asistencia_existente else f"ast-{uuid.uuid4().hex[:12]}"
@@ -302,7 +304,7 @@ def registrar_asistencia_unificada(
         usuario_id=operador.id,
         rol_usuario=operador.rol,
         estado_anterior=estado_anterior,
-        motivo_correccion=motivo_correccion if estado_anterior else None,
+        motivo_correccion=motivo_registrado,
         auditoria_id=id_auditoria,
         nivel=alumno.nivel,
         grado=alumno.grado,
@@ -311,16 +313,16 @@ def registrar_asistencia_unificada(
 
     auditoria = EventoAuditoria(
         id=id_auditoria,
-        evento_tipo="ASISTENCIA_REGISTRADA" if not estado_anterior else "ASISTENCIA_CORREGIDA",
+        evento_tipo="ASISTENCIA_CORREGIDA" if es_correccion else "ASISTENCIA_REGISTRADA",
         usuario_id=operador.id,
         rol=operador.rol,
         fecha_hora=timestamp_servidor,
-        operacion="CORRECCION_AUSENTE" if estado_anterior else "REGISTRO_ASISTENCIA",
+        operacion="CORRECCION_AUSENTE" if es_correccion else "REGISTRO_ASISTENCIA",
         metodo=metodo,
         alumno_id=alumno.id,
         estado_anterior=estado_anterior,
         estado_nuevo=nuevo_estado,
-        motivo=motivo_correccion if estado_anterior else None,
+        motivo=motivo_registrado,
     )
 
     # RN-29: auditoría atómica; si la persistencia falla no se confirma el registro.
