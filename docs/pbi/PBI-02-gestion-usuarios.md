@@ -4,7 +4,7 @@
 | :--- | :--- |
 | **ID** | `PBI-02` |
 | **Rama Git a crear** | `improvement/PBI-02-roles-dinamicos` *(desde `main`)* |
-| **Estado actual en `main`** | Dominio base completo en `src/dominio/usuarios.py` y `tests/test_usuarios_rbac.py` (limitado a 3 roles fijos y política de 6 caracteres). |
+| **Estado actual en `main`** | Implementado en `improvement/PBI-02-roles-dinamicos`: RBAC por permisos, roles personalizados activos, protección del último `ADMIN` y revocación de sesiones. |
 | **Dependencias** | `PBI-16` (Auditoría), `PBI-15` (RBAC Dinámico con Roles Personalizados). |
 | **Permisos requeridos** | `GESTIONAR_USUARIOS` y `ASIGNAR_ROLES`. |
 
@@ -49,6 +49,10 @@ Archivos: `src/dominio/usuarios.py`, `tests/test_usuarios_rbac.py`.
 2. Reemplazar validación rígida `operador.rol == ADMIN` por verificación de permisos `GESTIONAR_USUARIOS` / `ASIGNAR_ROLES`.
 3. Añadir validación para no desactivar ni cambiar de rol al último `ADMIN` activo.
 4. Unificar eventos de auditoría con `ServicioAuditoria` (`PBI-16`).
+
+> **Nota de implementación:** la política de credenciales es de 8 caracteres por defecto
+> (`longitud_minima` configurable) y la protección del último `ADMIN` se aplica cuando
+> el servicio recibe la lista `usuarios_existentes`.
 
 ---
 

@@ -83,6 +83,12 @@ MATRIZ_PERMISOS: dict[RolUsuario, set[PermisoOperacion]] = {
 }
 
 
+# Claves que nunca deben viajar en un evento de auditoría (RN-13, PBI-16)
+_CLAVES_AUDITORIA_PROHIBIDAS = frozenset(
+    {"password", "password_plana", "password_hash", "salt", "token"}
+)
+
+
 class UsuarioException(Exception):
     """Excepción base para el módulo de usuarios y seguridad."""
 
@@ -119,6 +125,10 @@ class SesionInvalidaException(UsuarioException):
     """Lanzada ante una sesión expirada, cerrada o inválida."""
 
 
+class UltimoAdminException(UsuarioException):
+    """Lanzada al intentar dejar al sistema sin ningún ADMIN activo (RN-10)."""
+
+
 def hora_actual_utc() -> datetime:
     return datetime.now(UTC)
 
@@ -137,6 +147,23 @@ def verificar_password(password: str, hash_almacenado: str, salt: str) -> bool:
     """Verifica si una contraseña en texto plano coincide con el hash almacenado."""
     hash_calculado, _ = hashear_password(password, salt)
     return secrets.compare_digest(hash_calculado, hash_almacenado)
+
+
+def validar_politica_password(
+    password: str,
+    longitud_minima: int = 8,
+    exigir_alfanumerico: bool = False,
+) -> None:
+    """Valida la política mínima de credenciales del sistema (RN-05)."""
+    if not isinstance(password, str) or len(password) < longitud_minima:
+        raise UsuarioException(
+            f"La contraseña debe tener al menos {longitud_minima} caracteres."
+        )
+    if exigir_alfanumerico and not (
+        any(caracter.isalpha() for caracter in password)
+        and any(caracter.isdigit() for caracter in password)
+    ):
+        raise UsuarioException("La contraseña debe combinar letras y números.")
 
 
 def _codigo_rol(rol: RolUsuario | str) -> str:
@@ -279,6 +306,14 @@ class EventoAuditoriaUsuario:
     usuario_afectado_username: str
     detalle: dict[str, str]
 
+    def __post_init__(self) -> None:
+        for clave in self.detalle:
+            if str(clave).strip().lower() in _CLAVES_AUDITORIA_PROHIBIDAS:
+                raise UsuarioException(
+                    "El detalle de auditoría no puede incluir el campo "
+                    f"sensible '{clave}'."
+                )
+
 
 class ServicioGestionUsuarios:
     """Implementa las reglas de negocio del PBI-02 (Gestión de Usuarios)."""
@@ -292,6 +327,41 @@ class ServicioGestionUsuarios:
             raise AccesoDenegadoException("Solo usuarios con rol ADMIN pueden administrar cuentas.")
 
     @staticmethod
+    def _validar_permiso_operador(
+        operador: Usuario,
+        permiso: PermisoOperacion,
+        roles: Sequence[Rol] | None,
+    ) -> None:
+        """Valida que el operador esté activo y tenga el permiso requerido (RN-01)."""
+        if operador.estado != EstadoUsuario.ACTIVO:
+            raise CuentaInactivaException("El administrador no cuenta con una cuenta activa.")
+        if not ServicioAutenticacionYPermisos.tiene_permiso(operador.rol, permiso, roles):
+            raise AccesoDenegadoException(
+                f"El rol {_codigo_rol(operador.rol)} no tiene permiso para "
+                f"la operación '{permiso.value}'."
+            )
+
+    @staticmethod
+    def _es_ultimo_admin_activo(
+        usuario_target: Usuario,
+        usuarios_existentes: Sequence[Usuario] | None,
+    ) -> bool:
+        """Indica si la cuenta es el único ADMIN activo del conjunto (RN-10)."""
+        if usuarios_existentes is None:
+            return False
+        if (
+            _codigo_rol(usuario_target.rol) != RolUsuario.ADMIN.value
+            or usuario_target.estado != EstadoUsuario.ACTIVO
+        ):
+            return False
+        return not any(
+            _codigo_rol(usuario.rol) == RolUsuario.ADMIN.value
+            and usuario.estado == EstadoUsuario.ACTIVO
+            and usuario.id != usuario_target.id
+            for usuario in usuarios_existentes
+        )
+
+    @staticmethod
     def crear_usuario(
         operador: Usuario,
         username: str,
@@ -301,9 +371,15 @@ class ServicioGestionUsuarios:
         usuarios_existentes: list[Usuario],
         fecha_hora: datetime | None = None,
         roles: Sequence[Rol] | None = None,
+        longitud_minima: int = 8,
     ) -> tuple[Usuario, EventoAuditoriaUsuario]:
         """Crea una nueva cuenta de usuario (RN-01 a RN-05)."""
-        ServicioGestionUsuarios.validar_admin(operador)
+        ServicioGestionUsuarios._validar_permiso_operador(
+            operador, PermisoOperacion.GESTIONAR_USUARIOS, roles
+        )
+        ServicioGestionUsuarios._validar_permiso_operador(
+            operador, PermisoOperacion.ASIGNAR_ROLES, roles
+        )
 
         rol_validado = _validar_rol_asignable(rol, roles or [])
 
@@ -316,8 +392,7 @@ class ServicioGestionUsuarios:
                 f"El nombre de usuario '{username}' ya está registrado."
             )
 
-        if not password_plana or len(password_plana) < 6:
-            raise UsuarioException("La credencial inicial debe tener al menos 6 caracteres.")
+        validar_politica_password(password_plana, longitud_minima)
 
         pwd_hash, salt = hashear_password(password_plana)
         nuevo_id = max([u.id for u in usuarios_existentes], default=0) + 1
@@ -358,9 +433,16 @@ class ServicioGestionUsuarios:
         nuevo_rol: RolUsuario | str | None = None,
         fecha_hora: datetime | None = None,
         roles: Sequence[Rol] | None = None,
+        usuarios_existentes: Sequence[Usuario] | None = None,
     ) -> tuple[Usuario, EventoAuditoriaUsuario]:
         """Modifica datos y/o rol de una cuenta existente (RN-06)."""
-        ServicioGestionUsuarios.validar_admin(operador)
+        ServicioGestionUsuarios._validar_permiso_operador(
+            operador, PermisoOperacion.GESTIONAR_USUARIOS, roles
+        )
+        if nuevo_rol is not None:
+            ServicioGestionUsuarios._validar_permiso_operador(
+                operador, PermisoOperacion.ASIGNAR_ROLES, roles
+            )
 
         detalle: dict[str, str] = {}
         nombre_final = usuario_target.nombre_completo
@@ -372,6 +454,15 @@ class ServicioGestionUsuarios:
         rol_final = usuario_target.rol
         if nuevo_rol is not None:
             rol_validado = _validar_rol_asignable(nuevo_rol, roles or [])
+            if (
+                _codigo_rol(rol_validado) != RolUsuario.ADMIN.value
+                and ServicioGestionUsuarios._es_ultimo_admin_activo(
+                    usuario_target, usuarios_existentes
+                )
+            ):
+                raise UltimoAdminException(
+                    "No se puede quitar el rol ADMIN al último administrador activo."
+                )
             detalle["rol_anterior"] = _codigo_rol(usuario_target.rol)
             detalle["rol_nuevo"] = _codigo_rol(rol_validado)
             rol_final = rol_validado
@@ -407,9 +498,23 @@ class ServicioGestionUsuarios:
         usuario_target: Usuario,
         nuevo_estado: EstadoUsuario,
         fecha_hora: datetime | None = None,
+        usuarios_existentes: Sequence[Usuario] | None = None,
+        roles: Sequence[Rol] | None = None,
     ) -> tuple[Usuario, EventoAuditoriaUsuario]:
         """Activa o desactiva una cuenta sin eliminar historial (RN-07, RN-11)."""
-        ServicioGestionUsuarios.validar_admin(operador)
+        ServicioGestionUsuarios._validar_permiso_operador(
+            operador, PermisoOperacion.GESTIONAR_USUARIOS, roles
+        )
+
+        if (
+            nuevo_estado == EstadoUsuario.INACTIVO
+            and ServicioGestionUsuarios._es_ultimo_admin_activo(
+                usuario_target, usuarios_existentes
+            )
+        ):
+            raise UltimoAdminException(
+                "No se puede desactivar al último administrador activo."
+            )
 
         usuario_actualizado = Usuario(
             id=usuario_target.id,
@@ -449,12 +554,14 @@ class ServicioGestionUsuarios:
         usuario_target: Usuario,
         nueva_password_plana: str,
         fecha_hora: datetime | None = None,
+        roles: Sequence[Rol] | None = None,
+        longitud_minima: int = 8,
     ) -> tuple[Usuario, EventoAuditoriaUsuario]:
         """Restablece la credencial sin conocer la contraseña anterior (RN-12)."""
-        ServicioGestionUsuarios.validar_admin(operador)
-
-        if not nueva_password_plana or len(nueva_password_plana) < 6:
-            raise UsuarioException("La nueva contraseña debe tener al menos 6 caracteres.")
+        ServicioGestionUsuarios._validar_permiso_operador(
+            operador, PermisoOperacion.GESTIONAR_USUARIOS, roles
+        )
+        validar_politica_password(nueva_password_plana, longitud_minima)
 
         pwd_hash, salt = hashear_password(nueva_password_plana)
         usuario_actualizado = Usuario(
@@ -481,6 +588,53 @@ class ServicioGestionUsuarios:
         )
 
         return usuario_actualizado, auditoria
+
+    @staticmethod
+    def desactivar_y_revocar_sesiones(
+        operador: Usuario,
+        usuario_target: Usuario,
+        sesiones: Sequence[SesionUsuario],
+        fecha_hora: datetime | None = None,
+        usuarios_existentes: Sequence[Usuario] | None = None,
+        roles: Sequence[Rol] | None = None,
+    ) -> tuple[Usuario, EventoAuditoriaUsuario, list[SesionUsuario]]:
+        """Desactiva la cuenta y revoca todas sus sesiones activas (RN-09)."""
+        actualizado, auditoria = ServicioGestionUsuarios.cambiar_estado(
+            operador=operador,
+            usuario_target=usuario_target,
+            nuevo_estado=EstadoUsuario.INACTIVO,
+            fecha_hora=fecha_hora,
+            usuarios_existentes=usuarios_existentes,
+            roles=roles,
+        )
+        sesiones_actualizadas = ServicioAutenticacionYPermisos.revocar_sesiones_usuario(
+            usuario_target.id, sesiones
+        )
+        return actualizado, auditoria, sesiones_actualizadas
+
+    @staticmethod
+    def restablecer_password_y_revocar_sesiones(
+        operador: Usuario,
+        usuario_target: Usuario,
+        nueva_password_plana: str,
+        sesiones: Sequence[SesionUsuario],
+        fecha_hora: datetime | None = None,
+        roles: Sequence[Rol] | None = None,
+        longitud_minima: int = 8,
+    ) -> tuple[Usuario, EventoAuditoriaUsuario, list[SesionUsuario]]:
+        """Restablece la credencial y revoca las sesiones vigentes (RN-09, RN-12)."""
+        actualizado, auditoria = ServicioGestionUsuarios.restablecer_password(
+            operador=operador,
+            usuario_target=usuario_target,
+            nueva_password_plana=nueva_password_plana,
+            fecha_hora=fecha_hora,
+            roles=roles,
+            longitud_minima=longitud_minima,
+        )
+        sesiones_actualizadas = ServicioAutenticacionYPermisos.revocar_sesiones_usuario(
+            usuario_target.id, sesiones
+        )
+        return actualizado, auditoria, sesiones_actualizadas
 
     @staticmethod
     def filtrar_usuarios(
