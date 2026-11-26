@@ -7,6 +7,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from enum import StrEnum
+from typing import Final
 
 from src.dominio.asistencia import UsuarioOperador
 from src.dominio.usuarios import (
@@ -15,7 +16,7 @@ from src.dominio.usuarios import (
     ServicioAutenticacionYPermisos,
 )
 
-ZONA_HORARIA_LIMA = timezone(timedelta(hours=-5))
+ZONA_HORARIA_LIMA: Final[timezone] = timezone(timedelta(hours=-5))
 
 
 class EstadoAcademico(StrEnum):
@@ -26,7 +27,7 @@ class EstadoAcademico(StrEnum):
     EGRESADO = "EGRESADO"
 
 
-ESTADOS_QUE_ANULAN_CARNET: frozenset[EstadoAcademico] = frozenset(
+ESTADOS_QUE_ANULAN_CARNET: Final[frozenset[EstadoAcademico]] = frozenset(
     {
         EstadoAcademico.RETIRADO,
         EstadoAcademico.TRASLADADO,
@@ -34,7 +35,7 @@ ESTADOS_QUE_ANULAN_CARNET: frozenset[EstadoAcademico] = frozenset(
     }
 )
 
-TRANSICIONES_VALIDAS: dict[EstadoAcademico, frozenset[EstadoAcademico]] = {
+TRANSICIONES_VALIDAS: Final[dict[EstadoAcademico, frozenset[EstadoAcademico]]] = {
     EstadoAcademico.ACTIVO: frozenset(
         {
             EstadoAcademico.SUSPENDIDO,
@@ -110,6 +111,43 @@ def _normalizar_fecha_hora(fecha_hora: datetime) -> datetime:
     return fecha_hora.astimezone(ZONA_HORARIA_LIMA)
 
 
+def _normalizar_motivo(motivo: str) -> str:
+    """Valida que el motivo no sea vacío y devuelve su texto limpio."""
+    motivo_limpio = motivo.strip() if isinstance(motivo, str) else ""
+    if not motivo_limpio:
+        raise MotivoObligatorioException(
+            "El motivo del cambio de estado académico es obligatorio."
+        )
+    return motivo_limpio
+
+
+def _validar_transicion_y_suspension(
+    estado_actual: EstadoAcademico,
+    nuevo_estado: EstadoAcademico,
+    fecha_inicio_suspension: date | None,
+    fecha_fin_suspension: date | None,
+) -> tuple[date | None, date | None]:
+    """Valida la matriz de transiciones y el rango de fechas si aplica suspensión."""
+    permitidos = TRANSICIONES_VALIDAS.get(estado_actual, frozenset())
+    if nuevo_estado not in permitidos:
+        raise TransicionEstadoInvalidaException(
+            f"Transición inválida de '{estado_actual.value}' a '{nuevo_estado.value}'."
+        )
+
+    if nuevo_estado != EstadoAcademico.SUSPENDIDO:
+        return None, None
+
+    if fecha_inicio_suspension is None or fecha_fin_suspension is None:
+        raise RangoSuspensionInvalidoException(
+            "La suspensión requiere fecha de inicio y fecha de fin."
+        )
+    if fecha_inicio_suspension > fecha_fin_suspension:
+        raise RangoSuspensionInvalidoException(
+            "La fecha de inicio de suspensión no puede superar a la fecha de fin."
+        )
+    return fecha_inicio_suspension, fecha_fin_suspension
+
+
 class ServicioEstadosAcademicos:
     """Implementa las reglas de negocio del PBI-08 (Estados Académicos de Acceso)."""
 
@@ -147,32 +185,13 @@ class ServicioEstadosAcademicos:
     ) -> ResultadoCambioEstado:
         """Valida y ejecuta la transición de estado académico de un alumno."""
         ServicioEstadosAcademicos.validar_operador(operador, roles=roles)
-
-        motivo_limpio = motivo.strip() if isinstance(motivo, str) else ""
-        if not motivo_limpio:
-            raise MotivoObligatorioException(
-                "El motivo del cambio de estado académico es obligatorio."
-            )
-
-        permitidos = TRANSICIONES_VALIDAS.get(estado_actual, frozenset())
-        if nuevo_estado not in permitidos:
-            raise TransicionEstadoInvalidaException(
-                f"Transición inválida de '{estado_actual.value}' a '{nuevo_estado.value}'."
-            )
-
-        inicio_suspension: date | None = None
-        fin_suspension: date | None = None
-        if nuevo_estado == EstadoAcademico.SUSPENDIDO:
-            if fecha_inicio_suspension is None or fecha_fin_suspension is None:
-                raise RangoSuspensionInvalidoException(
-                    "La suspensión requiere fecha de inicio y fecha de fin."
-                )
-            if fecha_inicio_suspension > fecha_fin_suspension:
-                raise RangoSuspensionInvalidoException(
-                    "La fecha de inicio de suspensión no puede superar a la fecha de fin."
-                )
-            inicio_suspension = fecha_inicio_suspension
-            fin_suspension = fecha_fin_suspension
+        motivo_limpio = _normalizar_motivo(motivo)
+        inicio_suspension, fin_suspension = _validar_transicion_y_suspension(
+            estado_actual=estado_actual,
+            nuevo_estado=nuevo_estado,
+            fecha_inicio_suspension=fecha_inicio_suspension,
+            fecha_fin_suspension=fecha_fin_suspension,
+        )
 
         historial = HistorialEstadoAlumno(
             id=f"est-{uuid.uuid4().hex[:12]}",
