@@ -228,6 +228,30 @@ def _contar_matriculados_activos(
     )
 
 
+def _validar_salon_activo(salon: Salon) -> None:
+    if not salon.activo:
+        raise SalonInactivoException(
+            f"El salón {salon.grado} '{salon.seccion}' no se encuentra activo."
+        )
+
+
+def _validar_vacantes_salon(
+    salon: Salon,
+    matriculas_existentes: Sequence[FichaMatricula],
+    excluir_alumno_id: int | None = None,
+) -> None:
+    ocupados = _contar_matriculados_activos(
+        salon,
+        matriculas_existentes,
+        excluir_alumno_id=excluir_alumno_id,
+    )
+    if ocupados >= salon.capacidad_maxima:
+        raise SalonSinVacantesException(
+            f"El salón {salon.grado} '{salon.seccion}' ({salon.anio_lectivo}) "
+            "no cuenta con vacantes disponibles."
+        )
+
+
 class ServicioMatricula:
     """Implementa las reglas de negocio del PBI-05 (Ficha de Matrícula Digital)."""
 
@@ -266,11 +290,7 @@ class ServicioMatricula:
     ) -> FichaMatricula:
         """Registra una matrícula digital validando datos, apoderados, duplicados y vacantes."""
         ServicioMatricula.validar_operador(operador, roles=roles)
-
-        if not salon.activo:
-            raise SalonInactivoException(
-                f"El salón {salon.grado} '{salon.seccion}' no se encuentra activo."
-            )
+        _validar_salon_activo(salon)
 
         if not _es_entero_valido(alumno_id) or alumno_id <= 0:
             raise MatriculaException("El identificador del alumno debe ser un entero positivo.")
@@ -311,11 +331,7 @@ class ServicioMatricula:
                     f"El código de estudiante '{codigo_limpio}' ya está registrado."
                 )
 
-        if _contar_matriculados_activos(salon, matriculas_existentes) >= salon.capacidad_maxima:
-            raise SalonSinVacantesException(
-                f"El salón {salon.grado} '{salon.seccion}' ({salon.anio_lectivo}) "
-                "no cuenta con vacantes disponibles."
-            )
+        _validar_vacantes_salon(salon, matriculas_existentes)
 
         momento = (
             _normalizar_fecha_hora(creado_en)
@@ -368,10 +384,7 @@ class ServicioMatricula:
             raise MatriculaException(
                 "Solo se puede cambiar de salón a un estudiante en estado ACTIVO."
             )
-        if not nuevo_salon.activo:
-            raise SalonInactivoException(
-                f"El salón {nuevo_salon.grado} '{nuevo_salon.seccion}' no se encuentra activo."
-            )
+        _validar_salon_activo(nuevo_salon)
         if nuevo_salon.anio_lectivo != ficha.anio_lectivo:
             raise MatriculaException(
                 "El cambio interno de salón solo se permite dentro del mismo año lectivo."
@@ -379,16 +392,11 @@ class ServicioMatricula:
         if nuevo_salon.id == ficha.salon_id:
             raise MatriculaException("El estudiante ya pertenece al salón indicado.")
 
-        ocupados = _contar_matriculados_activos(
+        _validar_vacantes_salon(
             nuevo_salon,
             matriculas_existentes,
             excluir_alumno_id=ficha.alumno_id,
         )
-        if ocupados >= nuevo_salon.capacidad_maxima:
-            raise SalonSinVacantesException(
-                f"El salón {nuevo_salon.grado} '{nuevo_salon.seccion}' ({nuevo_salon.anio_lectivo}) "
-                "no cuenta con vacantes disponibles."
-            )
 
         return replace(
             ficha,

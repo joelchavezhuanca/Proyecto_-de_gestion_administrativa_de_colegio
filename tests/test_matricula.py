@@ -326,9 +326,11 @@ def test_bdd_escenario_1_matricular_estudiante_exitoso_admin_y_staff(
         apoderados=(apoderado_principal,),
         matriculas_existentes=[ficha1],
         fecha_actual=FECHA_ACTUAL,
+        creado_en=datetime(2026, 3, 1, 14, 0, 0, tzinfo=UTC),
     )
     assert ficha2.alumno_id == 102
     assert ficha2.salon_id == salon_3a.id
+    assert ficha2.creado_en == datetime(2026, 3, 1, 9, 0, 0, tzinfo=ZONA_LIMA)
 
 
 def test_matricular_mismo_estudiante_en_otro_anio_lectivo_es_permitido(
@@ -794,10 +796,24 @@ def test_cambiar_salon_rechaza_alumno_no_activo_salon_invalido_y_sin_vacantes(
         )
 
     # Salón destino sin vacantes
-    ocupante1 = replace(ficha, id="mat-o1", alumno_id=201, codigo_estudiante="EST-201",
-                        dni="72010001", salon_id=salon_3b.id, seccion="B")
-    ocupante2 = replace(ficha, id="mat-o2", alumno_id=202, codigo_estudiante="EST-202",
-                        dni="72020002", salon_id=salon_3b.id, seccion="B")
+    ocupante1 = replace(
+        ficha,
+        id="mat-o1",
+        alumno_id=201,
+        codigo_estudiante="EST-201",
+        dni="72010001",
+        salon_id=salon_3b.id,
+        seccion="B",
+    )
+    ocupante2 = replace(
+        ficha,
+        id="mat-o2",
+        alumno_id=202,
+        codigo_estudiante="EST-202",
+        dni="72020002",
+        salon_id=salon_3b.id,
+        seccion="B",
+    )
     with pytest.raises(SalonSinVacantesException):
         ServicioMatricula.cambiar_salon(
             operador=admin_op,
@@ -805,6 +821,16 @@ def test_cambiar_salon_rechaza_alumno_no_activo_salon_invalido_y_sin_vacantes(
             nuevo_salon=salon_3b,
             matriculas_existentes=[ficha, ocupante1, ocupante2],
         )
+
+    # Si un ocupante del salón destino está RETIRADO, la vacante está disponible
+    ocupante2_retirado = replace(ocupante2, estado=EstadoAcademico.RETIRADO)
+    trasladada = ServicioMatricula.cambiar_salon(
+        operador=admin_op,
+        ficha=ficha,
+        nuevo_salon=salon_3b,
+        matriculas_existentes=[ficha, ocupante1, ocupante2_retirado],
+    )
+    assert trasladada.salon_id == salon_3b.id
 
 
 def test_bdd_escenario_6_permisos_base_y_roles_dinamicos(
