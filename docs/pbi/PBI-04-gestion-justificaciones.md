@@ -25,7 +25,7 @@ Como operador con permiso `GESTIONAR_JUSTIFICACIONES`, deseo registrar, consulta
 - **RN-09 / RN-10:** Registro atómico cambia asistencia a `JUSTIFICADO` (`minutos_tardanza = 0`, guarda `estado_anterior` y `minutos_tardanza_original`). La anulación (en período abierto) restaura el estado y los minutos originales.
 - **RN-11:** Modificación permitida sobre justificaciones vigentes dentro de período abierto (actualiza categoría/motivo y permite anexar nuevos adjuntos).
 - **RN-12 / RN-13 (Adjuntos):** Opcionales; extensiones permitidas `pdf`, `jpg`, `jpeg`, `png`; tamaño `<= 5 MB` (`5_242_880` bytes); máximo `3` adjuntos por justificación; **inmutables** (no se eliminan ni sobrescriben al modificar).
-- **RN-14 a RN-16 (Períodos Académicos):** Períodos flexibles (`BIMESTRE`, `TRIMESTRE`, `SEMESTRE`) con `anio_lectivo`, `orden`, `nombre` único, `fecha_inicio <= fecha_fin` y `fecha_limite_notas` (usada por `PBI-10`). Sin solapamiento de fechas y sin borrado si tienen justificaciones o calificaciones asociadas.
+- **RN-14 a RN-16 (Períodos Académicos):** Períodos flexibles (`BIMESTRE`, `TRIMESTRE`, `SEMESTRE`) con `anio_lectivo`, `orden`, `nombre` único, `fecha_inicio <= fecha_fin` y `fecha_limite_notas` (usada por `PBI-10`), la cual debe ser `>= fecha_inicio` y **puede ser posterior a `fecha_fin`** para que los docentes regularicen calificaciones al cierre del período. Sin solapamiento de fechas y sin borrado si tienen justificaciones o calificaciones asociadas.
 - **RN-17 / RN-18:** Historial filtrable por `nivel`, `grado`, `seccion`, `alumno_id`, `categoria`, `estado` y fechas; todo auditado en `PBI-16`.
 
 ---
