@@ -4,6 +4,12 @@ import pytest
 
 try:
     from src.dominio.aforo import (
+        ACTOR_SYSTEM_CRON,
+        AforoException,
+        CalendarioEscolar,
+        CierreYaEjecutadoException,
+        DetalleAsistenciaAlumno,
+        DiaNoLectivoException,
         PermisoAforoException,
         ServicioAforo,
     )
@@ -28,8 +34,15 @@ try:
         PermisoJustificacionException,
         ServicioJustificaciones,
     )
+    from src.dominio.usuarios import PermisoOperacion, Rol
 except ImportError:
     from aforo_dominio import (  # type: ignore
+        ACTOR_SYSTEM_CRON,
+        AforoException,
+        CalendarioEscolar,
+        CierreYaEjecutadoException,
+        DetalleAsistenciaAlumno,
+        DiaNoLectivoException,
         PermisoAforoException,
         ServicioAforo,
     )
@@ -54,6 +67,7 @@ except ImportError:
         PermisoJustificacionException,
         ServicioJustificaciones,
     )
+    from usuarios_dominio import PermisoOperacion, Rol  # type: ignore
 
 
 @pytest.fixture
@@ -372,6 +386,493 @@ def test_aforo_ejecutar_cierre_automatico(
     assert 101 not in evento.alumnos_ids_afectados
     assert 999 not in evento.alumnos_ids_afectados
     assert all(a.estado == EstadoAsistencia.AUSENTE for a in nuevas)
+
+
+# --- PRUEBAS PBI-03 CIERRE DE BRECHAS: CALENDARIO, RBAC DINÁMICO, FILTROS, DETALLE E HISTORIAL ---
+
+
+def test_calendario_escolar_evalua_dias_lectivos_feriados_fines_de_semana_y_excepciones() -> None:
+    """Valida reglas de CalendarioEscolar: excepciones > feriados > fines de semana > lectivos."""
+    feriado = date(2026, 7, 28)  # Martes (Fiestas Patrias)
+    sabado = date(2026, 11, 7)  # Sábado
+    domingo_habilitado = date(2026, 11, 8)  # Domingo con excepción lectiva
+    lunes_normal = date(2026, 11, 2)  # Lunes
+
+    calendario = CalendarioEscolar(
+        dias_no_lectivos=frozenset({feriado, domingo_habilitado}),
+        excepciones_lectivas=frozenset({domingo_habilitado}),
+        fines_de_semana_no_lectivos=True,
+    )
+
+    assert calendario.es_dia_lectivo(lunes_normal) is True
+    assert calendario.es_dia_lectivo(feriado) is False
+    assert calendario.es_dia_lectivo(sabado) is False
+    assert calendario.es_dia_lectivo(domingo_habilitado) is True
+
+    calendario_con_finde = CalendarioEscolar(fines_de_semana_no_lectivos=False)
+    assert calendario_con_finde.es_dia_lectivo(sabado) is True
+
+
+def test_aforo_roles_personalizados_consulta_y_configuracion(
+    alumnos_muestra: list[Alumno],
+) -> None:
+    """Roles personalizados con permisos dinámicos acceden al dashboard y configuración."""
+    rol_visor = Rol(
+        codigo="SUPERVISOR_AFORO",
+        nombre="Supervisor de Aforo",
+        descripcion="Consulta el dashboard de aforo",
+        permisos=frozenset({PermisoOperacion.CONSULTAR_DASHBOARD_AFORO}),
+    )
+    rol_config = Rol(
+        codigo="GESTOR_HORARIOS",
+        nombre="Gestor de Horarios",
+        descripcion="Configura la hora oficial de cierre",
+        permisos=frozenset({PermisoOperacion.CONFIGURAR_CIERRE_ASISTENCIA}),
+    )
+    op_visor = UsuarioOperador(
+        id=20, username="sup_aforo", rol="SUPERVISOR_AFORO"  # type: ignore[arg-type]
+    )
+    op_config = UsuarioOperador(
+        id=21, username="gestor_cierre", rol="GESTOR_HORARIOS"  # type: ignore[arg-type]
+    )
+
+    metricas = ServicioAforo.calcular_metricas(
+        operador=op_visor,
+        alumnos=alumnos_muestra,
+        asistencias_dia=[],
+        fecha_escolar=date(2026, 11, 2),
+        hora_consulta=time(8, 0, 0),
+        roles=[rol_visor, rol_config],
+    )
+    assert metricas.total_matriculados == 5
+
+    assert ServicioAforo.configurar_hora_cierre(
+        op_config, time(8, 50, 0), roles=[rol_visor, rol_config]
+    ) == time(8, 50, 0)
+
+    with pytest.raises(PermisoAforoException, match="no está autorizado"):
+        ServicioAforo.validar_acceso_consulta(op_config, roles=[rol_visor, rol_config])
+
+    with pytest.raises(PermisoAforoException):
+        ServicioAforo.configurar_hora_cierre(
+            op_visor, time(8, 50, 0), roles=[rol_visor, rol_config]
+        )
+
+
+def test_aforo_cierre_automatico_acepta_system_cron_y_rol_personalizado(
+    alumnos_muestra: list[Alumno],
+) -> None:
+    """SYSTEM_CRON y roles personalizados con EJECUTAR_CIERRE_ASISTENCIA ejecutan el cierre."""
+    fecha = date(2026, 11, 2)  # Lunes
+    ast_pendiente = RegistroAsistencia(
+        id="ast-pend-101",
+        alumno_id=101,
+        fecha_escolar=fecha,
+        hora_efectiva=time(7, 0, 0),
+        estado=EstadoAsistencia.PENDIENTE,
+        minutos_tardanza=0,
+        metodo=MetodoRegistro.MANUAL_BUSQUEDA,
+        usuario_id=1,
+        rol_usuario=RolUsuario.ADMIN,
+    )
+
+    nuevas_cron, evento_cron = ServicioAforo.ejecutar_cierre_automatico(
+        operador_o_sistema=ACTOR_SYSTEM_CRON,
+        alumnos=alumnos_muestra,
+        asistencias_existentes=[ast_pendiente],
+        fecha_escolar=fecha,
+        hora_cierre=time(9, 0, 0),
+        calendario=CalendarioEscolar(),
+    )
+    assert len(nuevas_cron) == 5
+    assert evento_cron.total_ausentes_marcados == 5
+    assert all(a.usuario_id == 0 and a.rol_usuario == ACTOR_SYSTEM_CRON for a in nuevas_cron)
+    assert any(a.id == "ast-pend-101" and a.estado == EstadoAsistencia.AUSENTE for a in nuevas_cron)
+
+    rol_cierre = Rol(
+        codigo="OPERADOR_CIERRE",
+        nombre="Operador de Cierre",
+        descripcion="Ejecuta el cierre diario",
+        permisos=frozenset({PermisoOperacion.EJECUTAR_CIERRE_ASISTENCIA}),
+    )
+    op_cierre = UsuarioOperador(
+        id=30, username="op_cierre", rol="OPERADOR_CIERRE"  # type: ignore[arg-type]
+    )
+    nuevas_custom, evento_custom = ServicioAforo.ejecutar_cierre_automatico(
+        operador_o_sistema=op_cierre,
+        alumnos=alumnos_muestra,
+        asistencias_existentes=[],
+        fecha_escolar=fecha,
+        hora_cierre=time(9, 0, 0),
+        roles=[rol_cierre],
+    )
+    assert len(nuevas_custom) == 5
+    assert evento_custom.total_ausentes_marcados == 5
+
+
+def test_aforo_cierre_automatico_rechaza_actores_sin_permiso_doble_cierre_y_no_lectivo(
+    admin_op: UsuarioOperador,
+    coord_op: UsuarioOperador,
+    staff_op: UsuarioOperador,
+    alumnos_muestra: list[Alumno],
+) -> None:
+    """Valida permisos, CierreYaEjecutadoException y DiaNoLectivoException en el cierre."""
+    lunes = date(2026, 11, 2)
+    sabado = date(2026, 11, 7)
+    feriado = date(2026, 7, 28)
+
+    for no_autorizado in [coord_op, staff_op]:
+        with pytest.raises(PermisoAforoException, match="no está autorizado"):
+            ServicioAforo.ejecutar_cierre_automatico(
+                operador_o_sistema=no_autorizado,
+                alumnos=alumnos_muestra,
+                asistencias_existentes=[],
+                fecha_escolar=lunes,
+                hora_cierre=time(9, 0, 0),
+            )
+
+    op_inactivo = UsuarioOperador(
+        id=1, username="admin_off", rol=RolUsuario.ADMIN, activo=False
+    )
+    with pytest.raises(PermisoAforoException, match="no tiene una cuenta activa"):
+        ServicioAforo.ejecutar_cierre_automatico(
+            operador_o_sistema=op_inactivo,
+            alumnos=alumnos_muestra,
+            asistencias_existentes=[],
+            fecha_escolar=lunes,
+            hora_cierre=time(9, 0, 0),
+        )
+
+    with pytest.raises(PermisoAforoException, match="no está autorizado"):
+        ServicioAforo.ejecutar_cierre_automatico(
+            operador_o_sistema="OTRO_PROCESO",
+            alumnos=alumnos_muestra,
+            asistencias_existentes=[],
+            fecha_escolar=lunes,
+            hora_cierre=time(9, 0, 0),
+        )
+
+    with pytest.raises(CierreYaEjecutadoException):
+        ServicioAforo.ejecutar_cierre_automatico(
+            operador_o_sistema=admin_op,
+            alumnos=alumnos_muestra,
+            asistencias_existentes=[],
+            fecha_escolar=lunes,
+            hora_cierre=time(9, 0, 0),
+            fechas_ya_cerradas={lunes},
+        )
+
+    calendario = CalendarioEscolar(
+        dias_no_lectivos=frozenset({feriado}),
+        excepciones_lectivas=frozenset({sabado}),
+    )
+    with pytest.raises(DiaNoLectivoException):
+        ServicioAforo.ejecutar_cierre_automatico(
+            operador_o_sistema=ACTOR_SYSTEM_CRON,
+            alumnos=alumnos_muestra,
+            asistencias_existentes=[],
+            fecha_escolar=feriado,
+            hora_cierre=time(9, 0, 0),
+            calendario=calendario,
+        )
+
+    # Sábado habilitado excepcionalmente sí permite cierre
+    nuevas_excepcion, evento_excepcion = ServicioAforo.ejecutar_cierre_automatico(
+        operador_o_sistema=ACTOR_SYSTEM_CRON,
+        alumnos=alumnos_muestra,
+        asistencias_existentes=[],
+        fecha_escolar=sabado,
+        hora_cierre=time(9, 0, 0),
+        calendario=calendario,
+    )
+    assert len(nuevas_excepcion) == 5
+    assert evento_excepcion.fecha_escolar == sabado
+
+
+def test_aforo_calcular_metricas_filtra_por_nivel_grado_y_seccion_sin_mezclar_paralelas(
+    staff_op: UsuarioOperador, alumnos_muestra: list[Alumno]
+) -> None:
+    """Filtros insensibles a mayúsculas/espacios separan correctamente 5to A de 5to B."""
+    fecha = date(2026, 11, 2)
+    asistencias = [
+        RegistroAsistencia(
+            id="ast-f1",
+            alumno_id=101,
+            fecha_escolar=fecha,
+            hora_efectiva=time(7, 10, 0),
+            estado=EstadoAsistencia.PUNTUAL,
+            minutos_tardanza=0,
+            metodo=MetodoRegistro.CARNET,
+            usuario_id=staff_op.id,
+            rol_usuario=staff_op.rol,
+        ),
+        RegistroAsistencia(
+            id="ast-f2",
+            alumno_id=103,  # Secundaria 5to B (no debe mezclarse con 5to A)
+            fecha_escolar=fecha,
+            hora_efectiva=time(7, 12, 0),
+            estado=EstadoAsistencia.PUNTUAL,
+            minutos_tardanza=0,
+            metodo=MetodoRegistro.CARNET,
+            usuario_id=staff_op.id,
+            rol_usuario=staff_op.rol,
+        ),
+    ]
+
+    metricas_5a = ServicioAforo.calcular_metricas(
+        operador=staff_op,
+        alumnos=alumnos_muestra,
+        asistencias_dia=asistencias,
+        fecha_escolar=fecha,
+        hora_consulta=time(8, 0, 0),
+        nivel="  secundaria ",
+        grado="5TO",
+        seccion=" a ",
+    )
+    assert metricas_5a.total_matriculados == 2
+    assert metricas_5a.presentes == 1
+    assert metricas_5a.pendientes == 1
+    assert len(metricas_5a.desglose_salones) == 1
+    assert metricas_5a.desglose_salones[0].seccion == "A"
+
+    metricas_primaria = ServicioAforo.calcular_metricas(
+        operador=staff_op,
+        alumnos=alumnos_muestra,
+        asistencias_dia=asistencias,
+        fecha_escolar=fecha,
+        hora_consulta=time(8, 0, 0),
+        nivel="primaria",
+    )
+    assert metricas_primaria.total_matriculados == 2
+    assert metricas_primaria.presentes == 0
+    assert metricas_primaria.pendientes == 2
+
+    metricas_vacio = ServicioAforo.calcular_metricas(
+        operador=staff_op,
+        alumnos=alumnos_muestra,
+        asistencias_dia=asistencias,
+        fecha_escolar=fecha,
+        hora_consulta=time(8, 0, 0),
+        nivel="Secundaria",
+        grado="5to",
+        seccion="Z",
+    )
+    assert metricas_vacio.total_matriculados == 0
+    assert metricas_vacio.porcentaje_asistencia == 0.0
+    assert metricas_vacio.desglose_salones == []
+
+
+def test_aforo_obtener_detalle_salon_antes_y_despues_de_cierre(
+    coord_op: UsuarioOperador, alumnos_muestra: list[Alumno]
+) -> None:
+    """RN-04: Detalle individual de salón muestra estado, hora efectiva, tardanza y método."""
+    fecha = date(2026, 11, 2)
+    alumno_inactivo = Alumno(
+        id=998,
+        codigo="SEC-5A-INAC",
+        dni="99999998",
+        nombres="Alumno",
+        apellidos="Retirado",
+        nivel="Secundaria",
+        grado="5to",
+        seccion="A",
+        carnet_codigo="CRN-998",
+        estado=EstadoAlumno.INACTIVO,
+    )
+    asistencias = [
+        RegistroAsistencia(
+            id="ast-d1",
+            alumno_id=101,
+            fecha_escolar=fecha,
+            hora_efectiva=time(7, 20, 0),
+            estado=EstadoAsistencia.TARDANZA,
+            minutos_tardanza=5,
+            metodo=MetodoRegistro.CARNET,
+            usuario_id=coord_op.id,
+            rol_usuario=coord_op.rol,
+        ),
+        RegistroAsistencia(
+            id="ast-d2",
+            alumno_id=103,  # 5to B, no pertenece a 5to A
+            fecha_escolar=fecha,
+            hora_efectiva=time(7, 10, 0),
+            estado=EstadoAsistencia.PUNTUAL,
+            minutos_tardanza=0,
+            metodo=MetodoRegistro.MANUAL_DNI,
+            usuario_id=coord_op.id,
+            rol_usuario=coord_op.rol,
+        ),
+    ]
+
+    detalle_antes = ServicioAforo.obtener_detalle_salon(
+        operador=coord_op,
+        alumnos=[*alumnos_muestra, alumno_inactivo],
+        asistencias_dia=asistencias,
+        nivel="secundaria",
+        grado="5to",
+        seccion="a",
+        hora_consulta=time(8, 15, 0),
+        hora_cierre=time(9, 0, 0),
+    )
+    assert len(detalle_antes) == 2
+    assert all(isinstance(item, DetalleAsistenciaAlumno) for item in detalle_antes)
+    por_id = {item.alumno_id: item for item in detalle_antes}
+    assert por_id[101].estado == EstadoAsistencia.TARDANZA
+    assert por_id[101].hora_efectiva == time(7, 20, 0)
+    assert por_id[101].minutos_tardanza == 5
+    assert por_id[101].metodo == MetodoRegistro.CARNET
+    assert por_id[101].nombre_completo == "Eduardo Luna"
+    assert por_id[102].estado == EstadoAsistencia.PENDIENTE
+    assert por_id[102].hora_efectiva is None
+    assert por_id[102].metodo is None
+
+    # Después del cierre: alumno sin registro y registro PENDIENTE se muestran como AUSENTE
+    ast_pendiente_102 = RegistroAsistencia(
+        id="ast-pend-102",
+        alumno_id=102,
+        fecha_escolar=fecha,
+        hora_efectiva=time(7, 0, 0),
+        estado=EstadoAsistencia.PENDIENTE,
+        minutos_tardanza=0,
+        metodo=MetodoRegistro.MANUAL_BUSQUEDA,
+        usuario_id=coord_op.id,
+        rol_usuario=coord_op.rol,
+    )
+    detalle_despues = ServicioAforo.obtener_detalle_salon(
+        operador=coord_op,
+        alumnos=alumnos_muestra,
+        asistencias_dia=[asistencias[0], ast_pendiente_102],
+        nivel="Secundaria",
+        grado="5to",
+        seccion="A",
+        hora_consulta=time(9, 10, 0),
+        hora_cierre=time(9, 0, 0),
+    )
+    por_id_despues = {item.alumno_id: item for item in detalle_despues}
+    assert por_id_despues[102].estado == EstadoAsistencia.AUSENTE
+
+    detalle_5b_despues = ServicioAforo.obtener_detalle_salon(
+        operador=coord_op,
+        alumnos=alumnos_muestra,
+        asistencias_dia=[],
+        nivel="Secundaria",
+        grado="5to",
+        seccion="B",
+        hora_consulta=time(9, 10, 0),
+        hora_cierre=time(9, 0, 0),
+    )
+    assert len(detalle_5b_despues) == 1
+    assert detalle_5b_despues[0].estado == EstadoAsistencia.AUSENTE
+    assert detalle_5b_despues[0].hora_efectiva is None
+
+
+def test_aforo_consultar_historial_modificaciones_filtros_y_permisos(
+    staff_op: UsuarioOperador,
+) -> None:
+    """RN-05: Devuelve solo registros modificados filtrados por fecha y alumno."""
+    ast_sin_cambios = RegistroAsistencia(
+        id="ast-h1",
+        alumno_id=101,
+        fecha_escolar=date(2026, 11, 2),
+        hora_efectiva=time(7, 10, 0),
+        estado=EstadoAsistencia.PUNTUAL,
+        minutos_tardanza=0,
+        metodo=MetodoRegistro.CARNET,
+        usuario_id=staff_op.id,
+        rol_usuario=staff_op.rol,
+    )
+    ast_corregida = RegistroAsistencia(
+        id="ast-h2",
+        alumno_id=101,
+        fecha_escolar=date(2026, 11, 3),
+        hora_efectiva=time(7, 25, 0),
+        estado=EstadoAsistencia.TARDANZA,
+        minutos_tardanza=10,
+        metodo=MetodoRegistro.MANUAL_DNI,
+        usuario_id=staff_op.id,
+        rol_usuario=staff_op.rol,
+        estado_anterior=EstadoAsistencia.AUSENTE,
+        motivo_correccion="Ingreso tardío autorizado",
+    )
+    ast_justificada = RegistroAsistencia(
+        id="ast-h3",
+        alumno_id=102,
+        fecha_escolar=date(2026, 11, 5),
+        hora_efectiva=time(8, 0, 0),
+        estado=EstadoAsistencia.JUSTIFICADO,
+        minutos_tardanza=0,
+        metodo=MetodoRegistro.MANUAL_BUSQUEDA,
+        usuario_id=staff_op.id,
+        rol_usuario=staff_op.rol,
+        estado_anterior=EstadoAsistencia.AUSENTE,
+        motivo_correccion="Justificado: Certificado médico",
+    )
+    registros = [ast_sin_cambios, ast_justificada, ast_corregida]
+
+    todos = ServicioAforo.consultar_historial_modificaciones(staff_op, registros)
+    assert [r.id for r in todos] == ["ast-h2", "ast-h3"]
+
+    por_rango = ServicioAforo.consultar_historial_modificaciones(
+        staff_op,
+        registros,
+        fecha_desde=date(2026, 11, 4),
+        fecha_hasta=date(2026, 11, 6),
+    )
+    assert [r.id for r in por_rango] == ["ast-h3"]
+
+    por_alumno = ServicioAforo.consultar_historial_modificaciones(
+        staff_op,
+        registros,
+        fecha_desde=date(2026, 11, 1),
+        fecha_hasta=date(2026, 11, 3),
+        alumno_id=101,
+    )
+    assert [r.id for r in por_alumno] == ["ast-h2"]
+
+    # Rol personalizado con permiso CONSULTAR_HISTORIAL_ASISTENCIA
+    rol_hist = Rol(
+        codigo="AUDITOR_ASISTENCIA",
+        nombre="Auditor de Asistencia",
+        descripcion="Consulta historial de modificaciones",
+        permisos=frozenset({PermisoOperacion.CONSULTAR_HISTORIAL_ASISTENCIA}),
+    )
+    rol_sin_hist = Rol(
+        codigo="SOLO_DASHBOARD",
+        nombre="Solo Dashboard",
+        descripcion="Sin acceso al historial",
+        permisos=frozenset({PermisoOperacion.CONSULTAR_DASHBOARD_AFORO}),
+    )
+    op_hist = UsuarioOperador(
+        id=40, username="aud_ast", rol="AUDITOR_ASISTENCIA"  # type: ignore[arg-type]
+    )
+    op_sin_hist = UsuarioOperador(
+        id=41, username="solo_dash", rol="SOLO_DASHBOARD"  # type: ignore[arg-type]
+    )
+    op_inactivo = UsuarioOperador(
+        id=42, username="inac", rol=RolUsuario.ADMIN, activo=False
+    )
+
+    assert len(
+        ServicioAforo.consultar_historial_modificaciones(
+            op_hist, registros, roles=[rol_hist, rol_sin_hist]
+        )
+    ) == 2
+
+    with pytest.raises(PermisoAforoException, match="no está autorizado"):
+        ServicioAforo.consultar_historial_modificaciones(
+            op_sin_hist, registros, roles=[rol_hist, rol_sin_hist]
+        )
+
+    with pytest.raises(PermisoAforoException, match="no tiene una cuenta activa"):
+        ServicioAforo.consultar_historial_modificaciones(op_inactivo, registros)
+
+    with pytest.raises(AforoException, match="rango"):
+        ServicioAforo.consultar_historial_modificaciones(
+            staff_op,
+            registros,
+            fecha_desde=date(2026, 11, 10),
+            fecha_hasta=date(2026, 11, 5),
+        )
 
 
 # --- PRUEBAS PBI-04: GESTIÓN DE JUSTIFICACIONES ---
