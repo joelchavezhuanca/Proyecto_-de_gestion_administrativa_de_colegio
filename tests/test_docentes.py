@@ -913,6 +913,18 @@ def test_validaciones_consistencia_curso_salon_revocacion_y_filtros(
     )
 
 
+def test_normalizacion_fecha_naive_a_lima() -> None:
+    asignacion = AsignacionDocente(
+        id=1,
+        usuario_docente_id=10,
+        curso_id=201,
+        salon_id=101,
+        anio_lectivo=2026,
+        creado_en=datetime(2026, 3, 2, 8, 30, 0),
+    )
+    assert asignacion.creado_en == datetime(2026, 3, 2, 8, 30, 0, tzinfo=ZONA_HORARIA_LIMA)
+
+
 def test_error_persistencia_auditoria_se_propaga(
     admin_operador: UsuarioOperador,
     docente_activo: Usuario,

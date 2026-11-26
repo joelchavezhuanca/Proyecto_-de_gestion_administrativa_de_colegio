@@ -179,10 +179,53 @@ def _validar_consistencia_curso_salon(
                 "El año lectivo indicado no coincide con el del curso y salón."
             )
     if curso.nivel != salon.nivel or not isinstance(curso.nivel, NivelEducativo):
-        raise AsignacionInvalidaException("El nivel educativo del curso y del salón debe coincidir.")
+        raise AsignacionInvalidaException(
+            "El nivel educativo del curso y del salón debe coincidir."
+        )
     if curso.grado != salon.grado or curso.grado not in GRADOS_POR_NIVEL[curso.nivel]:
         raise AsignacionInvalidaException("El grado del curso y del salón debe coincidir.")
     return salon.anio_lectivo
+
+
+def _registrar_auditoria_operacion(
+    *,
+    operador: ActorDocente,
+    asignacion: AsignacionDocente,
+    fecha_hora: datetime,
+    estado_anterior: str | None,
+    estado_nuevo: str,
+    accion: str,
+    eventos_auditoria_existentes: Sequence[RegistroAuditoria],
+    persistir_auditoria: Callable[[RegistroAuditoria], None] | None,
+    contexto_academico: ContextoAcademicoAuditoria | None = None,
+    motivo: str | None = None,
+    detalle_extra: dict[str, object] | None = None,
+) -> RegistroAuditoria:
+    detalle: dict[str, object] = {
+        "accion": accion,
+        "usuario_docente_id": asignacion.usuario_docente_id,
+        "curso_id": asignacion.curso_id,
+        "salon_id": asignacion.salon_id,
+        "anio_lectivo": asignacion.anio_lectivo,
+    }
+    if detalle_extra:
+        detalle.update(detalle_extra)
+    return ServicioAuditoria.registrar_evento(
+        usuario_id=operador.id,
+        rol_ejecutante=_codigo_rol(operador.rol),
+        operacion=TipoOperacionAuditoria.OTRA,
+        entidad="ASIGNACION_DOCENTE",
+        entidad_id=str(asignacion.id),
+        resultado=ResultadoAuditoria.CONFIRMADA,
+        fecha_hora=fecha_hora,
+        eventos_existentes=eventos_auditoria_existentes,
+        contexto_academico=contexto_academico,
+        estado_anterior=estado_anterior,
+        estado_nuevo=estado_nuevo,
+        motivo=motivo,
+        detalle=detalle,
+        persistir=persistir_auditoria,
+    )
 
 
 def _auditar_y_denegar_ambito(
@@ -300,31 +343,21 @@ class ServicioAsignacionDocente:
             creado_en=momento,
         )
 
-        auditoria = ServicioAuditoria.registrar_evento(
-            usuario_id=operador.id,
-            rol_ejecutante=_codigo_rol(operador.rol),
-            operacion=TipoOperacionAuditoria.OTRA,
-            entidad="ASIGNACION_DOCENTE",
-            entidad_id=str(asignacion.id),
-            resultado=ResultadoAuditoria.CONFIRMADA,
+        auditoria = _registrar_auditoria_operacion(
+            operador=operador,
+            asignacion=asignacion,
             fecha_hora=momento,
-            eventos_existentes=eventos_auditoria_existentes,
+            estado_anterior=None,
+            estado_nuevo="ACTIVA",
+            accion="ASIGNAR_DOCENTE",
+            eventos_auditoria_existentes=eventos_auditoria_existentes,
+            persistir_auditoria=persistir_auditoria,
             contexto_academico=ContextoAcademicoAuditoria(
                 nivel=salon.nivel.value,
                 grado=salon.grado,
                 seccion=salon.seccion,
             ),
-            estado_anterior=None,
-            estado_nuevo="ACTIVA",
-            detalle={
-                "accion": "ASIGNAR_DOCENTE",
-                "usuario_docente_id": docente.id,
-                "curso_id": curso.id,
-                "curso_codigo": curso.codigo,
-                "salon_id": salon.id,
-                "anio_lectivo": anio,
-            },
-            persistir=persistir_auditoria,
+            detalle_extra={"curso_codigo": curso.codigo},
         )
         return ResultadoAsignacionDocente(asignacion=asignacion, auditoria=auditoria)
 
@@ -356,26 +389,16 @@ class ServicioAsignacionDocente:
             revocada_en=momento,
             motivo_revocacion=motivo_limpio,
         )
-        auditoria = ServicioAuditoria.registrar_evento(
-            usuario_id=operador.id,
-            rol_ejecutante=_codigo_rol(operador.rol),
-            operacion=TipoOperacionAuditoria.OTRA,
-            entidad="ASIGNACION_DOCENTE",
-            entidad_id=str(asignacion.id),
-            resultado=ResultadoAuditoria.CONFIRMADA,
+        auditoria = _registrar_auditoria_operacion(
+            operador=operador,
+            asignacion=asignacion,
             fecha_hora=momento,
-            eventos_existentes=eventos_auditoria_existentes,
             estado_anterior="ACTIVA",
             estado_nuevo="REVOCADA",
+            accion="REVOCAR_DOCENTE",
+            eventos_auditoria_existentes=eventos_auditoria_existentes,
+            persistir_auditoria=persistir_auditoria,
             motivo=motivo_limpio or "Revocación de asignación docente",
-            detalle={
-                "accion": "REVOCAR_DOCENTE",
-                "usuario_docente_id": asignacion.usuario_docente_id,
-                "curso_id": asignacion.curso_id,
-                "salon_id": asignacion.salon_id,
-                "anio_lectivo": asignacion.anio_lectivo,
-            },
-            persistir=persistir_auditoria,
         )
         return ResultadoAsignacionDocente(asignacion=revocada, auditoria=auditoria)
 
@@ -397,25 +420,15 @@ class ServicioAsignacionDocente:
                 "utilice la revocación para preservar el historial."
             )
         momento = _normalizar_fecha_hora(fecha_hora or _hora_actual_lima())
-        return ServicioAuditoria.registrar_evento(
-            usuario_id=operador.id,
-            rol_ejecutante=_codigo_rol(operador.rol),
-            operacion=TipoOperacionAuditoria.OTRA,
-            entidad="ASIGNACION_DOCENTE",
-            entidad_id=str(asignacion.id),
-            resultado=ResultadoAuditoria.CONFIRMADA,
+        return _registrar_auditoria_operacion(
+            operador=operador,
+            asignacion=asignacion,
             fecha_hora=momento,
-            eventos_existentes=eventos_auditoria_existentes,
             estado_anterior="ACTIVA" if asignacion.activa else "REVOCADA",
             estado_nuevo="ELIMINADA",
-            detalle={
-                "accion": "ELIMINAR_ASIGNACION",
-                "usuario_docente_id": asignacion.usuario_docente_id,
-                "curso_id": asignacion.curso_id,
-                "salon_id": asignacion.salon_id,
-                "anio_lectivo": asignacion.anio_lectivo,
-            },
-            persistir=persistir_auditoria,
+            accion="ELIMINAR_ASIGNACION",
+            eventos_auditoria_existentes=eventos_auditoria_existentes,
+            persistir_auditoria=persistir_auditoria,
         )
 
     @staticmethod
