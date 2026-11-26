@@ -204,7 +204,9 @@ def test_bdd_escenario_2_rechazar_salon_duplicado(
         seccion="C",
         capacidad_maxima=30,
     )
-    assert ServicioMallaCurricular.crear_salon(operador_admin, otro_anio, [salon_4to_c]) == otro_anio
+    assert (
+        ServicioMallaCurricular.crear_salon(operador_admin, otro_anio, [salon_4to_c]) == otro_anio
+    )
 
 
 @pytest.mark.parametrize(
@@ -511,7 +513,9 @@ def test_listar_salones_y_cursos_con_filtros() -> None:
     cursos = [
         Curso(1, 2026, NivelEducativo.PRIMARIA, "1ro", "MAT-101", "Matemática", "Mat", 6, True),
         Curso(2, 2026, NivelEducativo.SECUNDARIA, "4to", "MAT-401", "Matemática", "Mat", 6, True),
-        Curso(3, 2026, NivelEducativo.SECUNDARIA, "4to", "COM-401", "Comunicación", "Com", 5, False),
+        Curso(
+            3, 2026, NivelEducativo.SECUNDARIA, "4to", "COM-401", "Comunicación", "Com", 5, False
+        ),
         Curso(4, 2025, NivelEducativo.SECUNDARIA, "4to", "MAT-401", "Matemática", "Mat", 6, True),
     ]
 
