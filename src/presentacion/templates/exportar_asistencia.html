@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icono %}
+
+{% block titulo %}Exportar asistencias{% endblock %}
+{% block eyebrow %}Reportes · PBI-13{% endblock %}
+{% block encabezado %}Exportación de listas de asistencia{% endblock %}
+{% block subtitulo %}
+  <p class="muted">Genere el reporte oficial en CSV o XLSX para el rango y aula seleccionados.</p>
+{% endblock %}
+
+{% block contenido %}
+<section class="card">
+  <div class="card-head">
+    <h2>{{ icono('asistencia') }} Filtros del reporte</h2>
+  </div>
+
+  <form method="post" action="{{ url_for('reportes.exportar_asistencia') }}" class="filtros-grid">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="field">
+      <label for="fecha_desde">Fecha desde</label>
+      <input id="fecha_desde" name="fecha_desde" type="date" required
+             value="{{ filtros.get('fecha_desde', '') }}">
+    </div>
+
+    <div class="field">
+      <label for="fecha_hasta">Fecha hasta</label>
+      <input id="fecha_hasta" name="fecha_hasta" type="date" required
+             value="{{ filtros.get('fecha_hasta', '') }}">
+    </div>
+
+    <div class="field">
+      <label for="nivel">Nivel</label>
+      <select id="nivel" name="nivel">
+        <option value="">Todos los niveles</option>
+        {% for nivel in niveles %}
+        <option value="{{ nivel.value }}"
+                {{ 'selected' if filtros.get('nivel') == nivel.value else '' }}>
+          {{ nivel.value }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="grado">Grado</label>
+      <input id="grado" name="grado" type="text" maxlength="20"
+             value="{{ filtros.get('grado', '') }}" placeholder="Ej. 3ro">
+    </div>
+
+    <div class="field">
+      <label for="seccion">Sección</label>
+      <input id="seccion" name="seccion" type="text" maxlength="10"
+             value="{{ filtros.get('seccion', '') }}" placeholder="Ej. A">
+    </div>
+
+    <div class="field">
+      <label for="formato">Formato</label>
+      <select id="formato" name="formato" required>
+        <option value="CSV" {{ 'selected' if filtros.get('formato') != 'XLSX' else '' }}>
+          CSV (UTF-8)
+        </option>
+        <option value="XLSX" {{ 'selected' if filtros.get('formato') == 'XLSX' else '' }}>
+          XLSX (Excel)
+        </option>
+      </select>
+    </div>
+
+    <div class="filtros-actions">
+      <button class="btn btn-primario" type="submit">Descargar reporte</button>
+    </div>
+  </form>
+
+  <p class="muted">
+    El archivo incluye código, DNI, apellidos y nombres, ubicación académica, fecha,
+    hora efectiva, estado, minutos de tardanza, método y usuario responsable.
+  </p>
+</section>
+
+{% if salones %}
+<section class="card">
+  <div class="card-head">
+    <h2>Aulas disponibles</h2>
+  </div>
+  <div class="tabla-scroll">
+    <table class="tabla">
+      <thead><tr><th>Año</th><th>Nivel</th><th>Grado</th><th>Sección</th></tr></thead>
+      <tbody>
+        {% for salon in salones %}
+        <tr>
+          <td>{{ salon.anio_lectivo }}</td>
+          <td>{{ salon.nivel.value }}</td>
+          <td>{{ salon.grado }}</td>
+          <td>{{ salon.seccion }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+{% endblock %}
