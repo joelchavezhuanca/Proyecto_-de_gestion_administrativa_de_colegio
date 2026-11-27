@@ -209,11 +209,12 @@ class ServicioCarnets:
         if carnet.estado == EstadoCarnet.ANULADO:
             raise CarnetYaAnuladoException("El carnet ya se encuentra anulado.")
 
+        motivo_validado = _validar_motivo(motivo)
         return replace(
             carnet,
             estado=EstadoCarnet.ANULADO,
             anulado_en=fecha_hora,
-            motivo_anulacion=motivo,
+            motivo_anulacion=motivo_validado,
             detalle_anulacion=detalle,
         )
 

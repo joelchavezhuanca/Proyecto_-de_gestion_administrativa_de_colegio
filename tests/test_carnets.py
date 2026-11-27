@@ -340,6 +340,27 @@ def test_anular_rechaza_carnet_ya_anulado(operador_admin: UsuarioOperador) -> No
         )
 
 
+def test_anular_valida_y_normaliza_motivo(operador_admin: UsuarioOperador) -> None:
+    carnet = _crear_carnet()
+
+    anulado = ServicioCarnets.anular_carnet(
+        operador=operador_admin,
+        carnet=carnet,
+        motivo="DANO",
+        fecha_hora=FECHA_HORA,
+    )
+    assert anulado.motivo_anulacion is MotivoAnulacionCarnet.DANO
+
+    for motivo_invalido in (None, "", "   ", "INVALIDO"):
+        with pytest.raises(MotivoAnulacionRequeridoException):
+            ServicioCarnets.anular_carnet(
+                operador=operador_admin,
+                carnet=carnet,
+                motivo=motivo_invalido,  # type: ignore[arg-type]
+                fecha_hora=FECHA_HORA,
+            )
+
+
 def test_anular_sin_permiso(
     operador_sin_permiso: UsuarioOperador,
     rol_sin_permiso: Rol,

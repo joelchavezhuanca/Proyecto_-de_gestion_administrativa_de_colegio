@@ -248,10 +248,20 @@ def _roles_base() -> tuple[Rol, ...]:
     )
 
 
+def _rol_base_o_none(codigo: str) -> RolUsuario | None:
+    try:
+        return RolUsuario(codigo)
+    except ValueError:
+        return None
+
+
 def _validar_rol_asignable(rol: RolUsuario | str, roles: Sequence[Rol]) -> RolUsuario | str:
     if isinstance(rol, RolUsuario):
         return rol
     codigo = _codigo_rol(rol)
+    rol_base = _rol_base_o_none(codigo)
+    if rol_base is not None:
+        return rol_base
     for disponible in roles:
         if disponible.codigo == codigo:
             if not disponible.activo:
@@ -849,6 +859,8 @@ class ServicioAutenticacionYPermisos:
         if isinstance(rol, RolUsuario):
             return
         codigo = _codigo_rol(rol)
+        if _rol_base_o_none(codigo) is not None:
+            return
         encontrado = next(
             (disponible for disponible in (roles or []) if disponible.codigo == codigo),
             None,
@@ -934,10 +946,7 @@ class ServicioAutenticacionYPermisos:
         if isinstance(rol, RolUsuario):
             return permiso in MATRIZ_PERMISOS.get(rol, set())
         codigo = _codigo_rol(rol)
-        try:
-            rol_base = RolUsuario(codigo)
-        except ValueError:
-            rol_base = None
+        rol_base = _rol_base_o_none(codigo)
         if rol_base is not None:
             return permiso in MATRIZ_PERMISOS.get(rol_base, set())
         if roles is None:

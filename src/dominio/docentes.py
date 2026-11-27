@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
@@ -33,7 +34,7 @@ class DocenteException(Exception):
     """Excepción base del dominio de asignación docente."""
 
 
-class PermisoDocenteException(AccesoDenegadoException, DocenteException):
+class PermisoAsignacionDocenteException(AccesoDenegadoException, DocenteException):
     """Lanzada cuando el operador no está activo o carece de ASIGNAR_DOCENTES."""
 
 
@@ -53,12 +54,17 @@ class AsignacionEnUsoException(DocenteException):
     """Lanzada al intentar eliminar físicamente una asignación con historial."""
 
 
-class AmbitoDocenteDenegadoException(AccesoDenegadoException, DocenteException):
+class AccesoAmbitoDocenteDenegadoException(AccesoDenegadoException, DocenteException):
     """Lanzada cuando un docente intenta operar fuera de sus grupos asignados."""
 
     def __init__(self, mensaje: str, *, auditoria: RegistroAuditoria | None = None) -> None:
         super().__init__(mensaje)
         self.auditoria = auditoria
+
+
+# Alias de retrocompatibilidad con nombres alternos de excepciones
+PermisoDocenteException = PermisoAsignacionDocenteException
+AmbitoDocenteDenegadoException = AccesoAmbitoDocenteDenegadoException
 
 
 def _es_entero_positivo(valor: object) -> bool:
@@ -67,11 +73,25 @@ def _es_entero_positivo(valor: object) -> bool:
 
 def _validar_entero_positivo(valor: object, campo: str) -> int:
     if not _es_entero_positivo(valor):
-        raise AsignacionInvalidaException(
-            f"El campo '{campo}' debe ser un entero positivo."
-        )
+        raise AsignacionInvalidaException(f"El campo '{campo}' debe ser un entero positivo.")
     assert isinstance(valor, int)
     return valor
+
+
+def _validar_entero_no_negativo(valor: object, campo: str) -> int:
+    if not isinstance(valor, int) or isinstance(valor, bool) or valor < 0:
+        raise AsignacionInvalidaException(
+            f"El campo '{campo}' debe ser un entero mayor o igual a cero."
+        )
+    return valor
+
+
+def _validar_texto_no_vacio(valor: object, campo: str) -> str:
+    if not isinstance(valor, str) or not valor.strip():
+        raise AsignacionInvalidaException(
+            f"El campo '{campo}' es obligatorio y no puede estar vacío."
+        )
+    return valor.strip()
 
 
 def _validar_anio_lectivo(anio_lectivo: object) -> int:
@@ -108,24 +128,26 @@ def _codigo_rol(rol: RolUsuario | str) -> str:
 class AsignacionDocente:
     """Representa la asignación de un docente a un curso y salón en un año lectivo."""
 
-    id: int
+    id: str
     usuario_docente_id: int
     curso_id: int
     salon_id: int
     anio_lectivo: int
     activa: bool = True
+    asignado_por: int = 0
     creado_en: datetime | None = None
     revocada_en: datetime | None = None
     motivo_revocacion: str | None = None
 
     def __post_init__(self) -> None:
-        _validar_entero_positivo(self.id, "id")
+        id_limpio = _validar_texto_no_vacio(self.id, "id")
         _validar_entero_positivo(self.usuario_docente_id, "usuario_docente_id")
         _validar_entero_positivo(self.curso_id, "curso_id")
         _validar_entero_positivo(self.salon_id, "salon_id")
         _validar_anio_lectivo(self.anio_lectivo)
         if not isinstance(self.activa, bool):
             raise AsignacionInvalidaException("El indicador 'activa' debe ser booleano.")
+        _validar_entero_no_negativo(self.asignado_por, "asignado_por")
 
         creado_norm = (
             _normalizar_fecha_hora(self.creado_en) if self.creado_en is not None else None
@@ -140,23 +162,12 @@ class AsignacionDocente:
 
         motivo_norm: str | None = None
         if self.motivo_revocacion is not None:
-            if not isinstance(self.motivo_revocacion, str) or not self.motivo_revocacion.strip():
-                raise AsignacionInvalidaException(
-                    "El motivo de revocación debe ser un texto no vacío."
-                )
-            motivo_norm = self.motivo_revocacion.strip()
+            motivo_norm = _validar_texto_no_vacio(self.motivo_revocacion, "motivo_revocacion")
 
+        object.__setattr__(self, "id", id_limpio)
         object.__setattr__(self, "creado_en", creado_norm)
         object.__setattr__(self, "revocada_en", revocada_norm)
         object.__setattr__(self, "motivo_revocacion", motivo_norm)
-
-
-@dataclass(frozen=True)
-class ResultadoAsignacionDocente:
-    """Resultado de una operación sobre asignación docente junto con su evento de auditoría."""
-
-    asignacion: AsignacionDocente
-    auditoria: RegistroAuditoria
 
 
 def _validar_consistencia_curso_salon(
@@ -215,7 +226,7 @@ def _registrar_auditoria_operacion(
         rol_ejecutante=_codigo_rol(operador.rol),
         operacion=TipoOperacionAuditoria.OTRA,
         entidad="ASIGNACION_DOCENTE",
-        entidad_id=str(asignacion.id),
+        entidad_id=asignacion.id,
         resultado=ResultadoAuditoria.CONFIRMADA,
         fecha_hora=fecha_hora,
         eventos_existentes=eventos_auditoria_existentes,
@@ -233,18 +244,19 @@ def _auditar_y_denegar_ambito(
     docente: ActorDocente,
     curso_id: int,
     salon_id: int,
+    anio_lectivo: int,
     mensaje: str,
     fecha_hora: datetime | None,
     eventos_auditoria_existentes: Sequence[RegistroAuditoria],
     persistir_auditoria: Callable[[RegistroAuditoria], None] | None,
-) -> AmbitoDocenteDenegadoException:
+) -> AccesoAmbitoDocenteDenegadoException:
     momento = _normalizar_fecha_hora(fecha_hora or _hora_actual_lima())
     registro = ServicioAuditoria.registrar_evento(
         usuario_id=docente.id,
         rol_ejecutante=_codigo_rol(docente.rol),
         operacion=TipoOperacionAuditoria.ACCESO_DENEGADO,
         entidad="ASIGNACION_DOCENTE",
-        entidad_id=f"{curso_id}:{salon_id}",
+        entidad_id=f"{curso_id}:{salon_id}:{anio_lectivo}",
         resultado=ResultadoAuditoria.FALLIDA,
         fecha_hora=momento,
         eventos_existentes=eventos_auditoria_existentes,
@@ -252,29 +264,31 @@ def _auditar_y_denegar_ambito(
             "accion": "VALIDAR_AMBITO_DOCENTE",
             "curso_id": curso_id,
             "salon_id": salon_id,
+            "anio_lectivo": anio_lectivo,
         },
         motivo=mensaje,
         persistir=persistir_auditoria,
     )
-    return AmbitoDocenteDenegadoException(mensaje, auditoria=registro)
+    return AccesoAmbitoDocenteDenegadoException(mensaje, auditoria=registro)
 
 
 class ServicioAsignacionDocente:
     """Implementa las reglas de negocio del PBI-11 (Asignación Docente Segura)."""
 
     @staticmethod
-    def _validar_operador_asignador(
+    def validar_operador_asignacion(
         operador: ActorDocente,
         roles: Sequence[Rol] | None = None,
     ) -> None:
+        """Valida cuenta activa y permiso ASIGNAR_DOCENTES en servidor (RN-01)."""
         if not _actor_activo(operador):
-            raise PermisoDocenteException("El operador no cuenta con una cuenta activa.")
+            raise PermisoAsignacionDocenteException("El operador no cuenta con una cuenta activa.")
         if not ServicioAutenticacionYPermisos.tiene_permiso(
             operador.rol,
             PermisoOperacion.ASIGNAR_DOCENTES,
             roles=roles,
         ):
-            raise PermisoDocenteException(
+            raise PermisoAsignacionDocenteException(
                 f"El rol {_codigo_rol(operador.rol)} no tiene permiso para asignar docentes."
             )
 
@@ -304,14 +318,15 @@ class ServicioAsignacionDocente:
         curso: Curso,
         salon: Salon,
         asignaciones_existentes: Sequence[AsignacionDocente] = (),
-        anio_lectivo: int | None = None,
         fecha_hora: datetime | None = None,
         roles: Sequence[Rol] | None = None,
+        *,
+        anio_lectivo: int | None = None,
         eventos_auditoria_existentes: Sequence[RegistroAuditoria] = (),
         persistir_auditoria: Callable[[RegistroAuditoria], None] | None = None,
-    ) -> ResultadoAsignacionDocente:
+    ) -> AsignacionDocente:
         """Asigna un docente habilitado a un curso y salón evitando duplicados activos."""
-        ServicioAsignacionDocente._validar_operador_asignador(operador, roles=roles)
+        ServicioAsignacionDocente.validar_operador_asignacion(operador, roles=roles)
         ServicioAsignacionDocente._validar_docente_habilitado(docente, roles=roles)
         anio = _validar_consistencia_curso_salon(curso, salon, anio_lectivo)
 
@@ -332,18 +347,18 @@ class ServicioAsignacionDocente:
                 )
 
         momento = _normalizar_fecha_hora(fecha_hora or _hora_actual_lima())
-        nuevo_id = max((a.id for a in asignaciones_existentes), default=0) + 1
         asignacion = AsignacionDocente(
-            id=nuevo_id,
+            id=f"asg-{uuid.uuid4().hex[:12]}",
             usuario_docente_id=docente.id,
             curso_id=curso.id,
             salon_id=salon.id,
             anio_lectivo=anio,
             activa=True,
+            asignado_por=operador.id,
             creado_en=momento,
         )
 
-        auditoria = _registrar_auditoria_operacion(
+        _registrar_auditoria_operacion(
             operador=operador,
             asignacion=asignacion,
             fecha_hora=momento,
@@ -359,28 +374,27 @@ class ServicioAsignacionDocente:
             ),
             detalle_extra={"curso_codigo": curso.codigo},
         )
-        return ResultadoAsignacionDocente(asignacion=asignacion, auditoria=auditoria)
+        return asignacion
 
     @staticmethod
     def revocar_asignacion(
         operador: ActorDocente,
         asignacion: AsignacionDocente,
-        motivo: str | None = None,
         fecha_hora: datetime | None = None,
         roles: Sequence[Rol] | None = None,
+        *,
+        motivo: str | None = None,
         eventos_auditoria_existentes: Sequence[RegistroAuditoria] = (),
         persistir_auditoria: Callable[[RegistroAuditoria], None] | None = None,
-    ) -> ResultadoAsignacionDocente:
+    ) -> AsignacionDocente:
         """Revoca lógicamente una asignación conservando el historial académico."""
-        ServicioAsignacionDocente._validar_operador_asignador(operador, roles=roles)
+        ServicioAsignacionDocente.validar_operador_asignacion(operador, roles=roles)
         if not asignacion.activa:
             raise AsignacionInvalidaException("La asignación ya se encuentra revocada.")
 
         motivo_limpio: str | None = None
         if motivo is not None:
-            if not isinstance(motivo, str) or not motivo.strip():
-                raise AsignacionInvalidaException("El motivo de revocación no puede estar vacío.")
-            motivo_limpio = motivo.strip()
+            motivo_limpio = _validar_texto_no_vacio(motivo, "motivo")
 
         momento = _normalizar_fecha_hora(fecha_hora or _hora_actual_lima())
         revocada = replace(
@@ -389,7 +403,7 @@ class ServicioAsignacionDocente:
             revocada_en=momento,
             motivo_revocacion=motivo_limpio,
         )
-        auditoria = _registrar_auditoria_operacion(
+        _registrar_auditoria_operacion(
             operador=operador,
             asignacion=asignacion,
             fecha_hora=momento,
@@ -400,7 +414,7 @@ class ServicioAsignacionDocente:
             persistir_auditoria=persistir_auditoria,
             motivo=motivo_limpio or "Revocación de asignación docente",
         )
-        return ResultadoAsignacionDocente(asignacion=revocada, auditoria=auditoria)
+        return revocada
 
     @staticmethod
     def eliminar_asignacion(
@@ -413,7 +427,7 @@ class ServicioAsignacionDocente:
         persistir_auditoria: Callable[[RegistroAuditoria], None] | None = None,
     ) -> RegistroAuditoria:
         """Permite eliminar una asignación solo si no posee calificaciones asociadas."""
-        ServicioAsignacionDocente._validar_operador_asignador(operador, roles=roles)
+        ServicioAsignacionDocente.validar_operador_asignacion(operador, roles=roles)
         if tiene_calificaciones_asociadas:
             raise AsignacionEnUsoException(
                 "No se puede eliminar la asignación porque tiene calificaciones asociadas; "
@@ -436,9 +450,10 @@ class ServicioAsignacionDocente:
         docente: ActorDocente,
         curso_id: int,
         salon_id: int,
+        anio_lectivo: int,
         asignaciones: Sequence[AsignacionDocente],
-        anio_lectivo: int | None = None,
         roles: Sequence[Rol] | None = None,
+        *,
         fecha_hora: datetime | None = None,
         eventos_auditoria_existentes: Sequence[RegistroAuditoria] = (),
         persistir_auditoria: Callable[[RegistroAuditoria], None] | None = None,
@@ -446,14 +461,14 @@ class ServicioAsignacionDocente:
         """Verifica que el docente esté habilitado y posea asignación activa en el grupo."""
         _validar_entero_positivo(curso_id, "curso_id")
         _validar_entero_positivo(salon_id, "salon_id")
-        if anio_lectivo is not None:
-            _validar_anio_lectivo(anio_lectivo)
+        _validar_anio_lectivo(anio_lectivo)
 
         if not _actor_activo(docente):
             raise _auditar_y_denegar_ambito(
                 docente=docente,
                 curso_id=curso_id,
                 salon_id=salon_id,
+                anio_lectivo=anio_lectivo,
                 mensaje="El usuario docente se encuentra inactivo.",
                 fecha_hora=fecha_hora,
                 eventos_auditoria_existentes=eventos_auditoria_existentes,
@@ -469,6 +484,7 @@ class ServicioAsignacionDocente:
                 docente=docente,
                 curso_id=curso_id,
                 salon_id=salon_id,
+                anio_lectivo=anio_lectivo,
                 mensaje=(
                     f"El rol {_codigo_rol(docente.rol)} no tiene permiso para "
                     "registrar calificaciones."
@@ -484,7 +500,7 @@ class ServicioAsignacionDocente:
                 and asignacion.usuario_docente_id == docente.id
                 and asignacion.curso_id == curso_id
                 and asignacion.salon_id == salon_id
-                and (anio_lectivo is None or asignacion.anio_lectivo == anio_lectivo)
+                and asignacion.anio_lectivo == anio_lectivo
             ):
                 return asignacion
 
@@ -492,6 +508,7 @@ class ServicioAsignacionDocente:
             docente=docente,
             curso_id=curso_id,
             salon_id=salon_id,
+            anio_lectivo=anio_lectivo,
             mensaje="El docente no cuenta con una asignación activa para el curso y salón.",
             fecha_hora=fecha_hora,
             eventos_auditoria_existentes=eventos_auditoria_existentes,
@@ -500,12 +517,13 @@ class ServicioAsignacionDocente:
 
     @staticmethod
     def listar_asignaciones_docente(
+        usuario_docente_id: int | None,
         asignaciones: Sequence[AsignacionDocente],
-        usuario_docente_id: int | None = None,
+        solo_activas: bool = True,
+        *,
         curso_id: int | None = None,
         salon_id: int | None = None,
         anio_lectivo: int | None = None,
-        solo_activas: bool = True,
     ) -> list[AsignacionDocente]:
         """Filtra asignaciones por docente, curso, salón, año lectivo y estado."""
         resultado = list(asignaciones)
