@@ -370,6 +370,7 @@ class ResultadoRegistroAsistenciaAplicacion:
     evento_whatsapp: EventoAsistenciaConfirmada | None
     notificacion_whatsapp_id: str | None = None
     despachos: list[Future[object]] = field(default_factory=list)
+    alumno: Alumno | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -398,6 +399,46 @@ class ServicioAsistencia:
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+
+    def ahora(self) -> datetime:
+        """Devuelve la fecha y hora oficial actual del servidor (America/Lima)."""
+        return self._ahora()
+
+    def buscar_alumnos(self, criterio: str, *, limite: int = 12) -> list[Alumno]:
+        """Busca alumnos activos por nombre, apellidos, código, DNI o carnet."""
+        consulta = criterio.strip()
+        if not consulta:
+            return []
+        with SqlAlchemyUnitOfWork(self._session_factory) as uow:
+            coincidencias = buscar_alumnos_activos(consulta, self._alumnos(uow.session))
+            return coincidencias[:limite]
+
+    def listar_registros_del_dia(
+        self, *, fecha_escolar: date | None = None, limite: int = 15
+    ) -> list[tuple[RegistroAsistencia, Alumno | None]]:
+        """Devuelve los últimos registros de asistencia de la fecha indicada."""
+        fecha = fecha_escolar or self._ahora().date()
+        with SqlAlchemyUnitOfWork(self._session_factory) as uow:
+            session = uow.session
+            asistencias_orm = session.scalars(
+                select(AsistenciaModel)
+                .filter_by(fecha_escolar=fecha)
+                .order_by(AsistenciaModel.hora_efectiva.desc(), AsistenciaModel.id.desc())
+                .limit(limite)
+            ).all()
+            if not asistencias_orm:
+                return []
+            ids = {m.estudiante_id for m in asistencias_orm}
+            alumnos_por_id = {
+                e.id: alumno_model_a_dominio(e)
+                for e in session.scalars(
+                    select(EstudianteModel).where(EstudianteModel.id.in_(ids))
+                ).all()
+            }
+            return [
+                (asistencia_model_a_dominio(m), alumnos_por_id.get(m.estudiante_id))
+                for m in asistencias_orm
+            ]
 
     def _ahora(self) -> datetime:
         return self._reloj()
@@ -547,6 +588,7 @@ class ServicioAsistencia:
             evento_whatsapp=evento_whatsapp,
             notificacion_whatsapp_id=notificacion_id,
             despachos=despachos,
+            alumno=alumno,
         )
 
     # ------------------------------------------------------------------
