@@ -18,6 +18,11 @@ jobs:
       - name: Arrancar la aplicación y comprobar que responde
         run: |
           docker compose up -d --build
-          curl --retry 20 --retry-delay 3 --retry-connrefused -fsS \
-            http://localhost:5000/health > /dev/null
+          sleep 2
+          if ! curl --retry 20 --retry-delay 3 --retry-all-errors -fsS \
+            http://localhost:5000/health > /dev/null; then
+            docker compose logs app
+            docker compose down
+            exit 1
+          fi
           docker compose down
