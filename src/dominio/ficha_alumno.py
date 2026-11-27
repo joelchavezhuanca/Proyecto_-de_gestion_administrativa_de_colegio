@@ -191,6 +191,22 @@ def _puede_ver_pagos(operador: UsuarioOperador, roles: Sequence[Rol] | None) -> 
     )
 
 
+def _calcular_porcentaje_asistencia(
+    puntuales: int,
+    tardanzas: int,
+    ausentes: int,
+    justificados: int,
+) -> Decimal:
+    """Calcula el porcentaje de asistencia efectiva con redondeo HALF_UP."""
+    total = puntuales + tardanzas + ausentes + justificados
+    if total == 0:
+        return _CERO
+    efectivos = puntuales + tardanzas + justificados
+    return (Decimal(efectivos) / Decimal(total) * _CIEN).quantize(
+        _DOS_DECIMALES, rounding=ROUND_HALF_UP
+    )
+
+
 def _resumir_asistencia(
     asistencias: Sequence[RegistroAsistencia],
 ) -> ResumenAsistenciaAlumno:
@@ -207,20 +223,17 @@ def _resumir_asistencia(
     justificados = sum(
         1 for registro in asistencias if registro.estado == EstadoAsistencia.JUSTIFICADO
     )
-    total = puntuales + tardanzas + ausentes + justificados
-    porcentaje = (
-        _CERO
-        if total == 0
-        else (
-            (Decimal(puntuales + tardanzas + justificados) / Decimal(total)) * _CIEN
-        ).quantize(_DOS_DECIMALES, rounding=ROUND_HALF_UP)
-    )
     return ResumenAsistenciaAlumno(
         puntuales=puntuales,
         tardanzas=tardanzas,
         ausentes=ausentes,
         justificados=justificados,
-        porcentaje_asistencia=porcentaje,
+        porcentaje_asistencia=_calcular_porcentaje_asistencia(
+            puntuales=puntuales,
+            tardanzas=tardanzas,
+            ausentes=ausentes,
+            justificados=justificados,
+        ),
     )
 
 
