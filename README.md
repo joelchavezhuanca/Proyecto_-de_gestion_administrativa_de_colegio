@@ -5,7 +5,6 @@ Proyecto integrador desarrollado para el **Colegio Domingo Savio S.A.C.** (Cusco
 - **Aplicación en producción (HTTPS · Render + PostgreSQL):** https://proyecto-de-gestion-administrativa-de.onrender.com
 - **Registro de Asistencia + Escáner QR:** https://proyecto-de-gestion-administrativa-de.onrender.com/asistencia
 - **Estado del servicio (Healthcheck):** https://proyecto-de-gestion-administrativa-de.onrender.com/health
-- **Guía de actualización para el equipo (Post-Ola 4):** [`docs/GUIA_ACTUALIZACION_EQUIPO_POST_OLA4.md`](docs/GUIA_ACTUALIZACION_EQUIPO_POST_OLA4.md)
 - **Informe Final del Proyecto por Competencias:** [`docs/INFORME_FINAL_PROYECTO_COMPETENCIAS.md`](docs/INFORME_FINAL_PROYECTO_COMPETENCIAS.md)
 
 ---
@@ -93,7 +92,6 @@ Proyecto_-de_gestion_administrativa_de_colegio/
 │   ├── DER_V2_PROPUESTO.md         # Modelo relacional DER v2 (5 bloques, 27 tablas)
 │   ├── vision-board.md             # Product Vision Board
 │   ├── pbi/                        # 17 especificaciones BDD (PBI-01 al PBI-17)
-│   ├── GUIA_ACTUALIZACION_EQUIPO_POST_OLA4.md
 │   └── INFORME_FINAL_PROYECTO_COMPETENCIAS.md
 ├── src/
 │   ├── dominio/                    # 16 módulos de reglas puras (100 % cobertura)

@@ -85,7 +85,7 @@ La gestión diaria del Colegio Domingo Savio S.A.C. dependía de procesos manual
 - **Social:** Beneficia al personal administrativo, coordinadores, auxiliares, docentes, estudiantes y apoderados; libera 10–15 minutos diarios por aula, agiliza portería, protege la dignidad del estudiante con alertas silenciosas de pago (sin exponer deudas en puerta) y ofrece transparencia académica.
 - **Económica:** Construido 100 % con software open-source sin costos de licencia (Python, Flask, SQLAlchemy, PostgreSQL, Docker, Ruff, Pytest). En producción se ejecuta en plan gratuito de Render.com (S/ 0) y puede migrar sin cambios a un VPS o servidor local del colegio.
 - **Ambiental:** Elimina papel e impresiones recurrentes al digitalizar partes diarios, fichas de matrícula, justificaciones con adjuntos digitales, libros de notas y boletas/reportes exportables.
-- **Técnica:** Clean Architecture con tipado estricto, 1,159 pruebas automatizadas, 97.60 % de cobertura, Docker reproducible (`docker compose up -d --build`), CI/CD automatizado y documentación completa (`README.md`, `docs/pbi/`, `docs/GUIA_ACTUALIZACION_EQUIPO_POST_OLA4.md`).
+- **Técnica:** Clean Architecture con tipado estricto, 1,159 pruebas automatizadas, 97.60 % de cobertura, Docker reproducible (`docker compose up -d --build`), CI/CD automatizado y documentación completa (`README.md`, `docs/README.md`, `docs/pbi/`).
 
 ### 1.6 Tablero de la visión del producto (Product Vision Board)
 
@@ -161,7 +161,7 @@ Publicada oficialmente como plantilla en [`.github/pull_request_template.md`](ht
 - [x] `ruff check .` y `ruff format --check .` con 0 errores.
 - [x] Cobertura ≥ 70 % en `src/dominio`, `src/aplicacion` y `src/infraestructura` (**97.60 % real**); `src/presentacion` excluida del umbral.
 - [x] Pull Request revisado con `Continuous Integration` y `Docker CI` en verde.
-- [x] Documentación actualizada (`README.md`, `docs/vision-board.md`, guía de equipo).
+- [x] Documentación actualizada (`README.md`, `docs/vision-board.md`, `docs/INFORME_FINAL_PROYECTO_COMPETENCIAS.md`).
 
 ---
 
@@ -402,6 +402,6 @@ La combinación de **772 pruebas unitarias de dominio (100 % de cobertura)**, **
 | **8.2 Análisis e interpretación** | Run verde con cobertura dominio/app/infra; defectos reales | 7.1–7.5 | [Run #45984537313](https://github.com/joelchavezhuanca/Proyecto_-de_gestion_administrativa_de_colegio/actions/runs/45984537313) (1,159 pruebas, **97.60 %**) · defectos D1–D7 | **3 (Sobresaliente)** |
 | **11.1 Diseño del proyecto** | `docs/vision-board.md`; `README.md` con problema y alcance | 1.1–1.6 | `docs/vision-board.md` · `README.md` · `docs/README.md` | **3 (Sobresaliente)** |
 | **11.2 Planificación de la gestión** | 17 especificaciones BDD, DoD en PR template, recursos y riesgos | 2.1–2.5 | `docs/pbi/` (17 guías) · `.github/pull_request_template.md` (`[PENDIENTE: enlazar Issues/Milestones en GitHub]`) | **3** *(al enlazar Issues/Milestones)* |
-| **11.3 Ejecución del proyecto** | Matriz R/A/C, 48 PRs fusionados de los 5 integrantes | 3.1–3.3 | [PRs fusionados (#1–#53)](https://github.com/joelchavezhuanca/Proyecto_-de_gestion_administrativa_de_colegio/pulls?q=is%3Apr+is%3Amerged) · `docs/GUIA_ACTUALIZACION_EQUIPO_POST_OLA4.md` | **3 (Sobresaliente)** |
+| **11.3 Ejecución del proyecto** | Matriz R/A/C, 48 PRs fusionados de los 5 integrantes | 3.1–3.3 | [PRs fusionados (#1–#53)](https://github.com/joelchavezhuanca/Proyecto_-de_gestion_administrativa_de_colegio/pulls?q=is%3Apr+is%3Amerged) | **3 (Sobresaliente)** |
 | **14.1 Técnicas y metodologías** | Comparación formal + ramas `feature` → `dev`/`main` + Conventional Commits | 4.1–4.3 | Ramas `dev` y `main` sincronizadas · `commits/main` (`[PENDIENTE: activar Branch Protection en Settings → Branches]`) | **3** *(al activar protección de `main`)* |
 | **14.2 Herramientas** | `ci.yml`, `docker-ci.yml`, `deploy-render.yml`, `pyproject.toml`, `Dockerfile`, `docker-compose.yml` | 5.1–5.3 | `.github/workflows/ci.yml` · `.github/workflows/docker-ci.yml` · `Dockerfile` · `docker-compose.yml` · Producción HTTPS en Render | **3 (Sobresaliente)** |
