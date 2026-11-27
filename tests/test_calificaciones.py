@@ -6,6 +6,7 @@ from decimal import Decimal
 
 import pytest
 
+from src.dominio.asistencia import UsuarioOperador
 from src.dominio.auditoria import ZONA_HORARIA_LIMA
 from src.dominio.calificaciones import (
     ActividadEvaluable,
@@ -559,6 +560,22 @@ def test_admin_no_requiere_asignacion_propia(admin, asignacion, periodo):
         (),
     )
     assert rubros[0].asignacion_docente_id == asignacion.id
+
+
+@pytest.mark.parametrize(("activo", "permitido"), [(True, True), (False, False)])
+def test_operador_de_asistencia_admin(asignacion, periodo, activo, permitido):
+    operador = UsuarioOperador(id=1, username="admin", rol=RolUsuario.ADMIN, activo=activo)
+    propuestos = [("Exámenes", Decimal("100"))]
+    if permitido:
+        rubros = ServicioCalificaciones.configurar_rubros(
+            operador, asignacion, periodo, propuestos, FECHA_ACTUAL, ()
+        )
+        assert len(rubros) == 1
+    else:
+        with pytest.raises(PermisoCalificacionException):
+            ServicioCalificaciones.configurar_rubros(
+                operador, asignacion, periodo, propuestos, FECHA_ACTUAL, ()
+            )
 
 
 # ---------------------------------------------------------------------------
