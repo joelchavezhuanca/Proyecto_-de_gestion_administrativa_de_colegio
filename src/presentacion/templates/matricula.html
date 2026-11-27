@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% from "_macros.html" import chip_estado %}
+
+{% block titulo %}Matrícula digital{% endblock %}
+{% block eyebrow %}Gestión de alumnos · PBI-05{% endblock %}
+{% block encabezado %}Matrícula digital y apoderados{% endblock %}
+{% block subtitulo %}
+  <p class="page-subtitle">Registro de estudiantes matriculados, apoderados WhatsApp y traslados de salón.</p>
+{% endblock %}
+
+{% block contenido %}
+<section class="grid-dos-amplio">
+  <article class="card">
+    <div class="card-head">
+      <h2>Nueva matrícula digital</h2>
+      <span class="badge-soft">Año lectivo vigente</span>
+    </div>
+
+    <form class="form" method="post" action="{{ url_for('alumnos.registrar_matricula') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="grid-dos">
+        <div class="field">
+          <label for="codigo_estudiante">Código de estudiante</label>
+          <input id="codigo_estudiante" name="codigo_estudiante" type="text" required placeholder="ALU-2026-001">
+        </div>
+        <div class="field">
+          <label for="dni">DNI (8 dígitos)</label>
+          <input id="dni" name="dni" type="text" maxlength="8" required placeholder="71234567">
+        </div>
+      </div>
+
+      <div class="grid-dos">
+        <div class="field">
+          <label for="nombres">Nombres</label>
+          <input id="nombres" name="nombres" type="text" required>
+        </div>
+        <div class="field">
+          <label for="apellidos">Apellidos</label>
+          <input id="apellidos" name="apellidos" type="text" required>
+        </div>
+      </div>
+
+      <div class="grid-dos">
+        <div class="field">
+          <label for="fecha_nacimiento">Fecha de nacimiento</label>
+          <input id="fecha_nacimiento" name="fecha_nacimiento" type="date" required>
+        </div>
+        <div class="field">
+          <label for="salon_id">Salón asignado</label>
+          <select id="salon_id" name="salon_id" required>
+            <option value="">Seleccione un salón…</option>
+            {% for salon in salones %}
+              <option value="{{ salon.id }}">
+                {{ salon.nivel.value }} · {{ salon.grado }} "{{ salon.seccion }}" ({{ salon.anio_lectivo }})
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <hr>
+      <h3>Apoderado principal (WhatsApp)</h3>
+      <div class="grid-dos">
+        <div class="field">
+          <label for="apoderado_nombres">Nombres del apoderado</label>
+          <input id="apoderado_nombres" name="apoderado_nombres" type="text" required>
+        </div>
+        <div class="field">
+          <label for="apoderado_apellidos">Apellidos del apoderado</label>
+          <input id="apoderado_apellidos" name="apoderado_apellidos" type="text" required>
+        </div>
+      </div>
+      <div class="grid-dos">
+        <div class="field">
+          <label for="apoderado_documento">Documento</label>
+          <input id="apoderado_documento" name="apoderado_documento" type="text" required>
+        </div>
+        <div class="field">
+          <label for="apoderado_parentesco">Parentesco</label>
+          <input id="apoderado_parentesco" name="apoderado_parentesco" type="text" required placeholder="PADRE / MADRE / TUTOR">
+        </div>
+      </div>
+      <div class="field">
+        <label for="apoderado_telefono">Teléfono WhatsApp (+51)</label>
+        <input id="apoderado_telefono" name="apoderado_telefono" type="tel" required placeholder="987654321">
+      </div>
+
+      <details>
+        <summary class="small muted">Agregar segundo apoderado (opcional)</summary>
+        <div class="grid-dos">
+          <div class="field">
+            <label for="apoderado2_nombres">Nombres</label>
+            <input id="apoderado2_nombres" name="apoderado2_nombres" type="text">
+          </div>
+          <div class="field">
+            <label for="apoderado2_apellidos">Apellidos</label>
+            <input id="apoderado2_apellidos" name="apoderado2_apellidos" type="text">
+          </div>
+        </div>
+        <div class="grid-dos">
+          <div class="field">
+            <label for="apoderado2_documento">Documento</label>
+            <input id="apoderado2_documento" name="apoderado2_documento" type="text">
+          </div>
+          <div class="field">
+            <label for="apoderado2_parentesco">Parentesco</label>
+            <input id="apoderado2_parentesco" name="apoderado2_parentesco" type="text">
+          </div>
+        </div>
+        <div class="field">
+          <label for="apoderado2_telefono">Teléfono WhatsApp</label>
+          <input id="apoderado2_telefono" name="apoderado2_telefono" type="tel">
+        </div>
+      </details>
+
+      <div class="page-actions">
+        <button class="btn btn-primario" type="submit">Registrar matrícula</button>
+      </div>
+    </form>
+  </article>
+
+  <article class="card">
+    <div class="card-head">
+      <h2>Estudiantes matriculados ({{ alumnos|length }})</h2>
+      <form class="form-inline" method="get" action="{{ url_for('alumnos.ver_matricula') }}">
+        <select name="salon_id" aria-label="Filtrar por salón">
+          <option value="">Todos los salones</option>
+          {% for salon in salones %}
+            <option value="{{ salon.id }}" {{ 'selected' if salon_id_filtro == salon.id }}>
+              {{ salon.nivel.value }} {{ salon.grado }} "{{ salon.seccion }}"
+            </option>
+          {% endfor %}
+        </select>
+        <button class="btn btn-secundario btn-pequeno" type="submit">Filtrar</button>
+      </form>
+    </div>
+
+    {% if alumnos %}
+      <div class="tabla-scroll">
+        <table class="tabla">
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Estudiante</th>
+              <th>DNI</th>
+              <th>Salón</th>
+              <th>Estado</th>
+              <th>Traslado de salón</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for alumno in alumnos %}
+              <tr>
+                <td class="mono">{{ alumno.codigo_estudiante }}</td>
+                <td>{{ alumno.nombres }} {{ alumno.apellidos }}</td>
+                <td class="mono">{{ alumno.dni }}</td>
+                <td>{{ alumno.nivel }} {{ alumno.grado }} "{{ alumno.seccion }}"</td>
+                <td>{{ chip_estado(alumno.estado) }}</td>
+                <td>
+                  <form class="form-inline" method="post" action="{{ url_for('alumnos.cambiar_salon', alumno_id=alumno.alumno_id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <select name="nuevo_salon_id" aria-label="Nuevo salón">
+                      {% for salon in salones %}
+                        <option value="{{ salon.id }}" {{ 'selected' if salon.id == alumno.salon_id }}>
+                          {{ salon.grado }} "{{ salon.seccion }}"
+                        </option>
+                      {% endfor %}
+                    </select>
+                    <button class="btn btn-secundario btn-pequeno" type="submit">Mover</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="empty-state">No hay estudiantes matriculados para el criterio seleccionado.</p>
+    {% endif %}
+  </article>
+</section>
+{% endblock %}

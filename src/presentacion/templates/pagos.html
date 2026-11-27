@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% from "_macros.html" import chip_estado %}
+
+{% block titulo %}Pagos y alertas silenciosas{% endblock %}
+{% block eyebrow %}Control económico · PBI-07{% endblock %}
+{% block encabezado %}Pagos y panel de alertas silenciosas{% endblock %}
+{% block subtitulo %}
+  <p class="page-subtitle">Gestión de obligaciones económicas y monitoreo interno no bloqueante de alertas de ingreso.</p>
+{% endblock %}
+
+{% block contenido %}
+{% if puede_gestionar_pagos and not solo_alertas %}
+<section class="grid-dos">
+  <article class="card">
+    <div class="card-head">
+      <h2>Registrar obligación económica</h2>
+    </div>
+    <form class="form" method="post" action="{{ url_for('alumnos.registrar_obligacion') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="field">
+        <label for="alumno_id">Estudiante</label>
+        <select id="alumno_id" name="alumno_id" required>
+          <option value="">Seleccione un estudiante…</option>
+          {% for alumno in alumnos %}
+            <option value="{{ alumno.alumno_id }}" {{ 'selected' if alumno_seleccionado == alumno.alumno_id }}>
+              {{ alumno.codigo_estudiante }} · {{ alumno.nombres }} {{ alumno.apellidos }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="concepto">Concepto</label>
+        <input id="concepto" name="concepto" type="text" required placeholder="Pensión Abril 2026">
+      </div>
+
+      <div class="grid-dos">
+        <div class="field">
+          <label for="monto">Monto (S/)</label>
+          <input id="monto" name="monto" type="text" required placeholder="320.00">
+        </div>
+        <div class="field">
+          <label for="fecha_vencimiento">Fecha de vencimiento</label>
+          <input id="fecha_vencimiento" name="fecha_vencimiento" type="date" required>
+        </div>
+      </div>
+
+      <button class="btn btn-primario" type="submit">Registrar obligación</button>
+    </form>
+  </article>
+
+  <article class="card">
+    <div class="card-head">
+      <h2>Obligaciones del estudiante</h2>
+      <form class="form-inline" method="get" action="{{ url_for('alumnos.ver_pagos') }}">
+        <select name="alumno_id" aria-label="Filtrar estudiante">
+          <option value="">Seleccione…</option>
+          {% for alumno in alumnos %}
+            <option value="{{ alumno.alumno_id }}" {{ 'selected' if alumno_seleccionado == alumno.alumno_id }}>
+              {{ alumno.codigo_estudiante }} · {{ alumno.nombres }} {{ alumno.apellidos }}
+            </option>
+          {% endfor %}
+        </select>
+        <button class="btn btn-secundario btn-pequeno" type="submit">Ver</button>
+      </form>
+    </div>
+
+    {% if obligaciones %}
+      <div class="tabla-scroll">
+        <table class="tabla">
+          <thead>
+            <tr>
+              <th>Concepto</th>
+              <th>Monto</th>
+              <th>Vencimiento</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for ob in obligaciones %}
+              <tr>
+                <td>{{ ob.concepto }}</td>
+                <td class="mono">S/ {{ "%.2f"|format(ob.monto) }}</td>
+                <td>{{ ob.fecha_vencimiento|fecha_corta }}</td>
+                <td>{{ chip_estado(ob.estado) }}</td>
+                <td>
+                  {% if ob.estado.value in ("PENDIENTE", "VENCIDO") %}
+                    <form class="form-inline" method="post" action="{{ url_for('alumnos.registrar_pago', obligacion_id=ob.id) }}">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <input type="hidden" name="alumno_id" value="{{ ob.alumno_id }}">
+                      <button class="btn btn-primario btn-pequeno" type="submit">Pagar</button>
+                    </form>
+                    <form class="form-inline" method="post" action="{{ url_for('alumnos.exonerar_obligacion', obligacion_id=ob.id) }}">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <input type="hidden" name="alumno_id" value="{{ ob.alumno_id }}">
+                      <input name="motivo" type="text" required placeholder="Motivo exoneración">
+                      <button class="btn btn-secundario btn-pequeno" type="submit">Exonerar</button>
+                    </form>
+                  {% else %}
+                    <span class="muted small">{{ ob.estado.value }}</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="empty-state">Seleccione un estudiante para gestionar sus obligaciones.</p>
+    {% endif %}
+  </article>
+</section>
+{% endif %}
+
+{% if puede_ver_alertas %}
+<section class="card">
+  <div class="card-head">
+    <h2>Panel restringido de alertas silenciosas de pago</h2>
+    <span class="badge-soft">{{ alertas|length }} activas</span>
+  </div>
+
+  {% if alertas %}
+    <div class="tabla-scroll">
+      <table class="tabla">
+        <thead>
+          <tr>
+            <th>Alumno ID</th>
+            <th>Fecha escolar</th>
+            <th>Obligaciones vencidas</th>
+            <th>Monto vencido</th>
+            <th>Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for alerta in alertas %}
+            <tr>
+              <td class="mono">#{{ alerta.alumno_id }}</td>
+              <td>{{ alerta.fecha_escolar|fecha_corta }}</td>
+              <td>{{ alerta.cantidad_obligaciones_vencidas }}</td>
+              <td class="mono">S/ {{ "%.2f"|format(alerta.monto_vencido_total) }}</td>
+              <td>
+                <form method="post" action="{{ url_for('alumnos.marcar_alerta_revisada', alerta_id=alerta.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn-secundario btn-pequeno" type="submit">Marcar revisada</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="empty-state">No existen alertas silenciosas pendientes de revisión.</p>
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}
