@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% from "_macros.html" import chip_estado %}
+
+{% block titulo %}Auditoría{% endblock %}
+{% block eyebrow %}Auditoría{% endblock %}
+{% block encabezado %}Visor de auditoría{% endblock %}
+{% block subtitulo %}
+<p class="page-subtitle">Consulte los eventos del sistema y verifique la integridad de la cadena.</p>
+{% endblock %}
+
+{% block contenido %}
+<section class="card">
+  <div class="card-head">
+    <div>
+      <h2>Eventos registrados</h2>
+      <p class="muted small">{{ eventos|length }} evento(s) encontrado(s).</p>
+    </div>
+    {% if tiene_permiso('VERIFICAR_INTEGRIDAD_AUDITORIA') %}
+    <form method="post" action="{{ url_for('auditoria.verificar_integridad') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-primario" type="submit">Verificar integridad SHA-256</button>
+    </form>
+    {% endif %}
+  </div>
+
+  <form class="filtros-grid" method="get" action="{{ url_for('auditoria.ver_auditoria') }}">
+    <div class="field">
+      <label for="filtro-desde">Desde</label>
+      <input id="filtro-desde" type="date" name="fecha_desde"
+             value="{{ filtros.get('fecha_desde', '') }}">
+    </div>
+    <div class="field">
+      <label for="filtro-hasta">Hasta</label>
+      <input id="filtro-hasta" type="date" name="fecha_hasta"
+             value="{{ filtros.get('fecha_hasta', '') }}">
+    </div>
+    <div class="field">
+      <label for="filtro-usuario">ID de usuario</label>
+      <input id="filtro-usuario" type="text" name="usuario_id"
+             value="{{ filtros.get('usuario_id', '') }}" placeholder="Ej. 1">
+    </div>
+    <div class="field">
+      <label for="filtro-rol">Rol</label>
+      <input id="filtro-rol" type="text" name="rol"
+             value="{{ filtros.get('rol', '') }}" placeholder="Ej. ADMIN">
+    </div>
+    <div class="field">
+      <label for="filtro-operacion">Operación</label>
+      <select id="filtro-operacion" name="operacion">
+        <option value="">Todas</option>
+        {% for operacion in operaciones %}
+        <option value="{{ operacion.value }}"
+                {% if filtros.get('operacion') == operacion.value %}selected{% endif %}>
+          {{ operacion.value }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="filtro-entidad">Entidad</label>
+      <input id="filtro-entidad" type="text" name="entidad"
+             value="{{ filtros.get('entidad', '') }}" placeholder="Ej. Usuario">
+    </div>
+    <div class="field">
+      <label for="filtro-resultado">Resultado</label>
+      <select id="filtro-resultado" name="resultado">
+        <option value="">Todos</option>
+        {% for resultado in resultados %}
+        <option value="{{ resultado.value }}"
+                {% if filtros.get('resultado') == resultado.value %}selected{% endif %}>
+          {{ resultado.value }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filtros-actions">
+      <button class="btn btn-primario" type="submit">Filtrar</button>
+      <a class="btn btn-secundario" href="{{ url_for('auditoria.ver_auditoria') }}">Limpiar</a>
+    </div>
+  </form>
+
+  <div class="tabla-scroll">
+    <table class="tabla">
+      <caption class="sr-only">Eventos de auditoría del sistema</caption>
+      <thead>
+        <tr>
+          <th scope="col">#</th>
+          <th scope="col">Fecha y hora</th>
+          <th scope="col">Usuario</th>
+          <th scope="col">Rol</th>
+          <th scope="col">Operación</th>
+          <th scope="col">Entidad</th>
+          <th scope="col">Resultado</th>
+          <th scope="col">Hash</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for evento in eventos %}
+        <tr>
+          <td class="mono">{{ evento.secuencia }}</td>
+          <td>{{ evento.fecha_hora|fecha_corta }} {{ evento.fecha_hora|hora_corta }}</td>
+          <td class="mono">{{ evento.usuario_id }}</td>
+          <td>{{ evento.rol_ejecutante }}</td>
+          <td><span class="badge-soft">{{ evento.operacion.value }}</span></td>
+          <td>{{ evento.entidad }}{% if evento.entidad_id %} · {{ evento.entidad_id }}{% endif %}</td>
+          <td>
+            {% if evento.resultado.value == 'CONFIRMADA' %}
+            {{ chip_estado('ACTIVO') }}
+            {% else %}
+            {{ chip_estado('INACTIVO') }}
+            {% endif %}
+          </td>
+          <td>
+            <span class="mono small" title="{{ evento.hash_integridad }}">
+              {{ evento.hash_integridad[:12] }}…
+            </span>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="8">
+            <div class="empty-state">No hay eventos de auditoría con los filtros aplicados.</div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

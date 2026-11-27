@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% from "_macros.html" import chip_estado %}
+
+{% block titulo %}Roles y permisos{% endblock %}
+{% block eyebrow %}Seguridad{% endblock %}
+{% block encabezado %}Roles y permisos{% endblock %}
+{% block subtitulo %}
+<p class="page-subtitle">Administre los roles personalizados y sus permisos granulares.</p>
+{% endblock %}
+
+{% block contenido %}
+<section class="card">
+  <div class="card-head">
+    <div>
+      <h2>Catálogo de roles</h2>
+      <p class="muted small">El sistema cuenta con {{ total_permisos }} permisos operativos.</p>
+    </div>
+    <a class="btn btn-primario" href="{{ url_for('roles.crear_rol') }}">Nuevo rol</a>
+  </div>
+
+  <div class="tabla-scroll">
+    <table class="tabla">
+      <caption class="sr-only">Listado de roles del sistema</caption>
+      <thead>
+        <tr>
+          <th scope="col">Código</th>
+          <th scope="col">Nombre</th>
+          <th scope="col">Descripción</th>
+          <th scope="col">Permisos</th>
+          <th scope="col">Tipo</th>
+          <th scope="col">Estado</th>
+          <th scope="col">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for rol in roles %}
+        <tr>
+          <td><span class="mono">{{ rol.codigo }}</span></td>
+          <td>{{ rol.nombre }}</td>
+          <td class="small">{{ rol.descripcion }}</td>
+          <td><span class="badge-soft">{{ rol.permisos|length }}</span></td>
+          <td>
+            {% if rol.es_sistema %}
+            <span class="badge-rol">Base</span>
+            {% else %}
+            <span class="badge-soft">Personalizado</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if rol.activo %}{{ chip_estado('ACTIVO') }}{% else %}{{ chip_estado('INACTIVO') }}{% endif %}
+          </td>
+          <td>
+            {% if rol.es_sistema %}
+            <span class="muted small">Rol inmutable</span>
+            {% else %}
+            <div class="page-actions">
+              <a class="btn btn-pequeno btn-secundario"
+                 href="{{ url_for('roles.editar_rol', codigo=rol.codigo) }}">Editar</a>
+
+              <form method="post" action="{{ url_for('roles.cambiar_estado_rol', codigo=rol.codigo) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                {% if rol.activo %}
+                <input type="hidden" name="accion" value="desactivar">
+                <button class="btn btn-pequeno btn-peligro-suave" type="submit">Desactivar</button>
+                {% else %}
+                <input type="hidden" name="accion" value="activar">
+                <button class="btn btn-pequeno btn-secundario" type="submit">Activar</button>
+                {% endif %}
+              </form>
+
+              <form method="post" action="{{ url_for('roles.eliminar_rol', codigo=rol.codigo) }}"
+                    data-confirmar="¿Eliminar el rol {{ rol.codigo }}? Esta acción no se puede deshacer.">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-pequeno btn-peligro" type="submit">Eliminar</button>
+              </form>
+            </div>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
