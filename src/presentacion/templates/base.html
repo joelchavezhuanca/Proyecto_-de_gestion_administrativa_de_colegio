@@ -29,37 +29,123 @@
       </div>
 
       <nav class="sidebar-nav">
+        {% set ep = request.endpoint or '' %}
+
         {% if tiene_permiso('CONSULTAR_DASHBOARD_AFORO') %}
-        <a class="nav-link {{ 'activo' if (request.endpoint or '').startswith('main.') }}"
-           href="{{ safe_url_for('main.aforo', '/aforo') }}" {% if (request.endpoint or '').startswith('main.') %}aria-current="page"{% endif %}>
+        <a class="nav-link {{ 'activo' if ep == 'asistencia.aforo' }}"
+           href="{{ safe_url_for('asistencia.aforo', '/aforo') }}" {% if ep == 'asistencia.aforo' %}aria-current="page"{% endif %}>
           {{ icono('aforo') }}<span>Dashboard de aforo</span>
         </a>
         {% endif %}
 
         {% if tiene_permiso('REGISTRAR_ASISTENCIA') or tiene_permiso('CONSULTAR_HISTORIAL_ASISTENCIA') %}
-        <a class="nav-link {{ 'activo' if (request.endpoint or '').startswith('asistencia.') }}"
-           href="{{ safe_url_for('asistencia.ver_asistencia', '/asistencia') }}" {% if (request.endpoint or '').startswith('asistencia.') %}aria-current="page"{% endif %}>
+        <a class="nav-link {{ 'activo' if ep in ('asistencia.ver_asistencia', 'asistencia.historial_asistencia') }}"
+           href="{{ safe_url_for('asistencia.ver_asistencia', '/asistencia') }}" {% if ep in ('asistencia.ver_asistencia', 'asistencia.historial_asistencia') %}aria-current="page"{% endif %}>
           {{ icono('asistencia') }}<span>Registro de asistencia</span>
         </a>
         {% endif %}
 
         {% if tiene_permiso('GESTIONAR_JUSTIFICACIONES') %}
-        <a class="nav-link {{ 'activo' if (request.endpoint or '').startswith('justificaciones.') }}"
-           href="{{ safe_url_for('justificaciones.ver_justificaciones', '/justificaciones') }}" {% if (request.endpoint or '').startswith('justificaciones.') %}aria-current="page"{% endif %}>
+        <a class="nav-link {{ 'activo' if ep == 'justificaciones.ver_justificaciones' }}"
+           href="{{ safe_url_for('justificaciones.ver_justificaciones', '/justificaciones') }}" {% if ep == 'justificaciones.ver_justificaciones' %}aria-current="page"{% endif %}>
           {{ icono('justificaciones') }}<span>Justificaciones</span>
         </a>
         {% endif %}
 
-        {% if tiene_permiso('GESTIONAR_USUARIOS') or tiene_permiso('GESTIONAR_ROLES') %}
-        <a class="nav-link {{ 'activo' if (request.endpoint or '').startswith('usuarios.') }}"
-           href="{{ safe_url_for('usuarios.listar_usuarios', '/usuarios') }}" {% if (request.endpoint or '').startswith('usuarios.') %}aria-current="page"{% endif %}>
+        {% if tiene_permiso('ADMINISTRAR_PERIODOS') %}
+        <a class="nav-link {{ 'activo' if ep == 'justificaciones.ver_periodos' }}"
+           href="{{ safe_url_for('justificaciones.ver_periodos', '/periodos') }}" {% if ep == 'justificaciones.ver_periodos' %}aria-current="page"{% endif %}>
+          {{ icono('reloj') }}<span>Períodos académicos</span>
+        </a>
+        {% endif %}
+
+        {% if tiene_permiso('GESTIONAR_MATRICULA') %}
+        <a class="nav-link {{ 'activo' if ep == 'alumnos.ver_matricula' }}"
+           href="{{ safe_url_for('alumnos.ver_matricula', '/matricula') }}" {% if ep == 'alumnos.ver_matricula' %}aria-current="page"{% endif %}>
+          {{ icono('usuarios') }}<span>Matrícula digital</span>
+        </a>
+        {% endif %}
+
+        {% if tiene_permiso('GESTIONAR_CARNETS') %}
+        <a class="nav-link {{ 'activo' if ep == 'alumnos.ver_carnets' }}"
+           href="{{ safe_url_for('alumnos.ver_carnets', '/carnets') }}" {% if ep == 'alumnos.ver_carnets' %}aria-current="page"{% endif %}>
+          {{ icono('asistencia') }}<span>Carnets QR</span>
+        </a>
+        {% endif %}
+
+        {% if tiene_permiso('GESTIONAR_ESTADOS_ACADEMICOS') %}
+        <a class="nav-link {{ 'activo' if ep == 'alumnos.ver_estados' }}"
+           href="{{ safe_url_for('alumnos.ver_estados', '/estados') }}" {% if ep == 'alumnos.ver_estados' %}aria-current="page"{% endif %}>
+          {{ icono('candado') }}<span>Estados académicos</span>
+        </a>
+        {% endif %}
+
+        {% if tiene_permiso('GESTIONAR_PAGOS') or tiene_permiso('VER_ALERTA_PAGOS') %}
+        <a class="nav-link {{ 'activo' if ep in ('alumnos.ver_pagos', 'alumnos.ver_alertas_pago') }}"
+           href="{{ safe_url_for('alumnos.ver_pagos', '/pagos') }}" {% if ep in ('alumnos.ver_pagos', 'alumnos.ver_alertas_pago') %}aria-current="page"{% endif %}>
+          {{ icono('justificaciones') }}<span>Pagos y alertas</span>
+        </a>
+        {% endif %}
+
+        {% if tiene_permiso('CONFIGURAR_MALLA_CURRICULAR') %}
+        <a class="nav-link {{ 'activo' if ep == 'academico.ver_malla' }}"
+           href="{{ safe_url_for('academico.ver_malla', '/malla') }}" {% if ep == 'academico.ver_malla' %}aria-current="page"{% endif %}>
+          {{ icono('aforo') }}<span>Malla curricular</span>
+        </a>
+        {% endif %}
+
+        {% if tiene_permiso('ASIGNAR_DOCENTES') %}
+        <a class="nav-link {{ 'activo' if ep == 'academico.ver_docentes' }}"
+           href="{{ safe_url_for('academico.ver_docentes', '/docentes') }}" {% if ep == 'academico.ver_docentes' %}aria-current="page"{% endif %}>
+          {{ icono('usuarios') }}<span>Asignación docente</span>
+        </a>
+        {% endif %}
+
+        {% if tiene_permiso('CONSULTAR_CALIFICACIONES') or tiene_permiso('REGISTRAR_CALIFICACIONES') %}
+        <a class="nav-link {{ 'activo' if ep == 'academico.ver_calificaciones' }}"
+           href="{{ safe_url_for('academico.ver_calificaciones', '/calificaciones') }}" {% if ep == 'academico.ver_calificaciones' %}aria-current="page"{% endif %}>
+          {{ icono('justificaciones') }}<span>Calificaciones</span>
+        </a>
+        {% endif %}
+
+        {% if tiene_permiso('CONSULTAR_FICHA_ALUMNO') %}
+        <a class="nav-link {{ 'activo' if ep in ('reportes.buscar_ficha', 'reportes.ficha_alumno') }}"
+           href="{{ safe_url_for('reportes.buscar_ficha', '/reportes/ficha') }}" {% if ep in ('reportes.buscar_ficha', 'reportes.ficha_alumno') %}aria-current="page"{% endif %}>
+          {{ icono('auditoria') }}<span>Ficha del alumno</span>
+        </a>
+        {% endif %}
+
+        {% if tiene_permiso('EXPORTAR_ASISTENCIAS') %}
+        <a class="nav-link {{ 'activo' if ep == 'reportes.exportar_asistencia' }}"
+           href="{{ safe_url_for('reportes.exportar_asistencia', '/reportes/asistencias/exportar') }}" {% if ep == 'reportes.exportar_asistencia' %}aria-current="page"{% endif %}>
+          {{ icono('justificaciones') }}<span>Exportar asistencia</span>
+        </a>
+        {% endif %}
+
+        {% if tiene_permiso('EMITIR_BOLETAS') %}
+        <a class="nav-link {{ 'activo' if ep == 'reportes.boletas' }}"
+           href="{{ safe_url_for('reportes.boletas', '/reportes/boletas') }}" {% if ep == 'reportes.boletas' %}aria-current="page"{% endif %}>
+          {{ icono('auditoria') }}<span>Boletas</span>
+        </a>
+        {% endif %}
+
+        {% if tiene_permiso('GESTIONAR_USUARIOS') %}
+        <a class="nav-link {{ 'activo' if ep.startswith('usuarios.') }}"
+           href="{{ safe_url_for('usuarios.listar_usuarios', '/usuarios') }}" {% if ep.startswith('usuarios.') %}aria-current="page"{% endif %}>
           {{ icono('usuarios') }}<span>Gestión de usuarios</span>
         </a>
         {% endif %}
 
+        {% if tiene_permiso('GESTIONAR_ROLES') %}
+        <a class="nav-link {{ 'activo' if ep.startswith('roles.') }}"
+           href="{{ safe_url_for('roles.listar_roles', '/roles') }}" {% if ep.startswith('roles.') %}aria-current="page"{% endif %}>
+          {{ icono('candado') }}<span>Roles y permisos</span>
+        </a>
+        {% endif %}
+
         {% if tiene_permiso('CONSULTAR_AUDITORIA') %}
-        <a class="nav-link {{ 'activo' if (request.endpoint or '').startswith('auditoria.') }}"
-           href="{{ safe_url_for('auditoria.ver_auditoria', '/auditoria') }}" {% if (request.endpoint or '').startswith('auditoria.') %}aria-current="page"{% endif %}>
+        <a class="nav-link {{ 'activo' if ep.startswith('auditoria.') }}"
+           href="{{ safe_url_for('auditoria.ver_auditoria', '/auditoria') }}" {% if ep.startswith('auditoria.') %}aria-current="page"{% endif %}>
           {{ icono('auditoria') }}<span>Auditoría</span>
         </a>
         {% endif %}
