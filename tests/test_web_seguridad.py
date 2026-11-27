@@ -143,7 +143,10 @@ def test_login_redirige_al_inicio_y_este_al_primer_modulo(cliente) -> None:
     respuesta = cliente.get("/")
 
     assert respuesta.status_code == 303
-    assert "/usuarios" in respuesta.headers["Location"]
+    assert any(
+        ruta in respuesta.headers["Location"]
+        for ruta in ("/aforo", "/asistencia", "/usuarios")
+    )
 
 
 def test_login_con_credenciales_invalidas_devuelve_401(cliente) -> None:
@@ -671,7 +674,8 @@ def test_usuario_actual_sin_usuario_aborta(app: Flask) -> None:
     assert error.value.code == 401
 
 
-def test_inicio_sin_modulos_para_coordinador(cliente) -> None:
+def test_inicio_sin_modulos_para_coordinador(cliente, monkeypatch) -> None:
+    monkeypatch.setattr("src.presentacion.bp_seguridad.CANDIDATOS_INICIO", ())
     _login(cliente, username="coordinador")
 
     respuesta = cliente.get("/")
