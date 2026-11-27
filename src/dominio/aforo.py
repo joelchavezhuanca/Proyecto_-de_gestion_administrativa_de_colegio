@@ -479,6 +479,11 @@ class ServicioAforo:
                     rol_usuario=actor_rol,  # type: ignore[arg-type]
                     estado_anterior=EstadoAsistencia.PENDIENTE,
                     motivo_correccion="CIERRE_AUTOMATICO_JORNADA",
+                    nivel=(ast_actual.nivel if ast_actual is not None else None) or al.nivel,
+                    grado=(ast_actual.grado if ast_actual is not None else None) or al.grado,
+                    seccion=(
+                        (ast_actual.seccion if ast_actual is not None else None) or al.seccion
+                    ),
                 )
                 nuevas_ausencias.append(nueva_ausencia)
                 ids_afectados.append(al.id)

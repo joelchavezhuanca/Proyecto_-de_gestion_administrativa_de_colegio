@@ -1,7 +1,7 @@
 """Pruebas BDD/unitarias del PBI-04: justificaciones y períodos académicos."""
 
 from dataclasses import replace
-from datetime import date, datetime, time
+from datetime import UTC, date, datetime, time, timedelta, timezone
 
 import pytest
 
@@ -1003,3 +1003,73 @@ def test_modificar_periodo_cambia_fechas_limite_y_estado(
     assert modificado.fecha_fin == date(2026, 12, 19)
     assert modificado.fecha_limite_notas == date(2026, 7, 1)
     assert modificado.cerrado is True
+
+
+def test_justificacion_preserva_snapshot_academico_zona_lima_y_correspondencia(
+    coord_op: UsuarioOperador,
+    alumno: Alumno,
+    alumno_primaria: Alumno,
+    asistencia_tardanza: RegistroAsistencia,
+    periodo: PeriodoAcademico,
+) -> None:
+    zona_lima = timezone(timedelta(hours=-5))
+    asistencia_con_snapshot = replace(
+        asistencia_tardanza,
+        nivel="Secundaria",
+        grado="2do",
+        seccion="C",
+    )
+
+    # Rechaza asistencia perteneciente a otro alumno
+    with pytest.raises(JustificacionException, match="no corresponde al alumno"):
+        _registrar(coord_op, alumno_primaria, asistencia_con_snapshot, periodo)
+
+    resultado = _registrar(coord_op, alumno, asistencia_con_snapshot, periodo)
+    assert resultado.justificacion.fecha_resolucion is not None
+    assert resultado.justificacion.fecha_resolucion.tzinfo == zona_lima
+    assert resultado.justificacion.nivel == "Secundaria"
+    assert resultado.justificacion.grado == "2do"
+    assert resultado.justificacion.seccion == "C"
+    assert resultado.asistencia_actualizada.nivel == "Secundaria"
+    assert resultado.asistencia_actualizada.grado == "2do"
+    assert resultado.asistencia_actualizada.seccion == "C"
+
+    # Modificar con fecha UTC normaliza a America/Lima
+    modificada = ServicioJustificaciones.modificar_justificacion(
+        operador=coord_op,
+        justificacion=resultado.justificacion,
+        asistencia=resultado.asistencia_actualizada,
+        periodo=periodo,
+        fecha_hora=datetime(2026, 11, 2, 15, 0, 0, tzinfo=UTC),
+    )
+    assert modificada.justificacion.fecha_resolucion == datetime(
+        2026, 11, 2, 10, 0, 0, tzinfo=zona_lima
+    )
+
+    # Rechaza anulación/modificación si la justificación no corresponde a la asistencia
+    otra_asistencia = replace(resultado.asistencia_actualizada, id="ast-otra")
+    with pytest.raises(JustificacionException, match="no corresponde al registro de asistencia"):
+        ServicioJustificaciones.anular_justificacion(
+            operador=coord_op,
+            justificacion=resultado.justificacion,
+            asistencia=otra_asistencia,
+            periodo=periodo,
+        )
+    with pytest.raises(JustificacionException, match="no corresponde al registro de asistencia"):
+        ServicioJustificaciones.modificar_justificacion(
+            operador=coord_op,
+            justificacion=resultado.justificacion,
+            asistencia=otra_asistencia,
+            periodo=periodo,
+        )
+
+    # Anular conserva el snapshot académico de la asistencia
+    restaurada = ServicioJustificaciones.anular_justificacion(
+        operador=coord_op,
+        justificacion=resultado.justificacion,
+        asistencia=resultado.asistencia_actualizada,
+        periodo=periodo,
+    )
+    assert restaurada.nivel == "Secundaria"
+    assert restaurada.grado == "2do"
+    assert restaurada.seccion == "C"

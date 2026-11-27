@@ -828,3 +828,40 @@ def test_validar_permiso_rechaza_rol_actual_inactivo(
             rol_actual=replace(docente_rol, activo=False),
             roles=[docente_rol],
         )
+
+
+def test_roles_base_como_texto_son_aceptados_en_sesion_y_gestion(
+    admin_user: Usuario, staff_user: Usuario
+) -> None:
+    """Al hidratar usuarios desde BD el rol base llega como str y debe funcionar."""
+    pwd_hash, salt = hashear_password("BaseStrPass2026!")
+    admin_desde_bd = Usuario(
+        id=90,
+        username="admin_bd",
+        password_hash=pwd_hash,
+        salt=salt,
+        nombre_completo="Admin BD",
+        rol="ADMIN",
+    )
+    sesion = ServicioAutenticacionYPermisos.iniciar_sesion(
+        "admin_bd", "BaseStrPass2026!", [admin_desde_bd]
+    )
+    assert sesion.activa is True
+    assert sesion.rol_codigo == "ADMIN"
+
+    creado, _ = ServicioGestionUsuarios.crear_usuario(
+        operador=admin_user,
+        username="staff_texto",
+        password_plana="StaffTexto2026!",
+        nombre_completo="Staff Texto",
+        rol="ADMIN_STAFF",
+        usuarios_existentes=[admin_user, staff_user],
+    )
+    assert creado.rol == RolUsuario.ADMIN_STAFF
+
+    modificado, _ = ServicioGestionUsuarios.modificar_usuario(
+        operador=admin_user,
+        usuario_target=staff_user,
+        nuevo_rol="COORDINADOR",
+    )
+    assert modificado.rol == RolUsuario.COORDINADOR

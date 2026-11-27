@@ -3,9 +3,10 @@
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from enum import StrEnum
 from pathlib import Path
+from typing import Final
 
 from src.dominio.asistencia import (
     Alumno,
@@ -24,6 +25,14 @@ from src.dominio.usuarios import (
 EXTENSIONES_PERMITIDAS = frozenset({"pdf", "jpg", "jpeg", "png"})
 TAMANO_MAXIMO_ADJUNTO = 5_242_880
 MAX_ADJUNTOS = 3
+ZONA_HORARIA_LIMA: Final[timezone] = timezone(timedelta(hours=-5))
+
+
+def _normalizar_fecha_hora(fecha_hora: datetime) -> datetime:
+    """Normaliza una marca temporal al huso institucional America/Lima (UTC-5)."""
+    if fecha_hora.tzinfo is None:
+        return fecha_hora.replace(tzinfo=ZONA_HORARIA_LIMA)
+    return fecha_hora.astimezone(ZONA_HORARIA_LIMA)
 
 
 class TipoPeriodo(StrEnum):
@@ -177,7 +186,7 @@ class Justificacion:
     motivo: str
     estado: EstadoJustificacion
     usuario_id: int
-    rol_usuario: RolUsuario
+    rol_usuario: RolUsuario | str
     documento_adjunto: str | None = None
     fecha_resolucion: datetime | None = None
     adjuntos: tuple[AdjuntoJustificacion, ...] = ()
@@ -270,6 +279,10 @@ class ServicioJustificaciones:
             raise JustificacionException("El alumno especificado no existe.")
         if alumno.estado != EstadoAlumno.ACTIVO:
             raise JustificacionException(f"El alumno {alumno.codigo} no se encuentra ACTIVO.")
+        if asistencia.alumno_id != alumno.id:
+            raise JustificacionException(
+                "El registro de asistencia no corresponde al alumno especificado."
+            )
 
         if fecha_solicitud > fecha_actual:
             raise FechaInvalidaException(
@@ -301,6 +314,10 @@ class ServicioJustificaciones:
         id_just = f"just-{uuid.uuid4().hex[:10]}"
         id_aud = f"aud-just-{uuid.uuid4().hex[:10]}"
 
+        nivel_snapshot = asistencia.nivel or alumno.nivel
+        grado_snapshot = asistencia.grado or alumno.grado
+        seccion_snapshot = asistencia.seccion or alumno.seccion
+
         justificacion = Justificacion(
             id=id_just,
             asistencia_id=asistencia.id,
@@ -312,12 +329,12 @@ class ServicioJustificaciones:
             usuario_id=operador.id,
             rol_usuario=operador.rol,
             documento_adjunto=documento_adjunto,
-            fecha_resolucion=datetime.now(),
+            fecha_resolucion=datetime.now(ZONA_HORARIA_LIMA),
             adjuntos=adjuntos_validos,
             minutos_tardanza_original=asistencia.minutos_tardanza,
-            nivel=alumno.nivel,
-            grado=alumno.grado,
-            seccion=alumno.seccion,
+            nivel=nivel_snapshot,
+            grado=grado_snapshot,
+            seccion=seccion_snapshot,
         )
 
         asistencia_modificada = RegistroAsistencia(
@@ -333,6 +350,9 @@ class ServicioJustificaciones:
             estado_anterior=asistencia.estado,
             motivo_correccion=f"Justificado: {motivo_limpio}",
             auditoria_id=id_aud,
+            nivel=nivel_snapshot,
+            grado=grado_snapshot,
+            seccion=seccion_snapshot,
         )
 
         return ResultadoOperacionJustificacion(
@@ -363,6 +383,10 @@ class ServicioJustificaciones:
                     f"está fuera del período {periodo.nombre}."
                 )
 
+        if justificacion.asistencia_id != asistencia.id:
+            raise JustificacionException(
+                "La justificación no corresponde al registro de asistencia especificado."
+            )
         if asistencia.estado != EstadoAsistencia.JUSTIFICADO:
             raise JustificacionException(
                 "La asistencia no se encuentra en estado JUSTIFICADO."
@@ -388,6 +412,9 @@ class ServicioJustificaciones:
             estado_anterior=EstadoAsistencia.JUSTIFICADO,
             motivo_correccion="Anulación de justificación previa",
             auditoria_id=f"aud-anul-{uuid.uuid4().hex[:10]}",
+            nivel=asistencia.nivel,
+            grado=asistencia.grado,
+            seccion=asistencia.seccion,
         )
 
     @staticmethod
@@ -413,6 +440,10 @@ class ServicioJustificaciones:
             raise JustificacionException(
                 f"La fecha de la asistencia {asistencia.fecha_escolar} "
                 f"está fuera del período {periodo.nombre}."
+            )
+        if justificacion.asistencia_id != asistencia.id:
+            raise JustificacionException(
+                "La justificación no corresponde al registro de asistencia especificado."
             )
         if asistencia.estado != EstadoAsistencia.JUSTIFICADO:
             raise JustificacionException(
@@ -448,7 +479,11 @@ class ServicioJustificaciones:
             categoria=categoria_final,
             motivo=motivo_final,
             adjuntos=adjuntos_finales,
-            fecha_resolucion=fecha_hora or datetime.now(),
+            fecha_resolucion=(
+                _normalizar_fecha_hora(fecha_hora)
+                if fecha_hora is not None
+                else datetime.now(ZONA_HORARIA_LIMA)
+            ),
         )
         asistencia_actualizada = replace(asistencia, auditoria_id=id_aud)
 

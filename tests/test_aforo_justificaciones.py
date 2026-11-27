@@ -386,6 +386,12 @@ def test_aforo_ejecutar_cierre_automatico(
     assert 101 not in evento.alumnos_ids_afectados
     assert 999 not in evento.alumnos_ids_afectados
     assert all(a.estado == EstadoAsistencia.AUSENTE for a in nuevas)
+    alumnos_por_id = {al.id: al for al in alumnos_muestra}
+    for ausencia in nuevas:
+        al = alumnos_por_id[ausencia.alumno_id]
+        assert ausencia.nivel == al.nivel
+        assert ausencia.grado == al.grado
+        assert ausencia.seccion == al.seccion
 
 
 # --- PRUEBAS PBI-03 CIERRE DE BRECHAS: CALENDARIO, RBAC DINÁMICO, FILTROS, DETALLE E HISTORIAL ---
