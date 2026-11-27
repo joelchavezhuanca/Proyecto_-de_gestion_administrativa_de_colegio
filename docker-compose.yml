@@ -1,3 +1,5 @@
+name: domingo-savio
+
 services:
   app:
     build: .
