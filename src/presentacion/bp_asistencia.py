@@ -98,8 +98,10 @@ def registrar_modulo_asistencia(
     app.extensions[EXTENSION_SERVICIO_ASISTENCIA] = servicio_asistencia
     if servicio_seguridad is not None:
         app.extensions[EXTENSION_SERVICIO_SEGURIDAD] = servicio_seguridad
-    app.register_blueprint(bp_asistencia)
-    app.register_blueprint(bp_justificaciones)
+    if bp_asistencia.name not in app.blueprints:
+        app.register_blueprint(bp_asistencia)
+    if bp_justificaciones.name not in app.blueprints:
+        app.register_blueprint(bp_justificaciones)
 
 
 def _servicio() -> Any:
