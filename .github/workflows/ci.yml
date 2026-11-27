@@ -2,14 +2,14 @@ name: Continuous Integration - Domingo Savio S.A.C.
 
 on:
   push:
-    branches: [ main, dev, 'feature/**', 'improvement/**', 'refactor/**', 'integration/**' ]
+    branches: [ main, dev, 'feature/**', 'improvement/**', 'refactor/**', 'integration/**', 'fix/**', 'feat/**' ]
   pull_request:
     branches: [ main, dev ]
   workflow_dispatch:
 
 jobs:
   lint-and-test:
-    name: Ruff Linteo y Pytest Unitario
+    name: Ruff (Linteo + Formato) y Pytest (Unitarias, Integración, ATDD y Cobertura)
     runs-on: ubuntu-latest
 
     steps:
@@ -30,5 +30,14 @@ jobs:
       - name: Inspección Estática de Código con Ruff
         run: ruff check .
 
-      - name: Ejecutar Pruebas Automatizadas con Pytest
-        run: pytest -v --cov=src --cov-report=term-missing
+      - name: Verificación de Formato con Ruff
+        run: ruff format --check .
+
+      - name: Ejecutar Pruebas Automatizadas y Cobertura ≥ 70 % (sin capa de presentación)
+        run: >
+          pytest -v
+          --cov=src/dominio
+          --cov=src/aplicacion
+          --cov=src/infraestructura
+          --cov-report=term-missing
+          --cov-fail-under=70

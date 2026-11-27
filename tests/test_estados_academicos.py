@@ -48,23 +48,32 @@ def test_enums_constantes_y_jerarquia_excepciones() -> None:
         EstadoAcademico.TRASLADADO,
         EstadoAcademico.EGRESADO,
     }
-    assert frozenset({
-        EstadoAcademico.RETIRADO,
-        EstadoAcademico.TRASLADADO,
-        EstadoAcademico.EGRESADO,
-    }) == ESTADOS_QUE_ANULAN_CARNET
+    assert (
+        frozenset(
+            {
+                EstadoAcademico.RETIRADO,
+                EstadoAcademico.TRASLADADO,
+                EstadoAcademico.EGRESADO,
+            }
+        )
+        == ESTADOS_QUE_ANULAN_CARNET
+    )
     assert TRANSICIONES_VALIDAS == {
-        EstadoAcademico.ACTIVO: frozenset({
-            EstadoAcademico.SUSPENDIDO,
-            EstadoAcademico.RETIRADO,
-            EstadoAcademico.TRASLADADO,
-            EstadoAcademico.EGRESADO,
-        }),
-        EstadoAcademico.SUSPENDIDO: frozenset({
-            EstadoAcademico.ACTIVO,
-            EstadoAcademico.RETIRADO,
-            EstadoAcademico.TRASLADADO,
-        }),
+        EstadoAcademico.ACTIVO: frozenset(
+            {
+                EstadoAcademico.SUSPENDIDO,
+                EstadoAcademico.RETIRADO,
+                EstadoAcademico.TRASLADADO,
+                EstadoAcademico.EGRESADO,
+            }
+        ),
+        EstadoAcademico.SUSPENDIDO: frozenset(
+            {
+                EstadoAcademico.ACTIVO,
+                EstadoAcademico.RETIRADO,
+                EstadoAcademico.TRASLADADO,
+            }
+        ),
         EstadoAcademico.RETIRADO: frozenset({EstadoAcademico.ACTIVO}),
         EstadoAcademico.TRASLADADO: frozenset({EstadoAcademico.ACTIVO}),
         EstadoAcademico.EGRESADO: frozenset(),
@@ -193,12 +202,9 @@ def test_todas_las_transiciones_no_suspension_validas_y_anulacion_carnet(
     assert resultado.historial.estado_nuevo == estado_destino
     assert resultado.historial.fecha_inicio_suspension is None
     assert resultado.historial.fecha_fin_suspension is None
-    assert (
-        ServicioEstadosAcademicos.puede_registrar_asistencia(
-            resultado.estado_actual, date(2026, 11, 25)
-        )
-        is (estado_destino == EstadoAcademico.ACTIVO)
-    )
+    assert ServicioEstadosAcademicos.puede_registrar_asistencia(
+        resultado.estado_actual, date(2026, 11, 25)
+    ) is (estado_destino == EstadoAcademico.ACTIVO)
 
 
 @pytest.mark.parametrize(
@@ -369,9 +375,7 @@ def test_normaliza_fecha_hora_a_america_lima_e_inmutabilidad(
         motivo="Culminó el quinto de secundaria",
         fecha_hora=fecha_utc,
     )
-    assert resultado_utc.historial.fecha_hora == datetime(
-        2026, 11, 25, 21, 15, 0, tzinfo=ZONA_LIMA
-    )
+    assert resultado_utc.historial.fecha_hora == datetime(2026, 11, 25, 21, 15, 0, tzinfo=ZONA_LIMA)
     assert resultado_utc.historial.fecha_hora.utcoffset() == timedelta(hours=-5)
 
     fecha_naive = datetime(2026, 11, 25, 14, 0, 0)

@@ -115,9 +115,7 @@ def _normalizar_motivo(motivo: str) -> str:
     """Valida que el motivo no sea vacío y devuelve su texto limpio."""
     motivo_limpio = motivo.strip() if isinstance(motivo, str) else ""
     if not motivo_limpio:
-        raise MotivoObligatorioException(
-            "El motivo del cambio de estado académico es obligatorio."
-        )
+        raise MotivoObligatorioException("El motivo del cambio de estado académico es obligatorio.")
     return motivo_limpio
 
 
@@ -158,9 +156,7 @@ class ServicioEstadosAcademicos:
     ) -> None:
         """Valida cuenta activa y permiso GESTIONAR_ESTADOS_ACADEMICOS en servidor."""
         if not operador.activo:
-            raise PermisoEstadoAcademicoException(
-                "El operador no cuenta con una cuenta activa."
-            )
+            raise PermisoEstadoAcademicoException("El operador no cuenta con una cuenta activa.")
         if not ServicioAutenticacionYPermisos.tiene_permiso(
             operador.rol,
             PermisoOperacion.GESTIONAR_ESTADOS_ACADEMICOS,

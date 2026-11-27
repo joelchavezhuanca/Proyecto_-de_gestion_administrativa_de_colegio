@@ -166,9 +166,7 @@ class RepositorioPagos:
         modelo = self.sesion.get(AlertaPagoSilenciosaModel, alerta_id)
         return self._alerta_a_dominio(modelo) if modelo else None
 
-    def obtener_alerta_por_asistencia(
-        self, asistencia_id: str
-    ) -> AlertaSilenciosaPago | None:
+    def obtener_alerta_por_asistencia(self, asistencia_id: str) -> AlertaSilenciosaPago | None:
         modelo = self.sesion.scalars(
             select(AlertaPagoSilenciosaModel).where(
                 AlertaPagoSilenciosaModel.asistencia_id == asistencia_id
@@ -270,9 +268,7 @@ class RepositorioNotificacionesWhatsApp:
         modelo = self.sesion.get(NotificacionWhatsappModel, notificacion_id)
         return self._a_dominio(modelo) if modelo else None
 
-    def obtener_por_clave_idempotencia(
-        self, clave: str
-    ) -> NotificacionWhatsApp | None:
+    def obtener_por_clave_idempotencia(self, clave: str) -> NotificacionWhatsApp | None:
         modelo = self.sesion.scalars(
             select(NotificacionWhatsappModel).where(
                 NotificacionWhatsappModel.clave_idempotencia == clave.strip()
@@ -280,9 +276,7 @@ class RepositorioNotificacionesWhatsApp:
         ).first()
         return self._a_dominio(modelo) if modelo else None
 
-    def listar_por_alumno(
-        self, alumno_id: int, limite: int = 50
-    ) -> list[NotificacionWhatsApp]:
+    def listar_por_alumno(self, alumno_id: int, limite: int = 50) -> list[NotificacionWhatsApp]:
         modelos = self.sesion.scalars(
             select(NotificacionWhatsappModel)
             .where(NotificacionWhatsappModel.estudiante_id == alumno_id)

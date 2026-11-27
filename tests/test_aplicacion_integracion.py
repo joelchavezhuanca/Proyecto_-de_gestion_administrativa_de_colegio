@@ -771,9 +771,7 @@ def test_registro_duplicado_es_rechazado_sin_alterar_el_existente(
     asistencia: ServicioAsistencia,
 ) -> None:
     _, carnet = alumno
-    asistencia.registrar_asistencia(
-        admin_id, metodo=MetodoRegistro.CARNET, codigo_carnet=carnet
-    )
+    asistencia.registrar_asistencia(admin_id, metodo=MetodoRegistro.CARNET, codigo_carnet=carnet)
 
     with pytest.raises(RegistroDuplicadoException):
         asistencia.registrar_asistencia(
@@ -944,9 +942,7 @@ def test_aforo_metricas_y_configuracion_de_hora_de_cierre(
     )
     servicio = _servicio_asistencia(fabrica_sesiones)
     try:
-        servicio.registrar_asistencia(
-            admin_id, metodo=MetodoRegistro.CARNET, codigo_carnet=carnet
-        )
+        servicio.registrar_asistencia(admin_id, metodo=MetodoRegistro.CARNET, codigo_carnet=carnet)
         metricas = servicio.consultar_metricas_aforo(
             admin_id, fecha_escolar=FECHA_ESCOLAR, hora_consulta=time(8, 0)
         )
@@ -1219,9 +1215,10 @@ def test_flujo_de_calificaciones_tres_niveles_y_boleta(
 
     asignacion = academico.asignar_docente(admin_id, docente_id, curso.id, salon.id)
     assert asignacion.activa is True
-    assert academico.validar_ambito_docente(
-        docente_id, curso.id, salon.id, ANIO_LECTIVO
-    ).id == asignacion.id
+    assert (
+        academico.validar_ambito_docente(docente_id, curso.id, salon.id, ANIO_LECTIVO).id
+        == asignacion.id
+    )
 
     servicio_asistencia = _servicio_asistencia(fabrica_sesiones)
     try:
@@ -1237,18 +1234,12 @@ def test_flujo_de_calificaciones_tres_niveles_y_boleta(
     )
     assert sum(r.peso_porcentaje for r in rubros) == Decimal("100")
 
-    practica = academico.crear_actividad(
-        docente_id, rubros[0].id, "Práctica 1", date(2026, 11, 10)
-    )
+    practica = academico.crear_actividad(docente_id, rubros[0].id, "Práctica 1", date(2026, 11, 10))
     examen = academico.crear_actividad(
         docente_id, rubros[1].id, "Examen bimestral", date(2026, 12, 1)
     )
-    academico.registrar_calificacion(
-        docente_id, practica.id, ficha.alumno_id, Decimal("16")
-    )
-    academico.registrar_calificacion(
-        docente_id, examen.id, ficha.alumno_id, Decimal("18")
-    )
+    academico.registrar_calificacion(docente_id, practica.id, ficha.alumno_id, Decimal("16"))
+    academico.registrar_calificacion(docente_id, examen.id, ficha.alumno_id, Decimal("18"))
 
     promedio = academico.calcular_promedio_periodo(ficha.alumno_id, curso.id, periodo.id)
     assert promedio.nota_final == Decimal("17.20")

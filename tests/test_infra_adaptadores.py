@@ -444,7 +444,7 @@ class TestExportarCsvBytes:
 
     def test_caracteres_especiales_escapados_por_csv(self) -> None:
         """Valores con comas deben quedar entre comillas en CSV estándar."""
-        texto = exportar_csv_bytes(["Col"], [['valor, con coma']]).decode("utf-8-sig")
+        texto = exportar_csv_bytes(["Col"], [["valor, con coma"]]).decode("utf-8-sig")
         assert "valor, con coma" in texto
 
     def test_encabezado_peligroso_es_sanitizado(self) -> None:

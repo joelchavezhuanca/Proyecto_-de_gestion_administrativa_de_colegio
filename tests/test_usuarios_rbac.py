@@ -181,9 +181,7 @@ def test_escenario_04_modificar_datos_y_rol(admin_user: Usuario, staff_user: Usu
     assert aud.detalle["rol_nuevo"] == "COORDINADOR"
 
 
-def test_escenario_04_modificar_rol_invalido(
-    admin_user: Usuario, staff_user: Usuario
-) -> None:
+def test_escenario_04_modificar_rol_invalido(admin_user: Usuario, staff_user: Usuario) -> None:
     """Rechazar modificación si se asigna un rol no reconocido."""
     with pytest.raises(RolInvalidoException, match="no es válido"):
         ServicioGestionUsuarios.modificar_usuario(
@@ -240,9 +238,7 @@ def test_escenario_07_consultar_y_filtrar_usuarios(
     filtro_user = ServicioGestionUsuarios.filtrar_usuarios(lista, username="luna")
     assert len(filtro_user) == 1
 
-    filtro_inactivo = ServicioGestionUsuarios.filtrar_usuarios(
-        lista, estado=EstadoUsuario.INACTIVO
-    )
+    filtro_inactivo = ServicioGestionUsuarios.filtrar_usuarios(lista, estado=EstadoUsuario.INACTIVO)
     assert len(filtro_inactivo) == 1
     assert filtro_inactivo[0].username == "bloqueado"
 
@@ -256,15 +252,11 @@ def test_escenario_08_restablecer_password(admin_user: Usuario, staff_user: Usua
         nueva_password_plana="NuevaPassSegura2026",
     )
     assert actualizado.password_hash != antiguo_hash
-    assert verificar_password(
-        "NuevaPassSegura2026", actualizado.password_hash, actualizado.salt
-    )
+    assert verificar_password("NuevaPassSegura2026", actualizado.password_hash, actualizado.salt)
     assert aud.operacion == "RESTABLECER_CREDENCIAL"
 
 
-def test_escenario_08_restablecer_password_corta(
-    admin_user: Usuario, staff_user: Usuario
-) -> None:
+def test_escenario_08_restablecer_password_corta(admin_user: Usuario, staff_user: Usuario) -> None:
     """Rechazar restablecimiento si la nueva contraseña tiene menos de 8 caracteres."""
     with pytest.raises(UsuarioException, match="al menos 8 caracteres"):
         ServicioGestionUsuarios.restablecer_password(
@@ -399,9 +391,7 @@ def test_rbac_matriz_permisos_oficial(
     # 3. Denegar operaciones administrativas a COORDINADOR y ADMIN_STAFF
     for s in [sesion_coord, sesion_staff]:
         with pytest.raises(AccesoDenegadoException):
-            ServicioAutenticacionYPermisos.validar_permiso(
-                s, PermisoOperacion.GESTIONAR_USUARIOS
-            )
+            ServicioAutenticacionYPermisos.validar_permiso(s, PermisoOperacion.GESTIONAR_USUARIOS)
         with pytest.raises(AccesoDenegadoException):
             ServicioAutenticacionYPermisos.validar_permiso(s, PermisoOperacion.ASIGNAR_ROLES)
         with pytest.raises(AccesoDenegadoException):
@@ -409,9 +399,7 @@ def test_rbac_matriz_permisos_oficial(
                 s, PermisoOperacion.CONFIGURAR_CIERRE_ASISTENCIA
             )
         with pytest.raises(AccesoDenegadoException):
-            ServicioAutenticacionYPermisos.validar_permiso(
-                s, PermisoOperacion.ADMINISTRAR_PERIODOS
-            )
+            ServicioAutenticacionYPermisos.validar_permiso(s, PermisoOperacion.ADMINISTRAR_PERIODOS)
 
 
 def test_rbac_sesion_cerrada_o_expirada(staff_user: Usuario) -> None:
@@ -607,9 +595,7 @@ def test_pbi02_no_degrada_ultimo_admin(admin_user: Usuario) -> None:
         )
 
 
-def test_pbi02_desactivar_cuenta_revoca_sesiones(
-    admin_user: Usuario, staff_user: Usuario
-) -> None:
+def test_pbi02_desactivar_cuenta_revoca_sesiones(admin_user: Usuario, staff_user: Usuario) -> None:
     """RN-09: desactivar una cuenta revoca de inmediato sus sesiones activas."""
     sesion = ServicioAutenticacionYPermisos.iniciar_sesion(
         "jluna_qa", "StaffPass123!", [staff_user]
@@ -634,19 +620,15 @@ def test_pbi02_restablecer_password_revoca_sesiones(
         "jluna_qa", "StaffPass123!", [staff_user]
     )
 
-    actualizado, aud, sesiones = (
-        ServicioGestionUsuarios.restablecer_password_y_revocar_sesiones(
-            operador=admin_user,
-            usuario_target=staff_user,
-            nueva_password_plana="NuevaClave2026",
-            sesiones=[sesion],
-        )
+    actualizado, aud, sesiones = ServicioGestionUsuarios.restablecer_password_y_revocar_sesiones(
+        operador=admin_user,
+        usuario_target=staff_user,
+        nueva_password_plana="NuevaClave2026",
+        sesiones=[sesion],
     )
 
     assert actualizado.password_hash != staff_user.password_hash
-    assert verificar_password(
-        "NuevaClave2026", actualizado.password_hash, actualizado.salt
-    )
+    assert verificar_password("NuevaClave2026", actualizado.password_hash, actualizado.salt)
     assert aud.operacion == "RESTABLECER_CREDENCIAL"
     assert sesiones[0].activa is False
 
@@ -719,4 +701,3 @@ def test_pbi02_validar_admin_retrocompatible(
     admin_inactivo = replace(admin_user, estado=EstadoUsuario.INACTIVO)
     with pytest.raises(CuentaInactivaException, match="no cuenta con una cuenta activa"):
         ServicioGestionUsuarios.validar_admin(admin_inactivo)
-

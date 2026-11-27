@@ -224,8 +224,7 @@ def test_eliminar_asistencia_elimina_justificaciones_en_cascada(
     db_session.commit()
 
     assert (
-        db_session.scalars(select(AsistenciaModel).filter_by(id="ast-cascada-02")).first()
-        is None
+        db_session.scalars(select(AsistenciaModel).filter_by(id="ast-cascada-02")).first() is None
     )
     assert (
         db_session.scalars(
@@ -505,9 +504,7 @@ def test_bloque2_estructura_academica_matricula_carnets_y_unicos(
     assert asig_db.curso_id == curso.id
 
     # UNIQUE(anio_lectivo, nivel, grado, seccion) en salones
-    db_session.add(
-        SalonModel(anio_lectivo=2026, nivel="Secundaria", grado="3ro", seccion="A")
-    )
+    db_session.add(SalonModel(anio_lectivo=2026, nivel="Secundaria", grado="3ro", seccion="A"))
     with pytest.raises(IntegrityError):
         db_session.commit()
     db_session.rollback()
@@ -926,4 +923,3 @@ def test_sembrar_admin_inicial_idempotente_y_por_entorno(
 
     # Segunda ejecución es idempotente y no duplica
     assert sembrar_admin_inicial(db_session) is False
-

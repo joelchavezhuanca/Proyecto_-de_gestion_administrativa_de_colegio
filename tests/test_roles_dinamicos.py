@@ -304,9 +304,7 @@ def test_crear_rol_rechaza_codigo_duplicado(
 
 
 @pytest.mark.parametrize("permisos", [set(), {"NO_EXISTE"}])
-def test_crear_rol_rechaza_permisos_invalidos(
-    admin_user: Usuario, permisos: set[object]
-) -> None:
+def test_crear_rol_rechaza_permisos_invalidos(admin_user: Usuario, permisos: set[object]) -> None:
     with pytest.raises(RolInvalidoException, match="permiso"):
         ServicioGestionRoles.crear_rol(
             operador=admin_user,
@@ -510,9 +508,7 @@ def test_eliminar_rol_inexistente_es_rechazado(admin_user: Usuario, docente_rol:
 # ----------------------------------------------------------------------
 # Asignación de roles personalizados a usuarios
 # ----------------------------------------------------------------------
-def test_crear_usuario_con_rol_personalizado(
-    admin_user: Usuario, docente_rol: Rol
-) -> None:
+def test_crear_usuario_con_rol_personalizado(admin_user: Usuario, docente_rol: Rol) -> None:
     nuevo, auditoria = ServicioGestionUsuarios.crear_usuario(
         operador=admin_user,
         username="docente_nuevo",
@@ -597,9 +593,7 @@ def test_iniciar_sesion_rechaza_rol_personalizado_inexistente(
         )
 
 
-def test_validar_permiso_de_rol_personalizado(
-    docente_user: Usuario, docente_rol: Rol
-) -> None:
+def test_validar_permiso_de_rol_personalizado(docente_user: Usuario, docente_rol: Rol) -> None:
     sesion = ServicioAutenticacionYPermisos.iniciar_sesion(
         "docente_uno", "DocentePass123!", [docente_user], roles=[docente_rol]
     )
@@ -652,9 +646,7 @@ def test_sesion_se_revoca_si_cambia_el_rol_del_usuario(
         )
 
 
-def test_revocar_todas_las_sesiones_de_un_usuario(
-    admin_user: Usuario, staff_user: Usuario
-) -> None:
+def test_revocar_todas_las_sesiones_de_un_usuario(admin_user: Usuario, staff_user: Usuario) -> None:
     sesion_admin = ServicioAutenticacionYPermisos.iniciar_sesion(
         "admin_roles", "AdminSecure2026!", [admin_user]
     )
@@ -789,17 +781,13 @@ def test_tiene_permiso_con_objeto_rol(docente_rol: Rol) -> None:
 
 
 def test_tiene_permiso_con_codigo_de_rol_base() -> None:
-    assert ServicioAutenticacionYPermisos.tiene_permiso(
-        "ADMIN", PermisoOperacion.GESTIONAR_ROLES
-    )
+    assert ServicioAutenticacionYPermisos.tiene_permiso("ADMIN", PermisoOperacion.GESTIONAR_ROLES)
     assert not ServicioAutenticacionYPermisos.tiene_permiso(
         "COORDINADOR", PermisoOperacion.GESTIONAR_ROLES
     )
 
 
-def test_sesion_revocada_por_usuario_distinto(
-    docente_user: Usuario, docente_rol: Rol
-) -> None:
+def test_sesion_revocada_por_usuario_distinto(docente_user: Usuario, docente_rol: Rol) -> None:
     sesion = ServicioAutenticacionYPermisos.iniciar_sesion(
         "docente_uno", "DocentePass123!", [docente_user], roles=[docente_rol]
     )

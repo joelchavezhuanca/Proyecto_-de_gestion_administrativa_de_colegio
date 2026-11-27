@@ -144,9 +144,7 @@ def _status_por_error(error: Exception) -> int:
 # ---------------------------------------------------------------------------
 
 
-def _render_malla(
-    status: int = 200, *, anio_lectivo: int | None = None
-) -> tuple[str, int]:
+def _render_malla(status: int = 200, *, anio_lectivo: int | None = None) -> tuple[str, int]:
     servicio = _obtener_servicio()
     salones = servicio.listar_salones(anio_lectivo=anio_lectivo, solo_activos=False)
     cursos = servicio.listar_cursos(anio_lectivo=anio_lectivo, solo_activos=False)
@@ -420,9 +418,7 @@ def _render_calificaciones(
         )
         periodos = repo_per.listar()
 
-        asignacion_actual = next(
-            (a for a in asignaciones if a.id == asignacion_id), None
-        )
+        asignacion_actual = next((a for a in asignaciones if a.id == asignacion_id), None)
         periodo_actual = next((p for p in periodos if p.id == periodo_id), None)
 
         rubros = []
@@ -432,9 +428,7 @@ def _render_calificaciones(
         bloqueado_por_fecha_limite = False
 
         if asignacion_actual is not None and periodo_actual is not None:
-            rubros = repo_cal.listar_rubros_asignacion(
-                asignacion_actual.id, periodo_actual.id
-            )
+            rubros = repo_cal.listar_rubros_asignacion(asignacion_actual.id, periodo_actual.id)
             alumnos = repo_mat.listar_por_salon(asignacion_actual.salon_id)
             for rubro in rubros:
                 acts = repo_cal.listar_actividades_rubro(rubro.id)
@@ -496,9 +490,7 @@ def configurar_rubros() -> Response | tuple[str, int]:
             for nombre, peso in zip(nombres, pesos, strict=False)
             if nombre.strip() or peso.strip()
         ]
-        servicio.configurar_rubros(
-            _operador_id(), asignacion_id, periodo_val, rubros_propuestos
-        )
+        servicio.configurar_rubros(_operador_id(), asignacion_id, periodo_val, rubros_propuestos)
     except (PermisoCalificacionException, AccesoAmbitoDocenteDenegadoException) as error:
         flash(str(error), "error")
         return _render_calificaciones(403, asignacion_id=asignacion_id, periodo_id=periodo_id)

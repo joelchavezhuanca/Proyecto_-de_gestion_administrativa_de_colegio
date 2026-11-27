@@ -100,9 +100,7 @@ def sembrar_seguridad_base(session: Session) -> None:
             )
     session.flush()
 
-    roles_existentes = {
-        rol.codigo: rol for rol in session.scalars(select(RolModel)).all()
-    }
+    roles_existentes = {rol.codigo: rol for rol in session.scalars(select(RolModel)).all()}
     for rol_base in ServicioGestionRoles.obtener_roles_base():
         rol_orm = roles_existentes.get(rol_base.codigo)
         if rol_orm is None:
@@ -124,9 +122,7 @@ def sembrar_seguridad_base(session: Session) -> None:
         )
         for permiso in rol_base.permisos:
             if permiso.value not in asignados:
-                session.add(
-                    RolPermisoModel(rol_id=rol_orm.id, permiso_codigo=permiso.value)
-                )
+                session.add(RolPermisoModel(rol_id=rol_orm.id, permiso_codigo=permiso.value))
     session.flush()
 
 
@@ -162,9 +158,7 @@ def sembrar_admin_inicial(
         select(RolModel.id).where(RolModel.codigo == RolUsuario.ADMIN.value)
     )
     nombre = (
-        nombre_completo
-        or os.environ.get("ADMIN_NOMBRE_COMPLETO")
-        or "Administrador del Sistema"
+        nombre_completo or os.environ.get("ADMIN_NOMBRE_COMPLETO") or "Administrador del Sistema"
     ).strip()
 
     session.add(

@@ -399,7 +399,14 @@ def test_fecha_hora_utc_se_evalua_en_hora_lima(
     # 2026-05-16 03:00 UTC == 2026-05-15 22:00 en Lima -> aún dentro del plazo.
     dentro = datetime(2026, 5, 16, 3, 0, tzinfo=UTC)
     cal = ServicioCalificaciones.registrar_calificacion(
-        docente, asignacion, periodo, actividad, 100, Decimal("15"), dentro, asignaciones,
+        docente,
+        asignacion,
+        periodo,
+        actividad,
+        100,
+        Decimal("15"),
+        dentro,
+        asignaciones,
         roles=roles,
     )
     assert cal.actualizado_en.utcoffset() == ZONA_HORARIA_LIMA.utcoffset(None)
@@ -408,7 +415,14 @@ def test_fecha_hora_utc_se_evalua_en_hora_lima(
     fuera = datetime(2026, 5, 16, 5, 30, tzinfo=UTC)
     with pytest.raises(FechaLimiteNotasVencidaException):
         ServicioCalificaciones.registrar_calificacion(
-            docente, asignacion, periodo, actividad, 100, Decimal("15"), fuera, asignaciones,
+            docente,
+            asignacion,
+            periodo,
+            actividad,
+            100,
+            Decimal("15"),
+            fuera,
+            asignaciones,
             roles=roles,
         )
 
@@ -419,8 +433,15 @@ def test_prorroga_de_fecha_limite_permite_regularizar(
     fecha_vencida = datetime(2026, 5, 20, 9, 0, tzinfo=ZONA_HORARIA_LIMA)
     with pytest.raises(FechaLimiteNotasVencidaException):
         ServicioCalificaciones.registrar_calificacion(
-            docente, asignacion, periodo, actividad, 100, Decimal("12"), fecha_vencida,
-            asignaciones, roles=roles,
+            docente,
+            asignacion,
+            periodo,
+            actividad,
+            100,
+            Decimal("12"),
+            fecha_vencida,
+            asignaciones,
+            roles=roles,
         )
 
     prorrogado = PeriodoAcademico(
@@ -432,8 +453,15 @@ def test_prorroga_de_fecha_limite_permite_regularizar(
         fecha_limite_notas=date(2026, 5, 22),
     )
     cal = ServicioCalificaciones.registrar_calificacion(
-        docente, asignacion, prorrogado, actividad, 100, Decimal("12"), fecha_vencida,
-        asignaciones, roles=roles,
+        docente,
+        asignacion,
+        prorrogado,
+        actividad,
+        100,
+        Decimal("12"),
+        fecha_vencida,
+        asignaciones,
+        roles=roles,
     )
     assert cal.nota == Decimal("12.00")
 
@@ -461,14 +489,19 @@ def test_docente_denegado_al_calificar_salon_ajeno(
 ):
     with pytest.raises(AccesoAmbitoDocenteDenegadoException):
         ServicioCalificaciones.registrar_calificacion(
-            otro_docente, asignacion, periodo, actividad, 100, Decimal("15"), FECHA_HORA,
-            asignaciones, roles=roles,
+            otro_docente,
+            asignacion,
+            periodo,
+            actividad,
+            100,
+            Decimal("15"),
+            FECHA_HORA,
+            asignaciones,
+            roles=roles,
         )
 
 
-def test_docente_con_asignacion_ajena_del_mismo_grupo_es_denegado(
-    docente, periodo, roles
-):
+def test_docente_con_asignacion_ajena_del_mismo_grupo_es_denegado(docente, periodo, roles):
     # El docente tiene asignación activa propia, pero se presenta otra asignación (ajena).
     propia = AsignacionDocente(
         id="asg-propia", usuario_docente_id=10, curso_id=5, salon_id=7, anio_lectivo=ANIO
@@ -596,8 +629,15 @@ def test_crear_actividad_con_fecha_en_prorroga_de_notas(
 ):
     # Después de fecha_fin pero antes de fecha_limite_notas (regularización).
     act = ServicioCalificaciones.crear_actividad(
-        docente, asignacion, periodo, rubros[1], "Práctica de recuperación",
-        date(2026, 5, 12), date(2026, 5, 12), asignaciones, roles=roles,
+        docente,
+        asignacion,
+        periodo,
+        rubros[1],
+        "Práctica de recuperación",
+        date(2026, 5, 12),
+        date(2026, 5, 12),
+        asignaciones,
+        roles=roles,
     )
     assert act.fecha == date(2026, 5, 12)
 
@@ -606,8 +646,15 @@ def test_crear_actividad_acepta_datetime_y_lo_normaliza(
     docente, asignacion, periodo, rubros, asignaciones, roles
 ):
     act = ServicioCalificaciones.crear_actividad(
-        docente, asignacion, periodo, rubros[2], "Tarea 1",
-        datetime(2026, 4, 2, 3, 0, tzinfo=UTC), FECHA_HORA, asignaciones, roles=roles,
+        docente,
+        asignacion,
+        periodo,
+        rubros[2],
+        "Tarea 1",
+        datetime(2026, 4, 2, 3, 0, tzinfo=UTC),
+        FECHA_HORA,
+        asignaciones,
+        roles=roles,
     )
     assert act.fecha == date(2026, 4, 1)
     assert type(act.fecha) is date
@@ -619,16 +666,30 @@ def test_crear_actividad_fuera_del_periodo(
 ):
     with pytest.raises(ActividadInvalidaException):
         ServicioCalificaciones.crear_actividad(
-            docente, asignacion, periodo, rubros[0], "Examen", fecha, FECHA_ACTUAL,
-            asignaciones, roles=roles,
+            docente,
+            asignacion,
+            periodo,
+            rubros[0],
+            "Examen",
+            fecha,
+            FECHA_ACTUAL,
+            asignaciones,
+            roles=roles,
         )
 
 
 def test_crear_actividad_titulo_vacio(docente, asignacion, periodo, rubros, asignaciones, roles):
     with pytest.raises(ActividadInvalidaException):
         ServicioCalificaciones.crear_actividad(
-            docente, asignacion, periodo, rubros[0], "  ", date(2026, 4, 1), FECHA_ACTUAL,
-            asignaciones, roles=roles,
+            docente,
+            asignacion,
+            periodo,
+            rubros[0],
+            "  ",
+            date(2026, 4, 1),
+            FECHA_ACTUAL,
+            asignaciones,
+            roles=roles,
         )
 
 
@@ -643,8 +704,15 @@ def test_crear_actividad_rubro_inactivo(docente, asignacion, periodo, asignacion
     )
     with pytest.raises(ActividadInvalidaException):
         ServicioCalificaciones.crear_actividad(
-            docente, asignacion, periodo, inactivo, "Tarea", date(2026, 4, 1), FECHA_ACTUAL,
-            asignaciones, roles=roles,
+            docente,
+            asignacion,
+            periodo,
+            inactivo,
+            "Tarea",
+            date(2026, 4, 1),
+            FECHA_ACTUAL,
+            asignaciones,
+            roles=roles,
         )
 
 
@@ -664,16 +732,30 @@ def test_crear_actividad_rubro_de_otro_contexto(
     )
     with pytest.raises(ActividadInvalidaException):
         ServicioCalificaciones.crear_actividad(
-            docente, asignacion, periodo, ajeno, "Tarea", date(2026, 4, 1), FECHA_ACTUAL,
-            asignaciones, roles=roles,
+            docente,
+            asignacion,
+            periodo,
+            ajeno,
+            "Tarea",
+            date(2026, 4, 1),
+            FECHA_ACTUAL,
+            asignaciones,
+            roles=roles,
         )
 
 
 def test_crear_actividad_fecha_invalida(docente, asignacion, periodo, rubros, asignaciones, roles):
     with pytest.raises(ActividadInvalidaException):
         ServicioCalificaciones.crear_actividad(
-            docente, asignacion, periodo, rubros[0], "Tarea", "2026-04-01", FECHA_ACTUAL,  # type: ignore[arg-type]
-            asignaciones, roles=roles,
+            docente,
+            asignacion,
+            periodo,
+            rubros[0],
+            "Tarea",
+            "2026-04-01",
+            FECHA_ACTUAL,  # type: ignore[arg-type]
+            asignaciones,
+            roles=roles,
         )
 
 
@@ -682,8 +764,15 @@ def test_crear_actividad_bloqueada_tras_fecha_limite(
 ):
     with pytest.raises(FechaLimiteNotasVencidaException):
         ServicioCalificaciones.crear_actividad(
-            docente, asignacion, periodo, rubros[0], "Tarea", date(2026, 4, 1),
-            date(2026, 6, 1), asignaciones, roles=roles,
+            docente,
+            asignacion,
+            periodo,
+            rubros[0],
+            "Tarea",
+            date(2026, 4, 1),
+            date(2026, 6, 1),
+            asignaciones,
+            roles=roles,
         )
 
 
@@ -694,8 +783,16 @@ def test_crear_actividad_bloqueada_tras_fecha_limite(
 
 def test_registrar_calificacion(docente, asignacion, periodo, actividad, asignaciones, roles):
     cal = ServicioCalificaciones.registrar_calificacion(
-        docente, asignacion, periodo, actividad, 100, Decimal("16.5"), FECHA_HORA,
-        asignaciones, observacion="  Buen desempeño ", roles=roles,
+        docente,
+        asignacion,
+        periodo,
+        actividad,
+        100,
+        Decimal("16.5"),
+        FECHA_HORA,
+        asignaciones,
+        observacion="  Buen desempeño ",
+        roles=roles,
     )
     assert cal.actividad_id == actividad.id
     assert cal.alumno_id == 100
@@ -711,8 +808,15 @@ def test_registrar_calificacion_redondea_half_up(
     docente, asignacion, periodo, actividad, asignaciones, roles
 ):
     cal = ServicioCalificaciones.registrar_calificacion(
-        docente, asignacion, periodo, actividad, 100, Decimal("14.125"), FECHA_HORA,
-        asignaciones, roles=roles,
+        docente,
+        asignacion,
+        periodo,
+        actividad,
+        100,
+        Decimal("14.125"),
+        FECHA_HORA,
+        asignaciones,
+        roles=roles,
     )
     assert cal.nota == Decimal("14.13")
 
@@ -721,8 +825,15 @@ def test_registrar_calificacion_naive_se_asume_lima(
     docente, asignacion, periodo, actividad, asignaciones, roles
 ):
     cal = ServicioCalificaciones.registrar_calificacion(
-        docente, asignacion, periodo, actividad, 100, 15, datetime(2026, 4, 10, 8, 0),
-        asignaciones, roles=roles,
+        docente,
+        asignacion,
+        periodo,
+        actividad,
+        100,
+        15,
+        datetime(2026, 4, 10, 8, 0),
+        asignaciones,
+        roles=roles,
     )
     assert cal.actualizado_en.tzinfo is not None
     assert cal.nota == Decimal("15.00")
@@ -734,7 +845,14 @@ def test_rechaza_nota_fuera_de_rango_o_tipo(
 ):
     with pytest.raises(NotaFueraDeRangoException):
         ServicioCalificaciones.registrar_calificacion(
-            docente, asignacion, periodo, actividad, 100, nota, FECHA_HORA, asignaciones,
+            docente,
+            asignacion,
+            periodo,
+            actividad,
+            100,
+            nota,
+            FECHA_HORA,
+            asignaciones,
             roles=roles,
         )
 
@@ -743,24 +861,55 @@ def test_modificar_nota_exige_motivo_y_conserva_anterior(
     docente, asignacion, periodo, actividad, asignaciones, roles
 ):
     original = ServicioCalificaciones.registrar_calificacion(
-        docente, asignacion, periodo, actividad, 100, Decimal("11"), FECHA_HORA, asignaciones,
+        docente,
+        asignacion,
+        periodo,
+        actividad,
+        100,
+        Decimal("11"),
+        FECHA_HORA,
+        asignaciones,
         roles=roles,
     )
     with pytest.raises(CalificacionException, match="motivo"):
         ServicioCalificaciones.registrar_calificacion(
-            docente, asignacion, periodo, actividad, 100, Decimal("14"), FECHA_HORA,
-            asignaciones, calificacion_existente=original, roles=roles,
+            docente,
+            asignacion,
+            periodo,
+            actividad,
+            100,
+            Decimal("14"),
+            FECHA_HORA,
+            asignaciones,
+            calificacion_existente=original,
+            roles=roles,
         )
     with pytest.raises(CalificacionException, match="motivo"):
         ServicioCalificaciones.registrar_calificacion(
-            docente, asignacion, periodo, actividad, 100, Decimal("14"), FECHA_HORA,
-            asignaciones, calificacion_existente=original, motivo_modificacion="   ",
+            docente,
+            asignacion,
+            periodo,
+            actividad,
+            100,
+            Decimal("14"),
+            FECHA_HORA,
+            asignaciones,
+            calificacion_existente=original,
+            motivo_modificacion="   ",
             roles=roles,
         )
 
     modificada = ServicioCalificaciones.registrar_calificacion(
-        docente, asignacion, periodo, actividad, 100, Decimal("14"), FECHA_HORA, asignaciones,
-        calificacion_existente=original, motivo_modificacion=" Revisión de examen ",
+        docente,
+        asignacion,
+        periodo,
+        actividad,
+        100,
+        Decimal("14"),
+        FECHA_HORA,
+        asignaciones,
+        calificacion_existente=original,
+        motivo_modificacion=" Revisión de examen ",
         roles=roles,
     )
     assert modificada.id == original.id
@@ -776,8 +925,16 @@ def test_modificar_nota_de_otra_actividad_o_alumno(
     existente = _nota(actividad_id or actividad.id, alumno_id, "10")
     with pytest.raises(CalificacionException):
         ServicioCalificaciones.registrar_calificacion(
-            docente, asignacion, periodo, actividad, 100, Decimal("14"), FECHA_HORA,
-            asignaciones, calificacion_existente=existente, motivo_modificacion="Error",
+            docente,
+            asignacion,
+            periodo,
+            actividad,
+            100,
+            Decimal("14"),
+            FECHA_HORA,
+            asignaciones,
+            calificacion_existente=existente,
+            motivo_modificacion="Error",
             roles=roles,
         )
 
@@ -788,8 +945,15 @@ def test_registrar_calificacion_actividad_inactiva(
     inactiva = _actividad("act-x", "rub-1", activo=False)
     with pytest.raises(ActividadInvalidaException):
         ServicioCalificaciones.registrar_calificacion(
-            docente, asignacion, periodo, inactiva, 100, Decimal("14"), FECHA_HORA,
-            asignaciones, roles=roles,
+            docente,
+            asignacion,
+            periodo,
+            inactiva,
+            100,
+            Decimal("14"),
+            FECHA_HORA,
+            asignaciones,
+            roles=roles,
         )
 
 
@@ -799,8 +963,15 @@ def test_registrar_calificacion_alumno_invalido(
 ):
     with pytest.raises(CalificacionException):
         ServicioCalificaciones.registrar_calificacion(
-            docente, asignacion, periodo, actividad, alumno_id, Decimal("14"), FECHA_HORA,
-            asignaciones, roles=roles,
+            docente,
+            asignacion,
+            periodo,
+            actividad,
+            alumno_id,
+            Decimal("14"),
+            FECHA_HORA,
+            asignaciones,
+            roles=roles,
         )
 
 
@@ -817,8 +988,15 @@ def test_registrar_calificacion_periodo_cerrado(
     )
     with pytest.raises(PeriodoCalificacionCerradoException):
         ServicioCalificaciones.registrar_calificacion(
-            docente, asignacion, cerrado, actividad, 100, Decimal("14"), FECHA_HORA,
-            asignaciones, roles=roles,
+            docente,
+            asignacion,
+            cerrado,
+            actividad,
+            100,
+            Decimal("14"),
+            FECHA_HORA,
+            asignaciones,
+            roles=roles,
         )
 
 
@@ -827,8 +1005,15 @@ def test_registrar_calificacion_fecha_hora_invalida(
 ):
     with pytest.raises(CalificacionException):
         ServicioCalificaciones.registrar_calificacion(
-            docente, asignacion, periodo, actividad, 100, Decimal("14"), date(2026, 4, 10),  # type: ignore[arg-type]
-            asignaciones, roles=roles,
+            docente,
+            asignacion,
+            periodo,
+            actividad,
+            100,
+            Decimal("14"),
+            date(2026, 4, 10),  # type: ignore[arg-type]
+            asignaciones,
+            roles=roles,
         )
 
 
@@ -940,9 +1125,7 @@ def test_promedio_rubros_no_suman_100(libro_completo) -> None:
 def test_promedio_sin_rubros(libro_completo) -> None:
     _, actividades, calificaciones = libro_completo
     with pytest.raises(PesosRubrosInvalidosException):
-        ServicioCalificaciones.calcular_promedio_periodo(
-            100, 5, 1, (), actividades, calificaciones
-        )
+        ServicioCalificaciones.calcular_promedio_periodo(100, 5, 1, (), actividades, calificaciones)
 
 
 def test_promedio_rubro_sin_actividades(libro_completo) -> None:
@@ -956,7 +1139,10 @@ def test_promedio_rubro_sin_actividades(libro_completo) -> None:
 
 def test_promedio_nota_perfecta_y_nula() -> None:
     rubro = RubroEvaluacion(
-        id="r", asignacion_docente_id="a", periodo_id=1, nombre="Único",
+        id="r",
+        asignacion_docente_id="a",
+        periodo_id=1,
+        nombre="Único",
         peso_porcentaje=Decimal("100"),
     )
     acts = (_actividad("a1", "r"),)
@@ -1079,7 +1265,10 @@ def test_rubro_invalido(kwargs) -> None:
 def test_rubro_peso_mayor_a_100() -> None:
     with pytest.raises(PesosRubrosInvalidosException):
         RubroEvaluacion(
-            id="r", asignacion_docente_id="a", periodo_id=1, nombre="X",
+            id="r",
+            asignacion_docente_id="a",
+            periodo_id=1,
+            nombre="X",
             peso_porcentaje=Decimal("100.01"),
         )
 
@@ -1122,7 +1311,12 @@ def test_calificacion_invalida(kwargs, excepcion) -> None:
 
 def test_calificacion_observacion_vacia_se_normaliza_a_none() -> None:
     cal = Calificacion(
-        id="c", actividad_id="a", alumno_id=1, nota=Decimal("10"), usuario_id=10,
-        actualizado_en=FECHA_HORA, observacion="   ",
+        id="c",
+        actividad_id="a",
+        alumno_id=1,
+        nota=Decimal("10"),
+        usuario_id=10,
+        actualizado_en=FECHA_HORA,
+        observacion="   ",
     )
     assert cal.observacion is None

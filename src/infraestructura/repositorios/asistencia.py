@@ -89,9 +89,7 @@ class RepositorioAsistencia:
         """Inserta o actualiza un registro diario de asistencia usando flush()."""
         usuario_fk = asistencia.usuario_id if asistencia.usuario_id > 0 else None
         rol_str = _codigo_rol_str(asistencia.rol_usuario)
-        estado_anterior = (
-            asistencia.estado_anterior.value if asistencia.estado_anterior else None
-        )
+        estado_anterior = asistencia.estado_anterior.value if asistencia.estado_anterior else None
 
         modelo = self._session.get(AsistenciaModel, asistencia.id)
         if modelo is None:
@@ -169,9 +167,7 @@ class RepositorioAsistencia:
         stmt = stmt.order_by(AsistenciaModel.fecha_escolar, AsistenciaModel.id)
         return [self._a_dominio(m) for m in self._session.scalars(stmt).all()]
 
-    def listar_por_rango(
-        self, fecha_desde: date, fecha_hasta: date
-    ) -> list[RegistroAsistencia]:
+    def listar_por_rango(self, fecha_desde: date, fecha_hasta: date) -> list[RegistroAsistencia]:
         stmt = (
             select(AsistenciaModel)
             .where(
@@ -190,9 +186,7 @@ class RepositorioAsistencia:
     ) -> int:
         """Registra una entrada de historial para cambios/correcciones de asistencia."""
         usuario_fk = asistencia.usuario_id if asistencia.usuario_id > 0 else None
-        estado_anterior = (
-            asistencia.estado_anterior.value if asistencia.estado_anterior else None
-        )
+        estado_anterior = asistencia.estado_anterior.value if asistencia.estado_anterior else None
         marca = (
             _normalizar_lima(fecha_hora)
             if fecha_hora is not None
@@ -319,9 +313,7 @@ class RepositorioAforo:
             modelo.actualizado_en = hora_actual_utc()
         self._session.flush()
 
-    def obtener_configuracion(
-        self, clave: str, defecto: str | None = None
-    ) -> str | None:
+    def obtener_configuracion(self, clave: str, defecto: str | None = None) -> str | None:
         modelo = self._session.get(ConfiguracionSistemaModel, clave.strip())
         return defecto if modelo is None else modelo.valor
 
@@ -405,9 +397,7 @@ class RepositorioJustificaciones:
             )
             self._session.add(modelo)
         else:
-            rutas_previas = {
-                adj.nombre_archivo: adj.ruta_almacenamiento for adj in modelo.adjuntos
-            }
+            rutas_previas = {adj.nombre_archivo: adj.ruta_almacenamiento for adj in modelo.adjuntos}
             if periodo_id is not None:
                 modelo.periodo_id = periodo_id
             modelo.rol_usuario = _codigo_rol_str(justificacion.rol_usuario)
@@ -612,9 +602,7 @@ class RepositorioCalendario:
         self._session.flush()
         return True
 
-    def obtener_calendario(
-        self, *, fines_de_semana_no_lectivos: bool = True
-    ) -> CalendarioEscolar:
+    def obtener_calendario(self, *, fines_de_semana_no_lectivos: bool = True) -> CalendarioEscolar:
         filas = self._session.scalars(select(CalendarioEscolarModel)).all()
         no_lectivos = frozenset(f.fecha for f in filas if not f.es_lectivo)
         excepciones = frozenset(f.fecha for f in filas if f.es_lectivo and f.es_excepcion)

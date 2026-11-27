@@ -161,9 +161,7 @@ def intentar_rubros(contexto: dict[str, Any], peso1: int, peso2: int, dia: str) 
 
 
 @then(
-    parsers.parse(
-        'la nota queda registrada con valor exacto "{nota}" y escala literal "{escala}"'
-    )
+    parsers.parse('la nota queda registrada con valor exacto "{nota}" y escala literal "{escala}"')
 )
 def verificar_nota_y_escala(contexto: dict[str, Any], nota: str, escala: str) -> None:
     calificacion = contexto["calificacion"]

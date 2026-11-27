@@ -274,11 +274,13 @@ def test_login_requerido_usuario_inactivo_devuelve_401():
 
 def test_login_requerido_con_reloj_aware_y_sesion_naive():
     # Cobertura de ramas de normalización de zonas horarias en login_requerido
-    app = crear_app({
-        "SECRET_KEY": "test-key",
-        "WTF_CSRF_ENABLED": False,
-        "RELOJ": lambda: datetime.now(UTC),
-    })
+    app = crear_app(
+        {
+            "SECRET_KEY": "test-key",
+            "WTF_CSRF_ENABLED": False,
+            "RELOJ": lambda: datetime.now(UTC),
+        }
+    )
     almacen: AlmacenSesiones = app.extensions["almacen_sesiones"]
 
     usuario = _crear_usuario(3, "usr_naive", RolUsuario.ADMIN)
@@ -300,11 +302,13 @@ def test_login_requerido_con_reloj_aware_y_sesion_naive():
 
 def test_login_requerido_con_reloj_naive_y_sesion_aware():
     # Cobertura de rama inversa: reloj naive y sesión aware
-    app = crear_app({
-        "SECRET_KEY": "test-key",
-        "WTF_CSRF_ENABLED": False,
-        "RELOJ": lambda: datetime.now(UTC).replace(tzinfo=None),
-    })
+    app = crear_app(
+        {
+            "SECRET_KEY": "test-key",
+            "WTF_CSRF_ENABLED": False,
+            "RELOJ": lambda: datetime.now(UTC).replace(tzinfo=None),
+        }
+    )
     almacen: AlmacenSesiones = app.extensions["almacen_sesiones"]
 
     usuario = _crear_usuario(4, "usr_aware", RolUsuario.ADMIN)
@@ -370,11 +374,13 @@ def test_permiso_requerido_exitoso_para_admin():
 
 
 def test_permiso_requerido_normaliza_tz_naive_reloj():
-    app = crear_app({
-        "SECRET_KEY": "test-key",
-        "WTF_CSRF_ENABLED": False,
-        "RELOJ": lambda: datetime.now(UTC).replace(tzinfo=None),
-    })
+    app = crear_app(
+        {
+            "SECRET_KEY": "test-key",
+            "WTF_CSRF_ENABLED": False,
+            "RELOJ": lambda: datetime.now(UTC).replace(tzinfo=None),
+        }
+    )
     almacen: AlmacenSesiones = app.extensions["almacen_sesiones"]
 
     admin = _crear_usuario(7, "admin_tz", RolUsuario.ADMIN)
@@ -395,11 +401,13 @@ def test_permiso_requerido_normaliza_tz_naive_reloj():
 
 
 def test_permiso_requerido_normaliza_tz_aware_reloj_y_sesion_naive():
-    app = crear_app({
-        "SECRET_KEY": "test-key",
-        "WTF_CSRF_ENABLED": False,
-        "RELOJ": lambda: datetime.now(UTC),
-    })
+    app = crear_app(
+        {
+            "SECRET_KEY": "test-key",
+            "WTF_CSRF_ENABLED": False,
+            "RELOJ": lambda: datetime.now(UTC),
+        }
+    )
     almacen: AlmacenSesiones = app.extensions["almacen_sesiones"]
 
     admin = _crear_usuario(8, "admin_tz2", RolUsuario.ADMIN)

@@ -172,16 +172,12 @@ def operador_admin() -> UsuarioOperador:
 
 @pytest.fixture
 def operador_coordinador() -> UsuarioOperador:
-    return UsuarioOperador(
-        id=2, username="coordinador", rol=RolUsuario.COORDINADOR, activo=True
-    )
+    return UsuarioOperador(id=2, username="coordinador", rol=RolUsuario.COORDINADOR, activo=True)
 
 
 @pytest.fixture
 def operador_admin_staff() -> UsuarioOperador:
-    return UsuarioOperador(
-        id=3, username="admin_staff", rol=RolUsuario.ADMIN_STAFF, activo=True
-    )
+    return UsuarioOperador(id=3, username="admin_staff", rol=RolUsuario.ADMIN_STAFF, activo=True)
 
 
 @pytest.fixture
@@ -431,9 +427,7 @@ def test_admin_staff_ve_bloque_financiero(
 
 
 def test_rol_personalizado_con_ver_alerta_ve_pagos(rol_ver_alerta: Rol) -> None:
-    operador = UsuarioOperador(
-        id=6, username="auditor", rol=rol_ver_alerta.codigo, activo=True
-    )
+    operador = UsuarioOperador(id=6, username="auditor", rol=rol_ver_alerta.codigo, activo=True)
 
     resultado = _construir_ficha(operador, roles=(rol_ver_alerta,))
 
@@ -443,9 +437,7 @@ def test_rol_personalizado_con_ver_alerta_ve_pagos(rol_ver_alerta: Rol) -> None:
 def test_rol_personalizado_con_gestionar_pagos_ve_pagos(
     rol_gestionar_pagos: Rol,
 ) -> None:
-    operador = UsuarioOperador(
-        id=7, username="cajero", rol=rol_gestionar_pagos.codigo, activo=True
-    )
+    operador = UsuarioOperador(id=7, username="cajero", rol=rol_gestionar_pagos.codigo, activo=True)
 
     resultado = _construir_ficha(operador, roles=(rol_gestionar_pagos,))
 
@@ -554,9 +546,7 @@ def test_fecha_referencia_por_defecto_usa_hora_de_lima(
 def test_fecha_referencia_naive_se_normaliza_a_lima(
     operador_admin: UsuarioOperador,
 ) -> None:
-    resultado = _construir_ficha(
-        operador_admin, fecha_referencia=datetime(2026, 3, 31, 12, 0)
-    )
+    resultado = _construir_ficha(operador_admin, fecha_referencia=datetime(2026, 3, 31, 12, 0))
 
     assert resultado.fecha_referencia.utcoffset() == timedelta(hours=-5)
 
@@ -703,9 +693,7 @@ def _ficha_informativa_valida() -> FichaInformativaAlumno:
         ("fecha_referencia", "2026-03-31"),
     ],
 )
-def test_ficha_informativa_rechaza_componentes_invalidos(
-    campo: str, valor: object
-) -> None:
+def test_ficha_informativa_rechaza_componentes_invalidos(campo: str, valor: object) -> None:
     valida = _ficha_informativa_valida()
     datos: dict[str, object] = {
         "ficha_matricula": valida.ficha_matricula,

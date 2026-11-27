@@ -633,9 +633,7 @@ def test_pagos_y_alertas_silenciosas_flujo_completo(entorno_web: dict[str, Any])
         session.commit()
 
     # Rol personalizado TESORERIA registra 2 obligaciones, paga 1 y exonera 1
-    cli_tes, csrf_tes = _autenticar(
-        app, entorno_web["tesorero"], [entorno_web["rol_tesoreria"]]
-    )
+    cli_tes, csrf_tes = _autenticar(app, entorno_web["tesorero"], [entorno_web["rol_tesoreria"]])
     resp_ob1 = cli_tes.post(
         "/pagos/obligaciones",
         data={
@@ -802,4 +800,3 @@ def test_casos_borde_vacantes_filtros_y_servicio_perezoso(
         ).status_code
         == 409
     )
-

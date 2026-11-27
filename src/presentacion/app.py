@@ -143,17 +143,11 @@ def _configurar_servicios(app: Flask) -> None:
 
     reloj = app.config["RELOJ"]
     if "servicio_seguridad" not in app.extensions:
-        app.extensions["servicio_seguridad"] = ServicioSeguridad(
-            fabrica, reloj=reloj
-        )
+        app.extensions["servicio_seguridad"] = ServicioSeguridad(fabrica, reloj=reloj)
     if "servicio_academico" not in app.extensions:
-        app.extensions["servicio_academico"] = ServicioAcademico(
-            fabrica, reloj=reloj
-        )
+        app.extensions["servicio_academico"] = ServicioAcademico(fabrica, reloj=reloj)
     if "servicio_asistencia" not in app.extensions:
-        app.extensions["servicio_asistencia"] = ServicioAsistencia(
-            fabrica, reloj=reloj
-        )
+        app.extensions["servicio_asistencia"] = ServicioAsistencia(fabrica, reloj=reloj)
 
 
 def _registrar_blueprints(app: Flask) -> None:

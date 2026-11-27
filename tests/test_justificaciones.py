@@ -412,9 +412,7 @@ def test_rol_personalizado_con_permiso_puede_administrar_periodos(
     assert creado == periodo
 
 
-def test_rechaza_periodos_solapados(
-    admin_op: UsuarioOperador, periodo: PeriodoAcademico
-) -> None:
+def test_rechaza_periodos_solapados(admin_op: UsuarioOperador, periodo: PeriodoAcademico) -> None:
     solapado = replace(
         periodo,
         id=2,
@@ -470,9 +468,7 @@ def test_modificar_cerrar_y_reabrir_periodo(
     assert reabierto.cerrado is False
 
 
-def test_eliminar_periodo_sin_uso(
-    admin_op: UsuarioOperador, periodo: PeriodoAcademico
-) -> None:
+def test_eliminar_periodo_sin_uso(admin_op: UsuarioOperador, periodo: PeriodoAcademico) -> None:
     restantes = ServicioPeriodosAcademicos.eliminar_periodo(
         admin_op,
         periodo,
@@ -705,9 +701,7 @@ def test_fecha_futura_sigue_siendo_rechazada(
         ("documento.pdf", True),
     ],
 )
-def test_adjunto_rechaza_nombre_vacio_o_tamano_no_entero(
-    nombre: str, tamano: object
-) -> None:
+def test_adjunto_rechaza_nombre_vacio_o_tamano_no_entero(nombre: str, tamano: object) -> None:
     with pytest.raises(AdjuntoInvalidoException):
         AdjuntoJustificacion(nombre, tamano)  # type: ignore[arg-type]
 
@@ -937,9 +931,7 @@ def test_consultar_excluye_por_grado_seccion_categoria_estado_y_fecha_hasta(
     asistencia_ausente: RegistroAsistencia,
     periodo: PeriodoAcademico,
 ) -> None:
-    justificacion = _registrar(
-        coord_op, alumno, asistencia_ausente, periodo
-    ).justificacion
+    justificacion = _registrar(coord_op, alumno, asistencia_ausente, periodo).justificacion
     criterios = [
         FiltroJustificaciones(grado="9no"),
         FiltroJustificaciones(seccion="Z"),

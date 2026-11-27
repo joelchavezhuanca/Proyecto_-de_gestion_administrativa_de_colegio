@@ -64,8 +64,10 @@ class RepositorioMatricula:
 
     def _a_dominio(self, modelo: EstudianteModel) -> FichaMatricula:
         apoderados = self._cargar_apoderados(modelo.id)
-        anio_lectivo = modelo.salon.anio_lectivo if modelo.salon else (
-            modelo.creado_en.year if modelo.creado_en else 2026
+        anio_lectivo = (
+            modelo.salon.anio_lectivo
+            if modelo.salon
+            else (modelo.creado_en.year if modelo.creado_en else 2026)
         )
         return FichaMatricula(
             id=f"mat-{modelo.codigo}",
@@ -151,9 +153,7 @@ class RepositorioMatricula:
             apoderados_ids_actuales.add(ap_model.id)
 
             # Relación N:M
-            rel = self.sesion.get(
-                EstudianteApoderadoModel, (est.id, ap_model.id)
-            )
+            rel = self.sesion.get(EstudianteApoderadoModel, (est.id, ap_model.id))
             if rel is None:
                 rel = EstudianteApoderadoModel(
                     estudiante_id=est.id,
@@ -166,9 +166,7 @@ class RepositorioMatricula:
 
         # Eliminar vínculos de apoderados que ya no figuren
         todos_rel = self.sesion.scalars(
-            select(EstudianteApoderadoModel).where(
-                EstudianteApoderadoModel.estudiante_id == est.id
-            )
+            select(EstudianteApoderadoModel).where(EstudianteApoderadoModel.estudiante_id == est.id)
         ).all()
         for r in todos_rel:
             if r.apoderado_id not in apoderados_ids_actuales:
@@ -240,11 +238,7 @@ class RepositorioCarnets:
 
     @staticmethod
     def _a_dominio(modelo: CarnetModel) -> CarnetEscolar:
-        motivo = (
-            MotivoAnulacionCarnet(modelo.motivo_anulacion)
-            if modelo.motivo_anulacion
-            else None
-        )
+        motivo = MotivoAnulacionCarnet(modelo.motivo_anulacion) if modelo.motivo_anulacion else None
         return CarnetEscolar(
             id=modelo.id,
             alumno_id=modelo.estudiante_id,

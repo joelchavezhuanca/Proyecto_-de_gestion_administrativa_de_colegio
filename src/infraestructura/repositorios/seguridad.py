@@ -313,9 +313,7 @@ class RepositorioSesiones:
         )
         return [self._a_dominio(m) for m in self._session.scalars(stmt).all()]
 
-    def revocar_por_token(
-        self, token: str, *, revocada_en: datetime | None = None
-    ) -> bool:
+    def revocar_por_token(self, token: str, *, revocada_en: datetime | None = None) -> bool:
         modelo = self._session.get(SesionUsuarioModel, token)
         if modelo is None or not modelo.activa:
             return False
@@ -324,9 +322,7 @@ class RepositorioSesiones:
         self._session.flush()
         return True
 
-    def revocar_por_usuario(
-        self, usuario_id: int, *, revocada_en: datetime | None = None
-    ) -> int:
+    def revocar_por_usuario(self, usuario_id: int, *, revocada_en: datetime | None = None) -> int:
         momento = _resolver_momento_utc(revocada_en)
         modelos = self._session.scalars(
             select(SesionUsuarioModel).where(

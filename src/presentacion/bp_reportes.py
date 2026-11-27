@@ -67,9 +67,7 @@ class AlmacenBoletas:
     def __init__(self) -> None:
         self._boletas: dict[tuple[int, str], BoletaCalificaciones] = {}
 
-    def guardar(
-        self, operador_id: int, boletas: Sequence[BoletaCalificaciones]
-    ) -> None:
+    def guardar(self, operador_id: int, boletas: Sequence[BoletaCalificaciones]) -> None:
         for boleta in boletas:
             self._boletas[(operador_id, boleta.id)] = boleta
 
@@ -152,9 +150,7 @@ def _fecha_formulario(nombre: str) -> date:
     try:
         return date.fromisoformat(crudo)
     except ValueError as exc:
-        raise ValueError(
-            f"La fecha '{nombre}' debe tener el formato AAAA-MM-DD."
-        ) from exc
+        raise ValueError(f"La fecha '{nombre}' debe tener el formato AAAA-MM-DD.") from exc
 
 
 def _filtro_desde_formulario() -> FiltroExportacionAsistencia:
@@ -210,8 +206,7 @@ def _respuesta_descarga(
         mimetype, extension = _MIME_XLSX, "xlsx"
 
     nombre = (
-        f"asistencias_{filtro.fecha_desde.isoformat()}_"
-        f"{filtro.fecha_hasta.isoformat()}.{extension}"
+        f"asistencias_{filtro.fecha_desde.isoformat()}_{filtro.fecha_hasta.isoformat()}.{extension}"
     )
     respuesta = Response(resultado.contenido, content_type=mimetype)
     respuesta.headers["Content-Disposition"] = f'attachment; filename="{nombre}"'
@@ -243,16 +238,12 @@ def _render_boletas(boletas: Sequence[BoletaCalificaciones] = ()):
 
 def _render_ficha(alumno_id: int):
     try:
-        ficha = _servicio_academico().construir_ficha_alumno(
-            _operador_id(), alumno_id
-        )
+        ficha = _servicio_academico().construir_ficha_alumno(_operador_id(), alumno_id)
     except (UsuarioException, ValueError) as exc:
         mensaje, codigo = _mensaje_error(exc)
         return _respuesta_error(codigo, mensaje)
 
-    return render_template(
-        "ficha_alumno.html", ficha=ficha, alumno_id=alumno_id
-    )
+    return render_template("ficha_alumno.html", ficha=ficha, alumno_id=alumno_id)
 
 
 @bp_reportes.get("/ficha")
@@ -265,9 +256,7 @@ def buscar_ficha():
     try:
         alumno_id = int(crudo)
     except ValueError:
-        return _respuesta_error(
-            400, "El identificador del alumno debe ser un número entero."
-        )
+        return _respuesta_error(400, "El identificador del alumno debe ser un número entero.")
     return _render_ficha(alumno_id)
 
 
@@ -297,9 +286,7 @@ def exportar_asistencia():
         return _render_formulario_exportacion(request.form, codigo=400)
 
     try:
-        resultado = _servicio_academico().exportar_asistencias(
-            _operador_id(), filtro
-        )
+        resultado = _servicio_academico().exportar_asistencias(_operador_id(), filtro)
     except (ExportacionException, UsuarioException, ValueError) as exc:
         mensaje, codigo = _mensaje_error(exc)
         return _respuesta_error(codigo, mensaje)
@@ -380,13 +367,9 @@ def descargar_boleta(boleta_id: str):
     """Descarga en texto estructurado una boleta emitida por el operador."""
     boleta = _almacen_boletas().obtener(_operador_id(), boleta_id)
     if boleta is None:
-        return _respuesta_error(
-            404, "La boleta solicitada no existe o no está disponible."
-        )
+        return _respuesta_error(404, "La boleta solicitada no existe o no está disponible.")
 
     contenido = _servicio_academico().exportar_boleta_texto(boleta)
     respuesta = Response(contenido, content_type=_MIME_TEXTO)
-    respuesta.headers["Content-Disposition"] = (
-        f'attachment; filename="boleta-{boleta.id}.txt"'
-    )
+    respuesta.headers["Content-Disposition"] = f'attachment; filename="boleta-{boleta.id}.txt"'
     return respuesta

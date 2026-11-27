@@ -121,11 +121,7 @@ class RepositorioAuditoria:
         return None if modelo is None else self._a_dominio(modelo)
 
     def obtener_ultimo(self) -> RegistroAuditoria | None:
-        stmt = (
-            select(AuditoriaEventoModel)
-            .order_by(AuditoriaEventoModel.secuencia.desc())
-            .limit(1)
-        )
+        stmt = select(AuditoriaEventoModel).order_by(AuditoriaEventoModel.secuencia.desc()).limit(1)
         modelo = self._session.scalar(stmt)
         return None if modelo is None else self._a_dominio(modelo)
 
@@ -158,13 +154,11 @@ class RepositorioAuditoria:
             if filtro.usuario_id is not None:
                 stmt = stmt.where(AuditoriaEventoModel.usuario_id == filtro.usuario_id)
             if filtro.rol is not None:
-                stmt = stmt.where(
-                    AuditoriaEventoModel.rol_ejecutante == filtro.rol.strip().upper()
-                )
+                stmt = stmt.where(AuditoriaEventoModel.rol_ejecutante == filtro.rol.strip().upper())
             if filtro.operacion is not None:
-                operacion_str = getattr(
-                    filtro.operacion, "value", str(filtro.operacion)
-                ).strip().upper()
+                operacion_str = (
+                    getattr(filtro.operacion, "value", str(filtro.operacion)).strip().upper()
+                )
                 stmt = stmt.where(AuditoriaEventoModel.operacion == operacion_str)
             if filtro.entidad is not None:
                 stmt = stmt.where(AuditoriaEventoModel.entidad == filtro.entidad.strip().upper())

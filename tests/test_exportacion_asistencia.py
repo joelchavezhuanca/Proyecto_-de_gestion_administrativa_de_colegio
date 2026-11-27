@@ -220,9 +220,7 @@ def test_enums_excepciones_y_encabezados() -> None:
         ("   ", "   "),
     ],
 )
-def test_sanitizar_celda_tabular_previene_formula_injection(
-    entrada: str, esperado: str
-) -> None:
+def test_sanitizar_celda_tabular_previene_formula_injection(entrada: str, esperado: str) -> None:
     assert sanitizar_celda_tabular(entrada) == esperado
 
 

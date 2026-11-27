@@ -432,9 +432,7 @@ def test_repositorio_malla_salones_y_cursos_con_unicidad(sesion_bd: Session):
         Salon(id=11, anio_lectivo=2026, nivel=NivelEducativo.SECUNDARIA, grado="3ro", seccion="B")
     )
     assert repo.obtener_salon_por_id(10) == s1
-    assert (
-        repo.obtener_salon(2026, NivelEducativo.SECUNDARIA, "3ro", "A") == s1
-    )
+    assert repo.obtener_salon(2026, NivelEducativo.SECUNDARIA, "3ro", "A") == s1
     assert (
         len(
             repo.listar_salones(
@@ -486,9 +484,7 @@ def test_repositorio_malla_salones_y_cursos_con_unicidad(sesion_bd: Session):
         )
     )
     assert repo.obtener_curso_por_id(100) == c1
-    assert (
-        repo.obtener_curso(2026, NivelEducativo.SECUNDARIA, "3ro", "MAT-3SEC") == c1
-    )
+    assert repo.obtener_curso(2026, NivelEducativo.SECUNDARIA, "3ro", "MAT-3SEC") == c1
     assert (
         len(
             repo.listar_cursos(

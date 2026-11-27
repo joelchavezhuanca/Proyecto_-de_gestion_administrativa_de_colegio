@@ -140,9 +140,7 @@ def corregir_ingreso(contexto: dict[str, Any], hora: str, motivo: str) -> None:
         'la asistencia queda confirmada con estado "{estado}" y {minutos:d} minutos de tardanza'
     )
 )
-def verificar_asistencia_confirmada(
-    contexto: dict[str, Any], estado: str, minutos: int
-) -> None:
+def verificar_asistencia_confirmada(contexto: dict[str, Any], estado: str, minutos: int) -> None:
     resultado = contexto["resultado"]
     assert resultado.asistencia.estado == EstadoAsistencia(estado)
     assert resultado.asistencia.minutos_tardanza == minutos
