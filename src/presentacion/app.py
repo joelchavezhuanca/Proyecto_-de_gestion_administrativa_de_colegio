@@ -123,17 +123,17 @@ def _registrar_filtros_y_contexto(app: Flask) -> None:
         return valor.strftime(formato)
 
     @app.template_filter("rol_legible")
-    def rol_legible(valor) -> str:
+    def rol_legible(valor: RolUsuario | str) -> str:
         texto = valor.value if isinstance(valor, RolUsuario) else str(valor)
         return _ROLES_LEGIBLES.get(texto, texto)
 
     @app.template_filter("estado_texto")
-    def estado_texto(valor) -> str:
+    def estado_texto(valor: object) -> str:
         texto = valor.value if hasattr(valor, "value") else str(valor)
         return _ESTADOS_LEGIBLES.get(texto, texto)
 
     @app.template_filter("estado_clase")
-    def estado_clase(valor) -> str:
+    def estado_clase(valor: object) -> str:
         texto = valor.value if hasattr(valor, "value") else str(valor)
         return {
             "PUNTUAL": "ok",
