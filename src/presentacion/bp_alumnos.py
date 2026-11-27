@@ -13,6 +13,7 @@ from decimal import Decimal, InvalidOperation
 
 from flask import (
     Blueprint,
+    Flask,
     Response,
     abort,
     current_app,
@@ -59,6 +60,12 @@ from src.presentacion.seguridad import login_requerido, permiso_requerido, tiene
 from src.presentacion.tiempo import hora_institucional
 
 bp_alumnos = Blueprint("alumnos", __name__)
+
+
+def registrar_blueprints_alumnos(app: Flask) -> None:
+    """Registra el blueprint de alumnos de forma idempotente en la aplicación Flask."""
+    if bp_alumnos.name not in app.blueprints:
+        app.register_blueprint(bp_alumnos)
 
 
 @bp_alumnos.before_request

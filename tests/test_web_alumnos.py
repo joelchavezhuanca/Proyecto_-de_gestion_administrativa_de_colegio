@@ -38,7 +38,7 @@ from src.infraestructura.modelos import (
 )
 from src.infraestructura.repositorios import RepositorioRoles, RepositorioUsuarios
 from src.presentacion.app import crear_app
-from src.presentacion.bp_alumnos import bp_alumnos
+from src.presentacion.bp_alumnos import registrar_blueprints_alumnos
 from src.presentacion.seguridad import AlmacenSesiones
 
 AHORA_FIJA = datetime(2026, 4, 15, 8, 30, 0, tzinfo=ZONA_HORARIA_LIMA)
@@ -172,7 +172,8 @@ def entorno_web() -> dict[str, Any]:
     )
     app.extensions["session_factory"] = session_factory
     app.extensions["servicio_academico"] = servicio
-    app.register_blueprint(bp_alumnos)
+    registrar_blueprints_alumnos(app)
+    registrar_blueprints_alumnos(app)  # Idempotente frente a auto-registro en app.py
 
     yield {
         "app": app,
