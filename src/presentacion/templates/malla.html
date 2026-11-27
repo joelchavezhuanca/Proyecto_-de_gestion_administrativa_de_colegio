@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+{% from "_macros.html" import chip_estado %}
+
+{% block titulo %}Malla curricular{% endblock %}
+{% block eyebrow %}Estructura académica · PBI-09{% endblock %}
+{% block encabezado %}Configuración de malla curricular{% endblock %}
+{% block subtitulo %}
+  <p class="page-subtitle">Administre los salones y cursos por año lectivo, nivel educativo y grado.</p>
+{% endblock %}
+
+{% block contenido %}
+<section class="grid-dos">
+  <article class="card">
+    <div class="card-head">
+      <h2>Nuevo salón</h2>
+    </div>
+    <form class="form" method="post" action="{{ url_for('academico.crear_salon') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="grid-dos">
+        <div class="field">
+          <label for="sal_anio">Año lectivo</label>
+          <input id="sal_anio" name="anio_lectivo" type="number" value="{{ anio_actual }}" required>
+        </div>
+        <div class="field">
+          <label for="sal_nivel">Nivel</label>
+          <select id="sal_nivel" name="nivel" required>
+            {% for nivel in niveles %}
+              <option value="{{ nivel.value }}">{{ nivel.value }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="grid-dos">
+        <div class="field">
+          <label for="sal_grado">Grado</label>
+          <input id="sal_grado" name="grado" type="text" required placeholder="3ro">
+        </div>
+        <div class="field">
+          <label for="sal_seccion">Sección</label>
+          <input id="sal_seccion" name="seccion" type="text" required placeholder="A">
+        </div>
+      </div>
+      <div class="field">
+        <label for="sal_cap">Capacidad máxima</label>
+        <input id="sal_cap" name="capacidad_maxima" type="number" value="30" required>
+      </div>
+      <button class="btn btn-primario" type="submit">Crear salón</button>
+    </form>
+  </article>
+
+  <article class="card">
+    <div class="card-head">
+      <h2>Nuevo curso</h2>
+    </div>
+    <form class="form" method="post" action="{{ url_for('academico.crear_curso') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="grid-dos">
+        <div class="field">
+          <label for="cur_anio">Año lectivo</label>
+          <input id="cur_anio" name="anio_lectivo" type="number" value="{{ anio_actual }}" required>
+        </div>
+        <div class="field">
+          <label for="cur_nivel">Nivel</label>
+          <select id="cur_nivel" name="nivel" required>
+            {% for nivel in niveles %}
+              <option value="{{ nivel.value }}">{{ nivel.value }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="grid-dos">
+        <div class="field">
+          <label for="cur_grado">Grado</label>
+          <input id="cur_grado" name="grado" type="text" required placeholder="3ro">
+        </div>
+        <div class="field">
+          <label for="cur_codigo">Código</label>
+          <input id="cur_codigo" name="codigo" type="text" required placeholder="MAT-3S">
+        </div>
+      </div>
+      <div class="grid-dos">
+        <div class="field">
+          <label for="cur_nombre">Nombre del curso</label>
+          <input id="cur_nombre" name="nombre" type="text" required>
+        </div>
+        <div class="field">
+          <label for="cur_area">Área curricular</label>
+          <input id="cur_area" name="area_curricular" type="text" required>
+        </div>
+      </div>
+      <div class="field">
+        <label for="cur_horas">Horas semanales</label>
+        <input id="cur_horas" name="horas_semanales" type="number" value="4" required>
+      </div>
+      <button class="btn btn-primario" type="submit">Crear curso</button>
+    </form>
+  </article>
+</section>
+
+<section class="card">
+  <div class="card-head">
+    <h2>Salones registrados ({{ salones|length }})</h2>
+    <form class="form-inline" method="get" action="{{ url_for('academico.ver_malla') }}">
+      <input name="anio_lectivo" type="number" value="{{ anio_filtro or '' }}" placeholder="Año lectivo">
+      <button class="btn btn-secundario btn-pequeno" type="submit">Filtrar</button>
+    </form>
+  </div>
+  {% if salones %}
+    <div class="tabla-scroll">
+      <table class="tabla">
+        <thead>
+          <tr>
+            <th>Año</th>
+            <th>Nivel / Grado</th>
+            <th>Sección</th>
+            <th>Capacidad</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for salon in salones %}
+            <tr>
+              <td class="mono">{{ salon.anio_lectivo }}</td>
+              <td>{{ salon.nivel.value }} · {{ salon.grado }}</td>
+              <td class="mono">{{ salon.seccion }}</td>
+              <td>
+                <form class="form-inline" method="post" action="{{ url_for('academico.actualizar_capacidad_salon', salon_id=salon.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <input name="nueva_capacidad" type="number" value="{{ salon.capacidad_maxima }}" required>
+                  <button class="btn btn-secundario btn-pequeno" type="submit">Actualizar</button>
+                </form>
+              </td>
+              <td>{{ chip_estado('ACTIVO' if salon.activo else 'INACTIVO') }}</td>
+              <td>
+                <form class="form-inline" method="post" action="{{ url_for('academico.desactivar_salon', salon_id=salon.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn-secundario btn-pequeno" type="submit">Desactivar</button>
+                </form>
+                <form class="form-inline" method="post" action="{{ url_for('academico.eliminar_salon', salon_id=salon.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn-peligro-suave btn-pequeno" type="submit">Eliminar</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="empty-state">No hay salones registrados.</p>
+  {% endif %}
+</section>
+
+<section class="card">
+  <div class="card-head">
+    <h2>Cursos registrados ({{ cursos|length }})</h2>
+  </div>
+  {% if cursos %}
+    <div class="tabla-scroll">
+      <table class="tabla">
+        <thead>
+          <tr>
+            <th>Código</th>
+            <th>Nombre</th>
+            <th>Nivel / Grado</th>
+            <th>Área</th>
+            <th>Horas</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for curso in cursos %}
+            <tr>
+              <td class="mono">{{ curso.codigo }}</td>
+              <td>{{ curso.nombre }}</td>
+              <td>{{ curso.nivel.value }} · {{ curso.grado }}</td>
+              <td>{{ curso.area_curricular }}</td>
+              <td class="mono">{{ curso.horas_semanales }}h</td>
+              <td>{{ chip_estado('ACTIVO' if curso.activo else 'INACTIVO') }}</td>
+              <td>
+                <form class="form-inline" method="post" action="{{ url_for('academico.desactivar_curso', curso_id=curso.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn-secundario btn-pequeno" type="submit">Desactivar</button>
+                </form>
+                <form class="form-inline" method="post" action="{{ url_for('academico.eliminar_curso', curso_id=curso.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn-peligro-suave btn-pequeno" type="submit">Eliminar</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="empty-state">No hay cursos registrados.</p>
+  {% endif %}
+</section>
+{% endblock %}

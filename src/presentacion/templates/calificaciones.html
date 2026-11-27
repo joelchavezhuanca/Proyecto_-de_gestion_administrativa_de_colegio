@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% from "_macros.html" import chip_estado %}
+
+{% block titulo %}Libro de calificaciones{% endblock %}
+{% block eyebrow %}Evaluación vigesimal · PBI-10{% endblock %}
+{% block encabezado %}Libro de calificaciones (3 niveles){% endblock %}
+{% block subtitulo %}
+  <p class="page-subtitle">Configure rubros ponderados (100%), cree actividades y registre notas vigesimales exactas [0, 20].</p>
+{% endblock %}
+
+{% block contenido %}
+<section class="card">
+  <div class="card-head">
+    <h2>Seleccionar asignación y período</h2>
+  </div>
+  <form class="form-inline" method="get" action="{{ url_for('academico.ver_calificaciones') }}">
+    <select name="asignacion_id" aria-label="Asignación docente" required>
+      <option value="">Seleccione asignación…</option>
+      {% for asig in asignaciones %}
+        <option value="{{ asig.id }}" {{ 'selected' if asignacion_actual and asignacion_actual.id == asig.id }}>
+          {{ asig.id }} (Curso #{{ asig.curso_id }} · Salón #{{ asig.salon_id }})
+        </option>
+      {% endfor %}
+    </select>
+    <select name="periodo_id" aria-label="Período académico" required>
+      <option value="">Seleccione período…</option>
+      {% for per in periodos %}
+        <option value="{{ per.id }}" {{ 'selected' if periodo_actual and periodo_actual.id == per.id }}>
+          {{ per.nombre }} (Límite: {{ per.fecha_limite_notas|fecha_corta }})
+        </option>
+      {% endfor %}
+    </select>
+    <button class="btn btn-primario btn-pequeno" type="submit">Abrir libro</button>
+  </form>
+</section>
+
+{% if asignacion_actual and periodo_actual %}
+  {% if bloqueado_por_fecha_limite %}
+    <div class="alert alert-warning" role="status">
+      <span class="alert-text">
+        Registro bloqueado: el período se encuentra cerrado o superó su fecha límite de notas ({{ periodo_actual.fecha_limite_notas|fecha_corta }}).
+      </span>
+    </div>
+  {% endif %}
+
+  {% if puede_registrar and not bloqueado_por_fecha_limite %}
+  <section class="grid-dos">
+    <article class="card">
+      <div class="card-head">
+        <h2>Nivel 2 · Configurar rubros (suman 100%)</h2>
+      </div>
+      <form class="form" method="post" action="{{ url_for('academico.configurar_rubros') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="asignacion_id" value="{{ asignacion_actual.id }}">
+        <input type="hidden" name="periodo_id" value="{{ periodo_actual.id }}">
+
+        <div class="grid-dos">
+          <div class="field">
+            <label>Rubro 1</label>
+            <input name="rubro_nombre" type="text" placeholder="Prácticas" required>
+          </div>
+          <div class="field">
+            <label>Peso (%)</label>
+            <input name="rubro_peso" type="text" placeholder="40" required>
+          </div>
+        </div>
+        <div class="grid-dos">
+          <div class="field">
+            <label>Rubro 2</label>
+            <input name="rubro_nombre" type="text" placeholder="Examen Final" required>
+          </div>
+          <div class="field">
+            <label>Peso (%)</label>
+            <input name="rubro_peso" type="text" placeholder="60" required>
+          </div>
+        </div>
+        <button class="btn btn-primario" type="submit">Guardar rubros</button>
+      </form>
+    </article>
+
+    <article class="card">
+      <div class="card-head">
+        <h2>Nivel 3 · Nueva actividad evaluable</h2>
+      </div>
+      {% if rubros %}
+        <form class="form" method="post" action="{{ url_for('academico.crear_actividad') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="asignacion_id" value="{{ asignacion_actual.id }}">
+          <input type="hidden" name="periodo_id" value="{{ periodo_actual.id }}">
+
+          <div class="field">
+            <label for="rubro_id">Rubro</label>
+            <select id="rubro_id" name="rubro_id" required>
+              {% for rubro in rubros %}
+                <option value="{{ rubro.id }}">{{ rubro.nombre }} ({{ rubro.peso_porcentaje }}%)</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="grid-dos">
+            <div class="field">
+              <label for="titulo_act">Título</label>
+              <input id="titulo_act" name="titulo" type="text" required placeholder="Práctica Calificada 1">
+            </div>
+            <div class="field">
+              <label for="fecha_act">Fecha</label>
+              <input id="fecha_act" name="fecha_actividad" type="date" required>
+            </div>
+          </div>
+          <button class="btn btn-primario" type="submit">Crear actividad</button>
+        </form>
+      {% else %}
+        <p class="empty-state">Primero configure los rubros de evaluación sumando 100%.</p>
+      {% endif %}
+    </article>
+  </section>
+  {% endif %}
+
+  <section class="card">
+    <div class="card-head">
+      <h2>Grilla de calificaciones [0, 20]</h2>
+    </div>
+    {% if rubros %}
+      {% for rubro in rubros %}
+        <h3>{{ rubro.nombre }} ({{ rubro.peso_porcentaje }}%)</h3>
+        {% set actividades = actividades_por_rubro.get(rubro.id, []) %}
+        {% if actividades %}
+          <div class="tabla-scroll">
+            <table class="tabla">
+              <thead>
+                <tr>
+                  <th>Estudiante</th>
+                  {% for act in actividades %}
+                    <th>{{ act.titulo }} ({{ act.fecha|fecha_corta }})</th>
+                  {% endfor %}
+                </tr>
+              </thead>
+              <tbody>
+                {% for alumno in alumnos %}
+                  <tr>
+                    <td>{{ alumno.nombres }} {{ alumno.apellidos }}</td>
+                    {% for act in actividades %}
+                      {% set cal = notas_mapa.get((act.id, alumno.alumno_id)) %}
+                      <td>
+                        {% if cal %}
+                          <strong class="mono">{{ "%.2f"|format(cal.nota) }}</strong>
+                        {% endif %}
+                        {% if puede_registrar and not bloqueado_por_fecha_limite %}
+                          <form class="form-inline" method="post" action="{{ url_for('academico.registrar_calificacion') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="asignacion_id" value="{{ asignacion_actual.id }}">
+                            <input type="hidden" name="periodo_id" value="{{ periodo_actual.id }}">
+                            <input type="hidden" name="actividad_id" value="{{ act.id }}">
+                            <input type="hidden" name="alumno_id" value="{{ alumno.alumno_id }}">
+                            <input name="nota" type="text" value="{{ cal.nota if cal else '' }}" placeholder="0-20" required>
+                            {% if cal %}
+                              <input name="motivo_modificacion" type="text" placeholder="Motivo cambio" required>
+                            {% endif %}
+                            <button class="btn btn-secundario btn-pequeno" type="submit">Guardar</button>
+                          </form>
+                        {% endif %}
+                      </td>
+                    {% endfor %}
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="muted small">Sin actividades en este rubro.</p>
+        {% endif %}
+      {% endfor %}
+    {% else %}
+      <p class="empty-state">No hay rubros configurados para esta asignación y período.</p>
+    {% endif %}
+  </section>
+{% else %}
+  <p class="empty-state">Seleccione una asignación docente y un período para abrir el libro de calificaciones.</p>
+{% endif %}
+{% endblock %}
