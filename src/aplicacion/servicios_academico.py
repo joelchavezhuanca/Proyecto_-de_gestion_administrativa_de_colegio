@@ -344,9 +344,7 @@ def calificacion_model_a_dominio(modelo: CalificacionModel) -> Calificacion:
         usuario_id=modelo.usuario_id,
         actualizado_en=modelo.actualizado_en,
         observacion=modelo.observacion,
-        nota_anterior=(
-            Decimal(modelo.nota_anterior) if modelo.nota_anterior is not None else None
-        ),
+        nota_anterior=(Decimal(modelo.nota_anterior) if modelo.nota_anterior is not None else None),
         motivo_modificacion=modelo.motivo_modificacion,
     )
 
@@ -561,9 +559,7 @@ class ServicioAcademico:
     def _operador(self, session: Session, operador_id: int):
         modelo = session.get(UsuarioModel, operador_id)
         if modelo is None:
-            raise UsuarioNoEncontradoException(
-                f"El usuario operador {operador_id} no existe."
-            )
+            raise UsuarioNoEncontradoException(f"El usuario operador {operador_id} no existe.")
         return usuario_model_a_operador(modelo)
 
     def _actor(self, session: Session, usuario_id: int) -> Usuario:
@@ -580,12 +576,9 @@ class ServicioAcademico:
     ) -> None:
         if not operador.activo:
             raise AccesoDenegadoException("El operador no cuenta con una cuenta activa.")
-        if not ServicioAutenticacionYPermisos.tiene_permiso(
-            operador.rol, permiso, roles=roles
-        ):
+        if not ServicioAutenticacionYPermisos.tiene_permiso(operador.rol, permiso, roles=roles):
             raise AccesoDenegadoException(
-                f"El rol {rol_codigo(operador.rol)} no posee el permiso "
-                f"'{permiso.value}'."
+                f"El rol {rol_codigo(operador.rol)} no posee el permiso '{permiso.value}'."
             )
 
     def _auditar(
@@ -751,9 +744,7 @@ class ServicioAcademico:
             modelo = self._estudiante(session, alumno_id)
             ficha = _ficha_desde_modelo(session, modelo)
             if ficha is None:
-                raise ValueError(
-                    "El alumno no tiene una matrícula completa para cambiar de salón."
-                )
+                raise ValueError("El alumno no tiene una matrícula completa para cambiar de salón.")
             nuevo_salon = self._salon(session, nuevo_salon_id)
             existentes = [
                 otra
@@ -908,8 +899,7 @@ class ServicioAcademico:
         session = self._session_factory()
         try:
             modelos = [
-                carnet_model_a_dominio(m)
-                for m in session.scalars(select(CarnetModel)).all()
+                carnet_model_a_dominio(m) for m in session.scalars(select(CarnetModel)).all()
             ]
             return ServicioCarnets.validar_carnet_para_ingreso(codigo_qr, modelos)
         finally:
@@ -1124,9 +1114,7 @@ class ServicioAcademico:
         finally:
             session.close()
 
-    def listar_alertas_pago(
-        self, *, solo_activas: bool = True
-    ) -> list[AlertaSilenciosaPago]:
+    def listar_alertas_pago(self, *, solo_activas: bool = True) -> list[AlertaSilenciosaPago]:
         """Lista las alertas silenciosas de pago registradas."""
         session = self._session_factory()
         try:
@@ -1237,9 +1225,7 @@ class ServicioAcademico:
             operador = self._operador(session, operador_id)
             roles = self._roles(session)
             modelo = self._salon(session, salon_id)
-            matriculados = session.query(EstudianteModel).filter_by(
-                salon_id=salon_id
-            ).count()
+            matriculados = session.query(EstudianteModel).filter_by(salon_id=salon_id).count()
             actualizado = ServicioMallaCurricular.actualizar_capacidad_salon(
                 operador=operador,
                 salon=salon_model_a_dominio(modelo),
@@ -1290,14 +1276,9 @@ class ServicioAcademico:
             operador = self._operador(session, operador_id)
             roles = self._roles(session)
             modelo = self._salon(session, salon_id)
-            tiene_alumnos = (
-                session.query(EstudianteModel).filter_by(salon_id=salon_id).count() > 0
-            )
+            tiene_alumnos = session.query(EstudianteModel).filter_by(salon_id=salon_id).count() > 0
             tiene_asignaciones = (
-                session.query(AsignacionDocenteModel)
-                .filter_by(salon_id=salon_id)
-                .count()
-                > 0
+                session.query(AsignacionDocenteModel).filter_by(salon_id=salon_id).count() > 0
             )
             ServicioMallaCurricular.eliminar_salon(
                 operador=operador,
@@ -1412,10 +1393,7 @@ class ServicioAcademico:
             roles = self._roles(session)
             modelo = self._curso(session, curso_id)
             tiene_asignaciones = (
-                session.query(AsignacionDocenteModel)
-                .filter_by(curso_id=curso_id)
-                .count()
-                > 0
+                session.query(AsignacionDocenteModel).filter_by(curso_id=curso_id).count() > 0
             )
             if tiene_asignaciones:
                 raise EntidadEnUsoException(
@@ -1448,9 +1426,7 @@ class ServicioAcademico:
         """Lista salones aplicando filtros de la malla."""
         session = self._session_factory()
         try:
-            salones = [
-                salon_model_a_dominio(m) for m in session.scalars(select(SalonModel)).all()
-            ]
+            salones = [salon_model_a_dominio(m) for m in session.scalars(select(SalonModel)).all()]
             return ServicioMallaCurricular.listar_salones(
                 salones,
                 anio_lectivo=anio_lectivo,
@@ -1472,9 +1448,7 @@ class ServicioAcademico:
         """Lista cursos aplicando filtros de la malla."""
         session = self._session_factory()
         try:
-            cursos = [
-                curso_model_a_dominio(m) for m in session.scalars(select(CursoModel)).all()
-            ]
+            cursos = [curso_model_a_dominio(m) for m in session.scalars(select(CursoModel)).all()]
             return ServicioMallaCurricular.listar_cursos(
                 cursos,
                 anio_lectivo=anio_lectivo,
@@ -1603,15 +1577,10 @@ class ServicioAcademico:
         """Lista las asignaciones de un docente."""
         session = self._session_factory()
         try:
-            consulta = select(AsignacionDocenteModel).filter_by(
-                usuario_docente_id=docente_id
-            )
+            consulta = select(AsignacionDocenteModel).filter_by(usuario_docente_id=docente_id)
             if solo_activas:
                 consulta = consulta.filter_by(activa=True)
-            return [
-                asignacion_model_a_dominio(m)
-                for m in session.scalars(consulta).all()
-            ]
+            return [asignacion_model_a_dominio(m) for m in session.scalars(consulta).all()]
         finally:
             session.close()
 
@@ -1626,9 +1595,7 @@ class ServicioAcademico:
             asignaciones = [
                 asignacion_model_a_dominio(m)
                 for m in session.scalars(
-                    select(AsignacionDocenteModel).filter_by(
-                        usuario_docente_id=docente_id
-                    )
+                    select(AsignacionDocenteModel).filter_by(usuario_docente_id=docente_id)
                 ).all()
             ]
             return ServicioAsignacionDocente.validar_ambito_docente(
@@ -1664,9 +1631,7 @@ class ServicioAcademico:
             asignaciones = [
                 asignacion_model_a_dominio(m)
                 for m in session.scalars(
-                    select(AsignacionDocenteModel).filter_by(
-                        usuario_docente_id=operador_id
-                    )
+                    select(AsignacionDocenteModel).filter_by(usuario_docente_id=operador_id)
                 ).all()
             ]
             creados = ServicioCalificaciones.configurar_rubros(
@@ -1725,9 +1690,7 @@ class ServicioAcademico:
             asignaciones = [
                 asignacion_model_a_dominio(m)
                 for m in session.scalars(
-                    select(AsignacionDocenteModel).filter_by(
-                        usuario_docente_id=operador_id
-                    )
+                    select(AsignacionDocenteModel).filter_by(usuario_docente_id=operador_id)
                 ).all()
             ]
             actividad = ServicioCalificaciones.crear_actividad(
@@ -1799,9 +1762,7 @@ class ServicioAcademico:
             asignaciones = [
                 asignacion_model_a_dominio(m)
                 for m in session.scalars(
-                    select(AsignacionDocenteModel).filter_by(
-                        usuario_docente_id=operador_id
-                    )
+                    select(AsignacionDocenteModel).filter_by(usuario_docente_id=operador_id)
                 ).all()
             ]
             calificacion = ServicioCalificaciones.registrar_calificacion(
@@ -1912,9 +1873,7 @@ class ServicioAcademico:
         alumno = self._estudiante(session, alumno_id)
         asignacion = self._asignacion_de_curso(session, curso_id, alumno.salon_id)
         if asignacion is None:
-            raise ValueError(
-                f"El curso {curso_id} no tiene una asignación docente activa."
-            )
+            raise ValueError(f"El curso {curso_id} no tiene una asignación docente activa.")
         rubros = [
             rubro_model_a_dominio(m)
             for m in session.scalars(
@@ -1924,24 +1883,32 @@ class ServicioAcademico:
             ).all()
         ]
         rubro_ids = [rubro.id for rubro in rubros]
-        actividades = [
-            actividad_model_a_dominio(m)
-            for m in session.scalars(
-                select(ActividadEvaluableModel).filter(
-                    ActividadEvaluableModel.rubro_id.in_(rubro_ids)
-                )
-            ).all()
-        ] if rubro_ids else []
+        actividades = (
+            [
+                actividad_model_a_dominio(m)
+                for m in session.scalars(
+                    select(ActividadEvaluableModel).filter(
+                        ActividadEvaluableModel.rubro_id.in_(rubro_ids)
+                    )
+                ).all()
+            ]
+            if rubro_ids
+            else []
+        )
         actividad_ids = [actividad.id for actividad in actividades]
-        calificaciones = [
-            calificacion_model_a_dominio(m)
-            for m in session.scalars(
-                select(CalificacionModel).filter(
-                    CalificacionModel.actividad_id.in_(actividad_ids),
-                    CalificacionModel.estudiante_id == alumno_id,
-                )
-            ).all()
-        ] if actividad_ids else []
+        calificaciones = (
+            [
+                calificacion_model_a_dominio(m)
+                for m in session.scalars(
+                    select(CalificacionModel).filter(
+                        CalificacionModel.actividad_id.in_(actividad_ids),
+                        CalificacionModel.estudiante_id == alumno_id,
+                    )
+                ).all()
+            ]
+            if actividad_ids
+            else []
+        )
         return ServicioCalificaciones.calcular_promedio_periodo(
             alumno_id=alumno_id,
             curso_id=curso_id,
@@ -1954,9 +1921,7 @@ class ServicioAcademico:
     # ------------------------------------------------------------------
     # PBI-12: ficha informativa del alumno
     # ------------------------------------------------------------------
-    def construir_ficha_alumno(
-        self, operador_id: int, alumno_id: int
-    ) -> FichaInformativaAlumno:
+    def construir_ficha_alumno(self, operador_id: int, alumno_id: int) -> FichaInformativaAlumno:
         """Ensambla la ficha consolidada del alumno con segregación financiera."""
         session = self._session_factory()
         try:
@@ -1989,9 +1954,7 @@ class ServicioAcademico:
             if salon is not None:
                 anio_lectivo = salon.anio_lectivo
             periodo = _periodo_actual(session, anio_lectivo, self._ahora().date())
-            resumen_promedios = self._promedios_ficha(
-                session, alumno_id, alumno, periodo
-            )
+            resumen_promedios = self._promedios_ficha(session, alumno_id, alumno, periodo)
 
             resumen_pagos: ResumenPagosAlumno | None = None
             if ServicioAutenticacionYPermisos.tiene_permiso(
@@ -2056,9 +2019,7 @@ class ServicioAcademico:
             if curso is None:
                 continue
             try:
-                promedio = self._promedio_periodo(
-                    session, alumno_id, modelo.curso_id, periodo.id
-                )
+                promedio = self._promedio_periodo(session, alumno_id, modelo.curso_id, periodo.id)
             except Exception:
                 continue
             resumenes.append(
@@ -2071,9 +2032,7 @@ class ServicioAcademico:
             )
         return tuple(resumenes)
 
-    def _resumen_pagos(
-        self, session: Session, alumno_id: int
-    ) -> ResumenPagosAlumno:
+    def _resumen_pagos(self, session: Session, alumno_id: int) -> ResumenPagosAlumno:
         obligaciones = session.scalars(
             select(ObligacionPagoModel).filter_by(estudiante_id=alumno_id)
         ).all()
@@ -2136,9 +2095,7 @@ class ServicioAcademico:
                     )
                 ).all()
             ]
-            usuarios = {
-                m.id: m.username for m in session.scalars(select(UsuarioModel)).all()
-            }
+            usuarios = {m.id: m.username for m in session.scalars(select(UsuarioModel)).all()}
             documento = ServicioExportacionAsistencia.preparar_exportacion(
                 operador=operador,
                 filtro=filtro,
@@ -2221,22 +2178,16 @@ class ServicioAcademico:
             ).first()
             if salon is None:
                 raise ValueError("El salón indicado no existe.")
-            alumnos = session.scalars(
-                select(EstudianteModel).filter_by(salon_id=salon.id)
-            ).all()
+            alumnos = session.scalars(select(EstudianteModel).filter_by(salon_id=salon.id)).all()
             boletas = tuple(
-                self._emitir_boleta(session, operador, alumno.id, periodo_id)
-                for alumno in alumnos
+                self._emitir_boleta(session, operador, alumno.id, periodo_id) for alumno in alumnos
             )
             uow.commit()
         return ResultadoEmisionBoleta(boletas=boletas)
 
     def exportar_boleta_texto(self, boleta: BoletaCalificaciones) -> bytes:
         """Renderiza una boleta como texto estructurado listo para imprimir."""
-        filas = [
-            [linea.curso_nombre, str(linea.nota), linea.literal]
-            for linea in boleta.lineas
-        ]
+        filas = [[linea.curso_nombre, str(linea.nota), linea.literal] for linea in boleta.lineas]
         return exportar_texto_boleta_o_pdf(
             f"Boleta de Calificaciones - {boleta.etiqueta}",
             ["Curso", "Nota", "Literal"],
@@ -2273,9 +2224,7 @@ class ServicioAcademico:
             if curso is None:
                 continue
             try:
-                promedio = self._promedio_periodo(
-                    session, alumno_id, modelo.curso_id, periodo.id
-                )
+                promedio = self._promedio_periodo(session, alumno_id, modelo.curso_id, periodo.id)
             except Exception:
                 if periodo.cerrado:
                     raise
@@ -2297,8 +2246,9 @@ class ServicioAcademico:
             )
 
         promedio_general = (
-            (sum((linea.nota for linea in lineas), Decimal("0")) / Decimal(len(lineas)))
-            .quantize(Decimal("0.01"))
+            (sum((linea.nota for linea in lineas), Decimal("0")) / Decimal(len(lineas))).quantize(
+                Decimal("0.01")
+            )
             if lineas
             else Decimal("0.00")
         )

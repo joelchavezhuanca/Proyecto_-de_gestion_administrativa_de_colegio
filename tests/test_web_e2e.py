@@ -131,25 +131,15 @@ def _crear_usuario(
 def _sembrar_datos(fabrica: sessionmaker[Session]) -> SimpleNamespace:
     """Siembra usuarios, roles personalizados, estructura académica y notas."""
     with fabrica() as session:
-        base = {
-            rol.codigo: rol for rol in session.scalars(select(RolModel)).all()
-        }
+        base = {rol.codigo: rol for rol in session.scalars(select(RolModel)).all()}
         rol_docente = _crear_rol_personalizado(session, "DOCENTE", PERMISOS_DOCENTE)
         rol_tesoreria = _crear_rol_personalizado(session, "TESORERIA", PERMISOS_TESORERIA)
 
         admin = _crear_usuario(session, "admin", "ADMIN", base["ADMIN"].id)
-        coordinador = _crear_usuario(
-            session, "coordinador", "COORDINADOR", base["COORDINADOR"].id
-        )
-        staff = _crear_usuario(
-            session, "staff", "ADMIN_STAFF", base["ADMIN_STAFF"].id
-        )
-        docente = _crear_usuario(
-            session, "docente", "DOCENTE", rol_docente.id
-        )
-        tesoreria = _crear_usuario(
-            session, "tesoreria", "TESORERIA", rol_tesoreria.id
-        )
+        coordinador = _crear_usuario(session, "coordinador", "COORDINADOR", base["COORDINADOR"].id)
+        staff = _crear_usuario(session, "staff", "ADMIN_STAFF", base["ADMIN_STAFF"].id)
+        docente = _crear_usuario(session, "docente", "DOCENTE", rol_docente.id)
+        tesoreria = _crear_usuario(session, "tesoreria", "TESORERIA", rol_tesoreria.id)
 
         salon = SalonModel(
             anio_lectivo=2026,
@@ -639,9 +629,7 @@ def test_exportacion_con_rango_invalido_devuelve_400(
         "/reportes/asistencias/exportar",
         data={
             "csrf_token": _token_csrf(cliente),
-            **_datos_exportacion(
-                fecha_desde="2026-12-01", fecha_hasta="2026-11-01"
-            ),
+            **_datos_exportacion(fecha_desde="2026-12-01", fecha_hasta="2026-11-01"),
         },
     )
     assert respuesta.status_code == 400
@@ -725,9 +713,7 @@ def test_formulario_boletas_muestra_salones_y_periodos(
 
 def test_boleta_preliminar_y_su_descarga(entorno: SimpleNamespace) -> None:
     cliente = _loguear(entorno, "admin")
-    respuesta = _emitir_individual(
-        cliente, entorno.datos, entorno.datos.periodo_abierto_id
-    )
+    respuesta = _emitir_individual(cliente, entorno.datos, entorno.datos.periodo_abierto_id)
     html = respuesta.get_data(as_text=True)
 
     assert respuesta.status_code == 200
@@ -749,9 +735,7 @@ def test_boleta_preliminar_y_su_descarga(entorno: SimpleNamespace) -> None:
 
 def test_boleta_oficial_incluye_codigo_verificador(entorno: SimpleNamespace) -> None:
     cliente = _loguear(entorno, "admin")
-    respuesta = _emitir_individual(
-        cliente, entorno.datos, entorno.datos.periodo_cerrado_id
-    )
+    respuesta = _emitir_individual(cliente, entorno.datos, entorno.datos.periodo_cerrado_id)
     html = respuesta.get_data(as_text=True)
 
     assert respuesta.status_code == 200
@@ -842,9 +826,7 @@ def test_descarga_de_boleta_inexistente_devuelve_404(
 
 def test_boleta_no_es_accesible_por_otro_operador(entorno: SimpleNamespace) -> None:
     cliente_admin = _loguear(entorno, "admin")
-    respuesta = _emitir_individual(
-        cliente_admin, entorno.datos, entorno.datos.periodo_abierto_id
-    )
+    respuesta = _emitir_individual(cliente_admin, entorno.datos, entorno.datos.periodo_abierto_id)
     enlace = PATRON_DESCARGA.search(respuesta.get_data(as_text=True))
     assert enlace is not None
 

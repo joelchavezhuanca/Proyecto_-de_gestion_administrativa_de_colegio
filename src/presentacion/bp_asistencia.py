@@ -191,9 +191,7 @@ def _respuesta_json_error(error: Exception) -> tuple[Response, int]:
     return jsonify({"ok": False, "error": web.mensaje}), web.codigo
 
 
-def _pagina_con_error(
-    error: Exception, renderizar: Callable[[], str]
-) -> tuple[str, int]:
+def _pagina_con_error(error: Exception, renderizar: Callable[[], str]) -> tuple[str, int]:
     """Muestra el mensaje como flash y re-renderiza la página con el código HTTP."""
     web = traducir_error(error)
     flash(web.mensaje, "error")
@@ -538,9 +536,7 @@ def anular_justificacion(justificacion_id: str):
         )
     except ERRORES_DOMINIO as error:
         return _pagina_con_error(error, _render_justificaciones)
-    flash(
-        f"Justificación anulada. La asistencia volvió a {restaurada.estado.value}.", "success"
-    )
+    flash(f"Justificación anulada. La asistencia volvió a {restaurada.estado.value}.", "success")
     return redirect(url_for("justificaciones.ver_justificaciones"))
 
 

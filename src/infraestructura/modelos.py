@@ -179,9 +179,7 @@ class SalonModel(Base):
 
     __tablename__ = "salones"
     __table_args__ = (
-        UniqueConstraint(
-            "anio_lectivo", "nivel", "grado", "seccion", name="uq_salon_ubicacion"
-        ),
+        UniqueConstraint("anio_lectivo", "nivel", "grado", "seccion", name="uq_salon_ubicacion"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -198,9 +196,7 @@ class CursoModel(Base):
 
     __tablename__ = "cursos"
     __table_args__ = (
-        UniqueConstraint(
-            "anio_lectivo", "nivel", "grado", "codigo", name="uq_curso_codigo_grado"
-        ),
+        UniqueConstraint("anio_lectivo", "nivel", "grado", "codigo", name="uq_curso_codigo_grado"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -455,9 +451,7 @@ class JustificacionModel(Base):
 
     __tablename__ = "justificaciones"
 
-    id: Mapped[str] = mapped_column(
-        String(50), primary_key=True, default=_nuevo_id_justificacion
-    )
+    id: Mapped[str] = mapped_column(String(50), primary_key=True, default=_nuevo_id_justificacion)
     asistencia_id: Mapped[str] = mapped_column(
         String(50), ForeignKey("asistencias.id", ondelete="CASCADE"), nullable=False, index=True
     )
@@ -631,9 +625,7 @@ class AlertaPagoSilenciosaModel(Base):
 
     __tablename__ = "alertas_pago_silenciosas"
     __table_args__ = (
-        UniqueConstraint(
-            "estudiante_id", "fecha_escolar", name="uq_alerta_pago_estudiante_fecha"
-        ),
+        UniqueConstraint("estudiante_id", "fecha_escolar", name="uq_alerta_pago_estudiante_fecha"),
     )
 
     id: Mapped[str] = mapped_column(String(50), primary_key=True)
@@ -644,9 +636,7 @@ class AlertaPagoSilenciosaModel(Base):
         String(50), ForeignKey("asistencias.id", ondelete="CASCADE"), nullable=False, index=True
     )
     fecha_escolar: Mapped[date] = mapped_column(Date, nullable=False, index=True)
-    cantidad_obligaciones_vencidas: Mapped[int] = mapped_column(
-        Integer, default=1, nullable=False
-    )
+    cantidad_obligaciones_vencidas: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     monto_vencido_total: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     revisada: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     creado_en: Mapped[datetime] = mapped_column(

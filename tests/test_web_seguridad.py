@@ -96,9 +96,7 @@ def app(fabrica_sesiones: sessionmaker[Session]) -> Flask:
     registrar_blueprints_seguridad(aplicacion)
     _crear_usuario_bd(fabrica_sesiones, username="admin", rol="ADMIN")
     _crear_usuario_bd(fabrica_sesiones, username="coordinador", rol="COORDINADOR")
-    _crear_usuario_bd(
-        fabrica_sesiones, username="inactivo", rol="ADMIN", activo=False
-    )
+    _crear_usuario_bd(fabrica_sesiones, username="inactivo", rol="ADMIN", activo=False)
     return aplicacion
 
 
@@ -108,9 +106,7 @@ def cliente(app: Flask):
 
 
 def _login(cliente, username: str = "admin", password: str = PASSWORD):
-    return cliente.post(
-        "/login", data={"username": username, "password": password}
-    )
+    return cliente.post("/login", data={"username": username, "password": password})
 
 
 def _servicio(app: Flask) -> ServicioSeguridad:
@@ -144,8 +140,7 @@ def test_login_redirige_al_inicio_y_este_al_primer_modulo(cliente) -> None:
 
     assert respuesta.status_code == 303
     assert any(
-        ruta in respuesta.headers["Location"]
-        for ruta in ("/aforo", "/asistencia", "/usuarios")
+        ruta in respuesta.headers["Location"] for ruta in ("/aforo", "/asistencia", "/usuarios")
     )
 
 
@@ -279,9 +274,7 @@ def test_editar_usuario(app: Flask, cliente) -> None:
     )
 
     assert respuesta.status_code == 303
-    assert _servicio(app).obtener_usuario(usuario_id).nombre_completo == (
-        "Nombre Actualizado"
-    )
+    assert _servicio(app).obtener_usuario(usuario_id).nombre_completo == ("Nombre Actualizado")
 
 
 def test_editar_usuario_inexistente_devuelve_404(cliente) -> None:
@@ -298,9 +291,7 @@ def test_desactivar_usuario_cambia_estado(app: Flask, cliente) -> None:
     )
     _login(cliente)
 
-    respuesta = cliente.post(
-        f"/usuarios/{usuario_id}/estado", data={"accion": "desactivar"}
-    )
+    respuesta = cliente.post(f"/usuarios/{usuario_id}/estado", data={"accion": "desactivar"})
 
     assert respuesta.status_code == 303
     assert _servicio(app).obtener_usuario(usuario_id).estado.value == "INACTIVO"
@@ -310,9 +301,7 @@ def test_no_se_puede_desactivar_al_ultimo_admin(app: Flask, cliente) -> None:
     _login(cliente)
     admin_id = _servicio(app).listar_usuarios(username="admin")[0].id
 
-    respuesta = cliente.post(
-        f"/usuarios/{admin_id}/estado", data={"accion": "desactivar"}
-    )
+    respuesta = cliente.post(f"/usuarios/{admin_id}/estado", data={"accion": "desactivar"})
 
     assert respuesta.status_code == 409
 
@@ -525,8 +514,7 @@ def test_filtro_de_auditoria_por_operacion(cliente) -> None:
     _login(cliente)
 
     respuesta = cliente.get(
-        "/auditoria?operacion=INICIAR_SESION"
-        "&fecha_desde=2020-01-01&fecha_hasta=2030-12-31"
+        "/auditoria?operacion=INICIAR_SESION&fecha_desde=2020-01-01&fecha_hasta=2030-12-31"
     )
 
     assert respuesta.status_code == 200
@@ -747,9 +735,7 @@ def test_cambiar_estado_accion_invalida_devuelve_400(app: Flask, cliente) -> Non
     )
     _login(cliente)
 
-    respuesta = cliente.post(
-        f"/usuarios/{usuario_id}/estado", data={"accion": "otra"}
-    )
+    respuesta = cliente.post(f"/usuarios/{usuario_id}/estado", data={"accion": "otra"})
 
     assert respuesta.status_code == 400
 
@@ -763,9 +749,7 @@ def test_activar_usuario(app: Flask, cliente) -> None:
     )
     _login(cliente)
 
-    respuesta = cliente.post(
-        f"/usuarios/{usuario_id}/estado", data={"accion": "activar"}
-    )
+    respuesta = cliente.post(f"/usuarios/{usuario_id}/estado", data={"accion": "activar"})
 
     assert respuesta.status_code == 303
     assert _servicio(app).obtener_usuario(usuario_id).estado.value == "ACTIVO"
@@ -860,9 +844,7 @@ def test_cambiar_estado_rol_accion_invalida_devuelve_400(app: Flask, cliente) ->
         },
     )
 
-    respuesta = cliente.post(
-        "/roles/ACCION_INVALIDA/estado", data={"accion": "otra"}
-    )
+    respuesta = cliente.post("/roles/ACCION_INVALIDA/estado", data={"accion": "otra"})
 
     assert respuesta.status_code == 400
 
@@ -880,9 +862,7 @@ def test_activar_rol_personalizado(app: Flask, cliente) -> None:
     )
     cliente.post("/roles/REACTIVABLE/estado", data={"accion": "desactivar"})
 
-    respuesta = cliente.post(
-        "/roles/REACTIVABLE/estado", data={"accion": "activar"}
-    )
+    respuesta = cliente.post("/roles/REACTIVABLE/estado", data={"accion": "activar"})
 
     assert respuesta.status_code == 303
     roles = {rol.codigo: rol for rol in _servicio(app).listar_roles()}
@@ -908,9 +888,7 @@ def test_eliminar_rol_inexistente_devuelve_404(cliente) -> None:
 def test_filtro_auditoria_con_fechas_invalidas_devuelve_400(cliente) -> None:
     _login(cliente)
 
-    respuesta = cliente.get(
-        "/auditoria?fecha_desde=2026-12-31&fecha_hasta=2026-01-01"
-    )
+    respuesta = cliente.get("/auditoria?fecha_desde=2026-12-31&fecha_hasta=2026-01-01")
 
     assert respuesta.status_code == 400
 
@@ -919,16 +897,13 @@ def test_filtro_auditoria_con_parametros_invalidos(cliente) -> None:
     _login(cliente)
 
     respuesta = cliente.get(
-        "/auditoria?usuario_id=abc&operacion=NO_EXISTE"
-        "&resultado=NO_EXISTE&fecha_desde=no-fecha"
+        "/auditoria?usuario_id=abc&operacion=NO_EXISTE&resultado=NO_EXISTE&fecha_desde=no-fecha"
     )
 
     assert respuesta.status_code == 200
 
 
-def test_verificar_integridad_con_error_de_dominio(
-    app: Flask, cliente, monkeypatch
-) -> None:
+def test_verificar_integridad_con_error_de_dominio(app: Flask, cliente, monkeypatch) -> None:
     _login(cliente)
     servicio = _servicio(app)
 
@@ -957,9 +932,7 @@ def test_verificar_integridad_alterada(app: Flask, cliente, monkeypatch) -> None
     assert "alteraciones" in respuesta.get_data(as_text=True).lower()
 
 
-def test_crear_usuario_sin_permiso_asignar_roles_devuelve_403(
-    app: Flask, cliente
-) -> None:
+def test_crear_usuario_sin_permiso_asignar_roles_devuelve_403(app: Flask, cliente) -> None:
     servicio = _servicio(app)
     admin_id = servicio.listar_usuarios(username="admin")[0].id
     servicio.crear_rol(

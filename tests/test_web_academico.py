@@ -230,10 +230,7 @@ def test_seguridad_401_csrf_400_y_rbac_403(entorno_academico: dict[str, Any]) ->
     assert cli_coord.get("/malla").status_code == 403
     assert cli_coord.get("/docentes").status_code == 403
     assert (
-        cli_coord.post(
-            "/calificaciones/rubros", data={"csrf_token": csrf_coord}
-        ).status_code
-        == 403
+        cli_coord.post("/calificaciones/rubros", data={"csrf_token": csrf_coord}).status_code == 403
     )
 
     # DOCENTE: puede /calificaciones, pero 403 en /malla y /docentes
@@ -602,9 +599,7 @@ def test_docentes_y_calificaciones_3_niveles_y_bloqueo_fecha_limite(
     asignacion = servicio.listar_asignaciones_docente(docente1.id)[0]
 
     # --- Libro de Calificaciones con docente1 (asignado) ---
-    cli_doc1, csrf_doc1 = _autenticar(
-        app, docente1, roles_extra=[entorno_academico["rol_docente"]]
-    )
+    cli_doc1, csrf_doc1 = _autenticar(app, docente1, roles_extra=[entorno_academico["rol_docente"]])
 
     # Rubros que NO suman 100% -> 400
     assert (
@@ -637,9 +632,7 @@ def test_docentes_y_calificaciones_3_niveles_y_bloqueo_fecha_limite(
     assert "Prácticas" in resp_rub.get_data(as_text=True)
 
     # Docente2 (NO asignado a este grupo) intenta configurar rubros -> 403
-    cli_doc2, csrf_doc2 = _autenticar(
-        app, docente2, roles_extra=[entorno_academico["rol_docente"]]
-    )
+    cli_doc2, csrf_doc2 = _autenticar(app, docente2, roles_extra=[entorno_academico["rol_docente"]])
     assert (
         cli_doc2.post(
             "/calificaciones/rubros",
@@ -708,9 +701,9 @@ def test_docentes_y_calificaciones_3_niveles_y_bloqueo_fecha_limite(
     with entorno_academico["session_factory"]() as session:
         from src.infraestructura.repositorios import RepositorioCalificaciones
 
-        actividad = RepositorioCalificaciones(session).listar_actividades_rubro(
-            rubro_practicas.id
-        )[0]
+        actividad = RepositorioCalificaciones(session).listar_actividades_rubro(rubro_practicas.id)[
+            0
+        ]
 
     # Registrar nota válida [0, 20] y luego modificarla con motivo
     resp_nota = cli_doc1.post(

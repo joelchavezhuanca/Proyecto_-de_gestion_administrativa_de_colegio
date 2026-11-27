@@ -269,9 +269,7 @@ class ServicioAforo:
                     else:
                         pend_sal += 1
 
-            pct_sal = (
-                round(((pres_sal + tard_sal) / tot_sal) * 100, 2) if tot_sal > 0 else 0.0
-            )
+            pct_sal = round(((pres_sal + tard_sal) / tot_sal) * 100, 2) if tot_sal > 0 else 0.0
 
             desglose.append(
                 ResumenSalon(
@@ -345,18 +343,14 @@ class ServicioAforo:
             and _coincide_texto(al.grado, grado)
             and _coincide_texto(al.seccion, seccion)
         ]
-        alumnos_salon.sort(
-            key=lambda al: (al.apellidos.casefold(), al.nombres.casefold(), al.id)
-        )
+        alumnos_salon.sort(key=lambda al: (al.apellidos.casefold(), al.nombres.casefold(), al.id))
 
         detalles: list[DetalleAsistenciaAlumno] = []
         for al in alumnos_salon:
             ast = mapa_asistencias.get(al.id)
             if ast is None:
                 estado = (
-                    EstadoAsistencia.AUSENTE
-                    if es_cierre_efectuado
-                    else EstadoAsistencia.PENDIENTE
+                    EstadoAsistencia.AUSENTE if es_cierre_efectuado else EstadoAsistencia.PENDIENTE
                 )
                 hora_efectiva: time | None = None
                 minutos_tardanza = 0
@@ -463,9 +457,7 @@ class ServicioAforo:
             ast_actual = mapa_asistencias.get(al.id)
             if ast_actual is None or ast_actual.estado == EstadoAsistencia.PENDIENTE:
                 id_ast = (
-                    ast_actual.id
-                    if ast_actual is not None
-                    else f"ast-cie-{uuid.uuid4().hex[:10]}"
+                    ast_actual.id if ast_actual is not None else f"ast-cie-{uuid.uuid4().hex[:10]}"
                 )
                 nueva_ausencia = RegistroAsistencia(
                     id=id_ast,

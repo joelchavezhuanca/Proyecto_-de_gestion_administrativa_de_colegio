@@ -318,9 +318,7 @@ def test_registrar_por_formulario_redirige_con_flash(
 
 
 def test_registrar_por_json_devuelve_201(admin: FlaskClient, alumno_id: int) -> None:
-    respuesta = _post_json(
-        admin, "/asistencia/registrar", {"metodo": "MANUAL_DNI", "valor": DNI}
-    )
+    respuesta = _post_json(admin, "/asistencia/registrar", {"metodo": "MANUAL_DNI", "valor": DNI})
     assert respuesta.status_code == 201
     cuerpo = respuesta.get_json()
     assert cuerpo["ok"] is True
@@ -502,9 +500,7 @@ def test_ejecutar_cierre_con_fecha_invalida(admin: FlaskClient) -> None:
 
 
 @pytest.fixture
-def asistencia_ausente(
-    admin: FlaskClient, fabrica: FabricaSesiones, alumno_id: int
-) -> str:
+def asistencia_ausente(admin: FlaskClient, fabrica: FabricaSesiones, alumno_id: int) -> str:
     assert _crear_periodo(admin).status_code == 302
     assert _post(admin, "/aforo/cierre", {"fecha": "2026-11-26"}).status_code == 302
     with fabrica() as session:
@@ -675,9 +671,7 @@ def test_crear_periodo_invalido_responde_400(admin: FlaskClient, cambios: dict) 
         ("/periodos/999/eliminar", {}),
     ],
 )
-def test_operar_periodo_inexistente_responde_404(
-    admin: FlaskClient, url: str, datos: dict
-) -> None:
+def test_operar_periodo_inexistente_responde_404(admin: FlaskClient, url: str, datos: dict) -> None:
     assert _post(admin, url, datos).status_code == 404
 
 
@@ -844,9 +838,7 @@ def test_traducir_error(error: Exception, codigo: int, mensaje: str) -> None:
     assert (resultado.codigo, resultado.mensaje) == (codigo, mensaje)
 
 
-def test_error_de_permiso_de_dominio_en_json_responde_403(
-    admin: FlaskClient, app: Flask
-) -> None:
+def test_error_de_permiso_de_dominio_en_json_responde_403(admin: FlaskClient, app: Flask) -> None:
     class ServicioQueDeniega:
         def consultar_metricas_aforo(self, *_args, **_kwargs):
             raise PermisoAforoException("El rol X no puede consultar el aforo.")

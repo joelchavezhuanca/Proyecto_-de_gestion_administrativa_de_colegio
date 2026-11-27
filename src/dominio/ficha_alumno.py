@@ -54,9 +54,7 @@ def _validar_entero_no_negativo(valor: object, campo: str) -> int:
 def _validar_decimal_no_negativo(valor: object, campo: str) -> Decimal:
     """Valida que un monto sea un Decimal finito no negativo."""
     if not isinstance(valor, Decimal) or not valor.is_finite() or valor < _CERO:
-        raise FichaAlumnoException(
-            f"El campo '{campo}' debe ser un Decimal finito no negativo."
-        )
+        raise FichaAlumnoException(f"El campo '{campo}' debe ser un Decimal finito no negativo.")
     return valor
 
 
@@ -82,9 +80,7 @@ class ResumenAsistenciaAlumno:
             self.porcentaje_asistencia, "porcentaje_asistencia"
         )
         if porcentaje > _CIEN:
-            raise FichaAlumnoException(
-                "El porcentaje de asistencia no puede superar 100."
-            )
+            raise FichaAlumnoException("El porcentaje de asistencia no puede superar 100.")
         object.__setattr__(
             self,
             "porcentaje_asistencia",
@@ -105,9 +101,7 @@ class ResumenPagosAlumno:
 
     def __post_init__(self) -> None:
         _validar_entero_no_negativo(self.total_obligaciones, "total_obligaciones")
-        _validar_entero_no_negativo(
-            self.obligaciones_vencidas, "obligaciones_vencidas"
-        )
+        _validar_entero_no_negativo(self.obligaciones_vencidas, "obligaciones_vencidas")
         for campo in (
             "monto_total",
             "monto_pagado",
@@ -134,9 +128,7 @@ class FichaInformativaAlumno:
             raise FichaAlumnoException("La ficha de matrícula proporcionada no es válida.")
         if not isinstance(self.estado_actual, EstadoAcademico):
             raise FichaAlumnoException("El estado académico proporcionado no es válido.")
-        if self.carnet_activo is not None and not isinstance(
-            self.carnet_activo, CarnetEscolar
-        ):
+        if self.carnet_activo is not None and not isinstance(self.carnet_activo, CarnetEscolar):
             raise FichaAlumnoException("El carnet proporcionado no es válido.")
         if not isinstance(self.resumen_asistencia, ResumenAsistenciaAlumno):
             raise FichaAlumnoException("El resumen de asistencia no es válido.")
@@ -164,9 +156,7 @@ def _normalizar_estado(estado: EstadoAcademico | str) -> EstadoAcademico:
     try:
         return EstadoAcademico(estado)
     except (TypeError, ValueError) as exc:
-        raise FichaAlumnoException(
-            f"El estado académico '{estado}' no es válido."
-        ) from exc
+        raise FichaAlumnoException(f"El estado académico '{estado}' no es válido.") from exc
 
 
 def _normalizar_fecha_hora(fecha_hora: datetime | None) -> datetime:
@@ -174,9 +164,7 @@ def _normalizar_fecha_hora(fecha_hora: datetime | None) -> datetime:
     if fecha_hora is None:
         return datetime.now(ZONA_HORARIA_LIMA)
     if not isinstance(fecha_hora, datetime):
-        raise FichaAlumnoException(
-            "La fecha de referencia debe ser una fecha y hora válida."
-        )
+        raise FichaAlumnoException("La fecha de referencia debe ser una fecha y hora válida.")
     if fecha_hora.tzinfo is None:
         return fecha_hora.replace(tzinfo=ZONA_HORARIA_LIMA)
     return fecha_hora
@@ -211,15 +199,9 @@ def _resumir_asistencia(
     asistencias: Sequence[RegistroAsistencia],
 ) -> ResumenAsistenciaAlumno:
     """Calcula los conteos y el porcentaje de asistencia del alumno."""
-    puntuales = sum(
-        1 for registro in asistencias if registro.estado == EstadoAsistencia.PUNTUAL
-    )
-    tardanzas = sum(
-        1 for registro in asistencias if registro.estado == EstadoAsistencia.TARDANZA
-    )
-    ausentes = sum(
-        1 for registro in asistencias if registro.estado == EstadoAsistencia.AUSENTE
-    )
+    puntuales = sum(1 for registro in asistencias if registro.estado == EstadoAsistencia.PUNTUAL)
+    tardanzas = sum(1 for registro in asistencias if registro.estado == EstadoAsistencia.TARDANZA)
+    ausentes = sum(1 for registro in asistencias if registro.estado == EstadoAsistencia.AUSENTE)
     justificados = sum(
         1 for registro in asistencias if registro.estado == EstadoAsistencia.JUSTIFICADO
     )
@@ -283,9 +265,7 @@ class ServicioFichaAlumno:
         if not isinstance(operador, UsuarioOperador):
             raise PermisoFichaAlumnoException("El operador proporcionado no es válido.")
         if not operador.activo:
-            raise PermisoFichaAlumnoException(
-                "El operador no cuenta con una cuenta activa."
-            )
+            raise PermisoFichaAlumnoException("El operador no cuenta con una cuenta activa.")
         if not ServicioAutenticacionYPermisos.tiene_permiso(
             operador.rol,
             PermisoOperacion.CONSULTAR_FICHA_ALUMNO,
@@ -319,17 +299,13 @@ class ServicioFichaAlumno:
         alumno_id = ficha_matricula.alumno_id
 
         asistencias = tuple(
-            registro
-            for registro in asistencias_alumno
-            if registro.alumno_id == alumno_id
+            registro for registro in asistencias_alumno if registro.alumno_id == alumno_id
         )
         promedios = tuple(
             promedio for promedio in promedios_cursos if promedio.alumno_id == alumno_id
         )
         obligaciones = tuple(
-            obligacion
-            for obligacion in obligaciones_pago
-            if obligacion.alumno_id == alumno_id
+            obligacion for obligacion in obligaciones_pago if obligacion.alumno_id == alumno_id
         )
 
         return FichaInformativaAlumno(
@@ -339,9 +315,7 @@ class ServicioFichaAlumno:
             resumen_asistencia=_resumir_asistencia(asistencias),
             promedios_cursos=promedios,
             resumen_pagos=(
-                _resumir_pagos(obligaciones, momento)
-                if _puede_ver_pagos(operador, roles)
-                else None
+                _resumir_pagos(obligaciones, momento) if _puede_ver_pagos(operador, roles) else None
             ),
             fecha_referencia=momento,
         )

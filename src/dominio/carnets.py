@@ -107,9 +107,7 @@ class ServicioCarnets:
     ) -> None:
         """Valida que el operador esté activo y tenga permiso de gestión (RN-01)."""
         if not operador.activo:
-            raise PermisoCarnetException(
-                "El operador no cuenta con una cuenta activa."
-            )
+            raise PermisoCarnetException("El operador no cuenta con una cuenta activa.")
         if not ServicioAutenticacionYPermisos.tiene_permiso(
             operador.rol,
             PermisoOperacion.GESTIONAR_CARNETS,
@@ -157,8 +155,7 @@ class ServicioCarnets:
             (
                 carnet
                 for carnet in carnets
-                if carnet.alumno_id == alumno_id
-                and carnet.estado == EstadoCarnet.ACTIVO
+                if carnet.alumno_id == alumno_id and carnet.estado == EstadoCarnet.ACTIVO
             ),
             None,
         )
@@ -231,6 +228,4 @@ class ServicioCarnets:
                         "El carnet se encuentra anulado y no habilita el ingreso."
                     )
                 return carnet
-        raise CarnetNoEncontradoException(
-            f"No existe un carnet con el código QR '{codigo_qr}'."
-        )
+        raise CarnetNoEncontradoException(f"No existe un carnet con el código QR '{codigo_qr}'.")

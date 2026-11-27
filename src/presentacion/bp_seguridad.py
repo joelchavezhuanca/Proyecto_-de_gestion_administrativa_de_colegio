@@ -361,9 +361,7 @@ def crear_usuario():
     roles = servicio.listar_roles()
 
     if request.method == "GET":
-        return render_template(
-            "usuarios_form.html", usuario=None, roles=roles, datos={}
-        )
+        return render_template("usuarios_form.html", usuario=None, roles=roles, datos={})
 
     datos = {
         "username": _texto("username"),
@@ -373,9 +371,7 @@ def crear_usuario():
     password = request.form.get("password") or ""
     if not datos["username"] or not datos["nombre_completo"] or not datos["rol"]:
         flash("Complete usuario, nombre completo y rol.", "error")
-        return render_template(
-            "usuarios_form.html", usuario=None, roles=roles, datos=datos
-        ), 400
+        return render_template("usuarios_form.html", usuario=None, roles=roles, datos=datos), 400
 
     try:
         servicio.crear_usuario(
@@ -388,9 +384,7 @@ def crear_usuario():
     except UsuarioException as exc:
         mensaje, codigo = _error_dominio(exc)
         flash(mensaje, "error")
-        return render_template(
-            "usuarios_form.html", usuario=None, roles=roles, datos=datos
-        ), codigo
+        return render_template("usuarios_form.html", usuario=None, roles=roles, datos=datos), codigo
 
     flash("Usuario creado correctamente.", "success")
     return _redirigir(url_for("usuarios.listar_usuarios"))
@@ -413,9 +407,7 @@ def editar_usuario(usuario_id: int):
             "nombre_completo": usuario.nombre_completo,
             "rol": str(usuario.rol),
         }
-        return render_template(
-            "usuarios_form.html", usuario=usuario, roles=roles, datos=datos
-        )
+        return render_template("usuarios_form.html", usuario=usuario, roles=roles, datos=datos)
 
     datos = {
         "username": usuario.username,

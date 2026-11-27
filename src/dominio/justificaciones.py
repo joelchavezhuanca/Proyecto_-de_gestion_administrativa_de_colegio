@@ -125,9 +125,7 @@ def _validar_adjuntos(
         raise AdjuntoInvalidoException("Solo se permiten hasta 3 adjuntos por justificación.")
     for adjunto in adjuntos:
         if not isinstance(adjunto, AdjuntoJustificacion):
-            raise AdjuntoInvalidoException(
-                "Cada adjunto debe ser un AdjuntoJustificacion válido."
-            )
+            raise AdjuntoInvalidoException("Cada adjunto debe ser un AdjuntoJustificacion válido.")
     return tuple(adjuntos)
 
 
@@ -164,10 +162,7 @@ class PeriodoAcademico:
 
         # La fecha límite de notas puede ser posterior a ``fecha_fin`` para que los
         # docentes regularicen calificaciones al cierre del bimestre/trimestre.
-        if (
-            self.fecha_limite_notas is not None
-            and self.fecha_limite_notas < self.fecha_inicio
-        ):
+        if self.fecha_limite_notas is not None and self.fecha_limite_notas < self.fecha_inicio:
             raise PeriodoInvalidoException(
                 "La fecha límite de notas no puede ser anterior al inicio del período."
             )
@@ -247,12 +242,8 @@ class ServicioJustificaciones:
     ) -> None:
         """Valida cuenta activa y permiso en servidor; nunca por nombre de rol."""
         if not operador.activo:
-            raise PermisoJustificacionException(
-                "El operador no cuenta con una cuenta activa."
-            )
-        if not ServicioAutenticacionYPermisos.tiene_permiso(
-            operador.rol, permiso, roles
-        ):
+            raise PermisoJustificacionException("El operador no cuenta con una cuenta activa.")
+        if not ServicioAutenticacionYPermisos.tiene_permiso(operador.rol, permiso, roles):
             raise PermisoJustificacionException(
                 f"El rol {_codigo_rol(operador.rol)} no está autorizado para la operación "
                 f"'{permiso.value}'."
@@ -302,8 +293,7 @@ class ServicioJustificaciones:
 
         if asistencia.estado not in (EstadoAsistencia.AUSENTE, EstadoAsistencia.TARDANZA):
             raise EstadoNoJustificableException(
-                f"No es posible justificar una asistencia con estado "
-                f"'{asistencia.estado.value}'."
+                f"No es posible justificar una asistencia con estado '{asistencia.estado.value}'."
             )
 
         motivo_limpio = motivo.strip() if isinstance(motivo, str) else ""
@@ -388,9 +378,7 @@ class ServicioJustificaciones:
                 "La justificación no corresponde al registro de asistencia especificado."
             )
         if asistencia.estado != EstadoAsistencia.JUSTIFICADO:
-            raise JustificacionException(
-                "La asistencia no se encuentra en estado JUSTIFICADO."
-            )
+            raise JustificacionException("La asistencia no se encuentra en estado JUSTIFICADO.")
 
         estado_original = asistencia.estado_anterior or EstadoAsistencia.AUSENTE
         minutos_originales = (
@@ -446,13 +434,9 @@ class ServicioJustificaciones:
                 "La justificación no corresponde al registro de asistencia especificado."
             )
         if asistencia.estado != EstadoAsistencia.JUSTIFICADO:
-            raise JustificacionException(
-                "La asistencia no se encuentra en estado JUSTIFICADO."
-            )
+            raise JustificacionException("La asistencia no se encuentra en estado JUSTIFICADO.")
         if justificacion.estado != EstadoJustificacion.APROBADA:
-            raise JustificacionException(
-                "Solo se pueden modificar justificaciones aprobadas."
-            )
+            raise JustificacionException("Solo se pueden modificar justificaciones aprobadas.")
 
         categoria_final = categoria or justificacion.categoria
         if not isinstance(categoria_final, CategoriaJustificacion):
@@ -461,17 +445,11 @@ class ServicioJustificaciones:
             except ValueError as error:
                 raise JustificacionException("Categoría de justificación inválida.") from error
 
-        motivo_final = (
-            motivo.strip()
-            if isinstance(motivo, str)
-            else justificacion.motivo
-        )
+        motivo_final = motivo.strip() if isinstance(motivo, str) else justificacion.motivo
         if not motivo_final:
             raise JustificacionException("El motivo de la justificación es obligatorio.")
 
-        adjuntos_finales = _validar_adjuntos(
-            (*justificacion.adjuntos, *nuevos_adjuntos)
-        )
+        adjuntos_finales = _validar_adjuntos((*justificacion.adjuntos, *nuevos_adjuntos))
         id_aud = f"aud-just-{uuid.uuid4().hex[:10]}"
 
         actualizada = replace(
@@ -522,15 +500,9 @@ class ServicioJustificaciones:
                 and justificacion.seccion.lower() != criterio.seccion.strip().lower()
             ):
                 continue
-            if (
-                criterio.alumno_id is not None
-                and justificacion.alumno_id != criterio.alumno_id
-            ):
+            if criterio.alumno_id is not None and justificacion.alumno_id != criterio.alumno_id:
                 continue
-            if (
-                criterio.categoria is not None
-                and justificacion.categoria != criterio.categoria
-            ):
+            if criterio.categoria is not None and justificacion.categoria != criterio.categoria:
                 continue
             if criterio.estado is not None and justificacion.estado != criterio.estado:
                 continue
@@ -561,9 +533,7 @@ class ServicioPeriodosAcademicos:
         roles: Sequence[Rol] | None = None,
     ) -> None:
         if not operador.activo:
-            raise PermisoJustificacionException(
-                "El operador no cuenta con una cuenta activa."
-            )
+            raise PermisoJustificacionException("El operador no cuenta con una cuenta activa.")
         if not ServicioAutenticacionYPermisos.tiene_permiso(
             operador.rol,
             PermisoOperacion.ADMINISTRAR_PERIODOS,
@@ -678,8 +648,4 @@ class ServicioPeriodosAcademicos:
                 "El período tiene justificaciones asociadas y no puede eliminarse."
             )
 
-        return [
-            existente
-            for existente in periodos_existentes
-            if existente.id != periodo.id
-        ]
+        return [existente for existente in periodos_existentes if existente.id != periodo.id]

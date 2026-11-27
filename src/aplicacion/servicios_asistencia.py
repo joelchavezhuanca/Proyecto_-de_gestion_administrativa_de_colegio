@@ -412,17 +412,12 @@ class ServicioAsistencia:
         return usuario_model_a_operador(modelo)
 
     def _alumnos(self, session: Session) -> list[Alumno]:
-        return [
-            alumno_model_a_dominio(m)
-            for m in session.scalars(select(EstudianteModel)).all()
-        ]
+        return [alumno_model_a_dominio(m) for m in session.scalars(select(EstudianteModel)).all()]
 
     def _asistencias_dia(self, session: Session, fecha: date) -> list[RegistroAsistencia]:
         return [
             asistencia_model_a_dominio(m)
-            for m in session.scalars(
-                select(AsistenciaModel).filter_by(fecha_escolar=fecha)
-            ).all()
+            for m in session.scalars(select(AsistenciaModel).filter_by(fecha_escolar=fecha)).all()
         ]
 
     def _hora_cierre(self, session: Session) -> time:
@@ -599,8 +594,9 @@ class ServicioAsistencia:
         session = self._session_factory()
         try:
             vinculo = session.scalars(
-                select(EstudianteApoderadoModel)
-                .filter_by(estudiante_id=alumno_id, es_principal=True)
+                select(EstudianteApoderadoModel).filter_by(
+                    estudiante_id=alumno_id, es_principal=True
+                )
             ).first()
             if vinculo is None:
                 vinculo = session.scalars(
@@ -701,9 +697,7 @@ class ServicioAsistencia:
                 telefono_destino=None,
                 tipo=tipo,
                 plantilla=(
-                    "ingreso_puntual"
-                    if tipo == TipoNotificacion.PUNTUAL
-                    else "ingreso_tardanza"
+                    "ingreso_puntual" if tipo == TipoNotificacion.PUNTUAL else "ingreso_tardanza"
                 ),
                 contenido="",
                 estado=EstadoNotificacion.FALLIDO,
@@ -764,8 +758,7 @@ class ServicioAsistencia:
                 modelo = None
         elif criterio_busqueda is not None and metodo == MetodoRegistro.MANUAL_BUSQUEDA:
             todos = [
-                alumno_model_a_dominio(m)
-                for m in session.scalars(select(EstudianteModel)).all()
+                alumno_model_a_dominio(m) for m in session.scalars(select(EstudianteModel)).all()
             ]
             resultados = buscar_alumnos_activos(criterio_busqueda, todos)
             if not resultados:
@@ -1063,9 +1056,7 @@ class ServicioAsistencia:
             calendario = self._calendario(session)
 
             # idempotencia: ¿ya hay cierre para la fecha?
-            ya_cerrada = session.scalars(
-                select(CierreDiarioModel.fecha_escolar)
-            ).all()
+            ya_cerrada = session.scalars(select(CierreDiarioModel.fecha_escolar)).all()
             fechas_ya_cerradas = set(ya_cerrada)
 
             alumnos = self._alumnos(session)
@@ -1159,9 +1150,7 @@ class ServicioAsistencia:
             asistencias = self._asistencias_dia(session, fecha)
             alumnos = {a.id: a for a in self._alumnos(session)}
             contactos = {
-                aid: c
-                for aid in alumnos
-                if (c := self._contacto_apoderado(aid)) is not None
+                aid: c for aid in alumnos if (c := self._contacto_apoderado(aid)) is not None
             }
             calendario = self._calendario(session)
             programada = hora_programada or cierre.hora_cierre
@@ -1421,9 +1410,7 @@ class ServicioAsistencia:
         finally:
             session.close()
 
-    def crear_periodo(
-        self, operador_id: int, periodo: PeriodoAcademico
-    ) -> PeriodoAcademico:
+    def crear_periodo(self, operador_id: int, periodo: PeriodoAcademico) -> PeriodoAcademico:
         with SqlAlchemyUnitOfWork(self._session_factory) as uow:
             session = uow.session
             operador = self._operador(session, operador_id)

@@ -236,9 +236,7 @@ def registrar_matricula() -> Response | tuple[str, int]:
     servicio = _obtener_servicio()
     try:
         salon_id = _parsear_entero(request.form.get("salon_id"), "salon_id")
-        fecha_nacimiento = _parsear_fecha(
-            request.form.get("fecha_nacimiento"), "fecha_nacimiento"
-        )
+        fecha_nacimiento = _parsear_fecha(request.form.get("fecha_nacimiento"), "fecha_nacimiento")
         apoderados = _construir_apoderados_desde_form()
         ficha = servicio.matricular(
             _operador_id(),
@@ -458,9 +456,7 @@ def cambiar_estado(alumno_id: int) -> Response | tuple[str, int]:
         return _render_estados(status, alumno_id=alumno_id)
 
     aviso_carnet = (
-        " El carnet activo fue anulado automáticamente."
-        if resultado.debe_anular_carnet
-        else ""
+        " El carnet activo fue anulado automáticamente." if resultado.debe_anular_carnet else ""
     )
     flash(
         f"Estado académico actualizado a {resultado.estado_actual.value}.{aviso_carnet}",

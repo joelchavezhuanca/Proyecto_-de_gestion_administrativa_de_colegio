@@ -344,9 +344,7 @@ class ServicioNotificacionesWhatsApp:
                     contactos.get(asistencia.alumno_id),
                     ahora,
                     evento_origen_id=cierre.id,
-                    clave_idempotencia=ServicioNotificacionesWhatsApp._clave_ausencia(
-                        asistencia
-                    ),
+                    clave_idempotencia=ServicioNotificacionesWhatsApp._clave_ausencia(asistencia),
                 )
             )
         return notificaciones

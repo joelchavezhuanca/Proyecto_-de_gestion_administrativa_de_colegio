@@ -136,9 +136,7 @@ def usuario_model_a_operador(modelo: UsuarioModel) -> UsuarioOperador:
 def rol_model_a_dominio(modelo: RolModel, session: Session | None = None) -> Rol:
     permisos: set[PermisoOperacion] = set()
     if session is not None:
-        vinculos = list(
-            session.scalars(select(RolPermisoModel).filter_by(rol_id=modelo.id)).all()
-        )
+        vinculos = list(session.scalars(select(RolPermisoModel).filter_by(rol_id=modelo.id)).all())
     else:
         vinculos = list(modelo.permisos_rel or [])
     for vinculo in vinculos:
@@ -479,9 +477,7 @@ class ServicioSeguridad:
                 activa=True,
             )
 
-    def cerrar_sesion(
-        self, token: str, *, fecha_hora: datetime | None = None
-    ) -> SesionUsuario:
+    def cerrar_sesion(self, token: str, *, fecha_hora: datetime | None = None) -> SesionUsuario:
         """Invalida la sesión actual y la persiste revocada (auditado)."""
         momento = fecha_hora or self._ahora()
         with SqlAlchemyUnitOfWork(self._session_factory) as uow:
@@ -542,9 +538,7 @@ class ServicioSeguridad:
                 raise SesionInvalidaException("La sesión fue revocada.")
 
             roles = self._roles(session)
-            rol_actual = next(
-                (r for r in roles if r.codigo == rol_codigo(usuario.rol)), None
-            )
+            rol_actual = next((r for r in roles if r.codigo == rol_codigo(usuario.rol)), None)
             if rol_actual is not None and not rol_actual.activo:
                 raise SesionInvalidaException("El rol asignado no está activo.")
 
@@ -1016,9 +1010,7 @@ class ServicioSeguridad:
     # ------------------------------------------------------------------
 
     def _sesiones_dominio(self, session: Session, usuario_id: int) -> list[SesionUsuario]:
-        filas = session.scalars(
-            select(SesionUsuarioModel).filter_by(usuario_id=usuario_id)
-        ).all()
+        filas = session.scalars(select(SesionUsuarioModel).filter_by(usuario_id=usuario_id)).all()
         resultado: list[SesionUsuario] = []
         for fila in filas:
             resultado.append(

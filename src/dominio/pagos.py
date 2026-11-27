@@ -55,17 +55,13 @@ def _validar_texto_no_vacio(valor: object, campo: str) -> str:
 
 def _validar_entero_positivo(valor: object, campo: str) -> int:
     if isinstance(valor, bool) or not isinstance(valor, int) or valor <= 0:
-        raise ObligacionInvalidaException(
-            f"El campo '{campo}' debe ser un entero positivo."
-        )
+        raise ObligacionInvalidaException(f"El campo '{campo}' debe ser un entero positivo.")
     return valor
 
 
 def _validar_fecha(valor: object, campo: str) -> date:
     if not isinstance(valor, date) or isinstance(valor, datetime):
-        raise ObligacionInvalidaException(
-            f"El campo '{campo}' debe ser una fecha válida."
-        )
+        raise ObligacionInvalidaException(f"El campo '{campo}' debe ser una fecha válida.")
     return valor
 
 
@@ -75,9 +71,7 @@ def _validar_monto_decimal(valor: object) -> Decimal:
             "El monto debe proporcionarse como Decimal (nunca float)."
         )
     if not valor.is_finite() or valor <= Decimal("0"):
-        raise ObligacionInvalidaException(
-            "El monto debe ser un Decimal finito mayor a cero."
-        )
+        raise ObligacionInvalidaException("El monto debe ser un Decimal finito mayor a cero.")
     return valor
 
 
@@ -132,9 +126,7 @@ class ServicioPagos:
     ) -> None:
         if not operador.activo:
             raise PermisoPagosException("El operador no cuenta con una cuenta activa.")
-        if not ServicioAutenticacionYPermisos.tiene_permiso(
-            operador.rol, permiso, roles=roles
-        ):
+        if not ServicioAutenticacionYPermisos.tiene_permiso(operador.rol, permiso, roles=roles):
             raise PermisoPagosException(
                 f"El rol {_codigo_rol(operador.rol)} no está autorizado para "
                 f"la operación '{permiso.value}'."

@@ -111,12 +111,8 @@ class Apoderado:
                 "El identificador del apoderado debe ser un entero no negativo."
             )
         nombres = _validar_texto_no_vacio(self.nombres, "nombres", ApoderadoInvalidoException)
-        apellidos = _validar_texto_no_vacio(
-            self.apellidos, "apellidos", ApoderadoInvalidoException
-        )
-        documento = _validar_texto_no_vacio(
-            self.documento, "documento", ApoderadoInvalidoException
-        )
+        apellidos = _validar_texto_no_vacio(self.apellidos, "apellidos", ApoderadoInvalidoException)
+        documento = _validar_texto_no_vacio(self.documento, "documento", ApoderadoInvalidoException)
         parentesco = _validar_texto_no_vacio(
             self.parentesco, "parentesco", ApoderadoInvalidoException
         )
@@ -307,9 +303,7 @@ class ServicioMatricula:
             or isinstance(fecha_nacimiento, datetime)
             or fecha_nacimiento >= fecha_actual
         ):
-            raise MatriculaException(
-                "La fecha de nacimiento debe ser anterior a la fecha actual."
-            )
+            raise MatriculaException("La fecha de nacimiento debe ser anterior a la fecha actual.")
 
         apoderados_validos = _validar_apoderados(apoderados)
         codigo_norm = codigo_limpio.upper()

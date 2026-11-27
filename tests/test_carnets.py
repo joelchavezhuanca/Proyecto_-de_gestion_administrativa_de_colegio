@@ -474,10 +474,7 @@ def test_rechaza_rol_personalizado_inactivo() -> None:
 def test_validar_carnet_activo_retorna_el_carnet() -> None:
     carnet = _crear_carnet()
 
-    assert (
-        ServicioCarnets.validar_carnet_para_ingreso(carnet.codigo_qr, [carnet])
-        is carnet
-    )
+    assert ServicioCarnets.validar_carnet_para_ingreso(carnet.codigo_qr, [carnet]) is carnet
 
 
 def test_validar_carnet_recorre_varios_hasta_encontrar() -> None:
@@ -488,10 +485,7 @@ def test_validar_carnet_recorre_varios_hasta_encontrar() -> None:
     )
     carnet = _crear_carnet(codigo_qr="DSV-2026-AAAAAAAAAAAA")
 
-    assert (
-        ServicioCarnets.validar_carnet_para_ingreso(carnet.codigo_qr, [otro, carnet])
-        is carnet
-    )
+    assert ServicioCarnets.validar_carnet_para_ingreso(carnet.codigo_qr, [otro, carnet]) is carnet
 
 
 def test_validar_carnet_anulado_lanza_excepcion() -> None:

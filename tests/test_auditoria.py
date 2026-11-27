@@ -248,9 +248,7 @@ def test_detectar_reordenamiento_de_eventos(admin_user: Usuario) -> None:
     primero = _evento(id_evento="aud-001")
     segundo = _evento(id_evento="aud-002", eventos_existentes=[primero])
 
-    resultado = ServicioAuditoria.verificar_integridad(
-        [segundo, primero], operador=admin_user
-    )
+    resultado = ServicioAuditoria.verificar_integridad([segundo, primero], operador=admin_user)
 
     assert resultado.integra is False
     assert resultado.ids_alterados
@@ -261,9 +259,7 @@ def test_detectar_borrado_de_evento_intermedio(admin_user: Usuario) -> None:
     segundo = _evento(id_evento="aud-002", eventos_existentes=[primero])
     tercero = _evento(id_evento="aud-003", eventos_existentes=[primero, segundo])
 
-    resultado = ServicioAuditoria.verificar_integridad(
-        [primero, tercero], operador=admin_user
-    )
+    resultado = ServicioAuditoria.verificar_integridad([primero, tercero], operador=admin_user)
 
     assert resultado.integra is False
     assert resultado.ids_alterados
@@ -560,9 +556,7 @@ def test_consultar_eventos_filtra_por_rol_y_fecha_hasta(admin_user: Usuario) -> 
     )
     por_hasta = ServicioAuditoria.consultar_eventos(
         eventos,
-        FiltroAuditoria(
-            fecha_hasta=datetime(2026, 11, 23, 7, 30, tzinfo=ZONA_HORARIA_LIMA)
-        ),
+        FiltroAuditoria(fecha_hasta=datetime(2026, 11, 23, 7, 30, tzinfo=ZONA_HORARIA_LIMA)),
         operador=admin_user,
     )
 

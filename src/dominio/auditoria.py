@@ -392,17 +392,12 @@ class ServicioAuditoria:
         roles: Sequence[Rol] | None = None,
     ) -> list[RegistroAuditoria]:
         """Consulta la bitácora aplicando filtros y validando el permiso del operador."""
-        ServicioAuditoria._validar_permiso(
-            operador, PermisoOperacion.CONSULTAR_AUDITORIA, roles
-        )
+        ServicioAuditoria._validar_permiso(operador, PermisoOperacion.CONSULTAR_AUDITORIA, roles)
         criterio = filtro or FiltroAuditoria()
 
         resultados = []
         for evento in eventos:
-            if (
-                criterio.fecha_desde is not None
-                and evento.fecha_hora < criterio.fecha_desde
-            ):
+            if criterio.fecha_desde is not None and evento.fecha_hora < criterio.fecha_desde:
                 continue
             if criterio.fecha_hasta is not None and evento.fecha_hora > criterio.fecha_hasta:
                 continue
@@ -438,9 +433,7 @@ class ServicioAuditoria:
     ) -> RegistroAuditoria:
         """Adapta el DTO de auditoría de asistencia al registro inmutable del PBI-16."""
         estado_anterior = evento.estado_anterior.value if evento.estado_anterior else None
-        rol_ejecutante = (
-            evento.rol.value if isinstance(evento.rol, RolUsuario) else str(evento.rol)
-        )
+        rol_ejecutante = evento.rol.value if isinstance(evento.rol, RolUsuario) else str(evento.rol)
         return ServicioAuditoria.registrar_evento(
             usuario_id=evento.usuario_id,
             rol_ejecutante=rol_ejecutante,
@@ -553,9 +546,7 @@ class ServicioAuditoria:
             )
         if not ServicioAutenticacionYPermisos.tiene_permiso(operador.rol, permiso, roles=roles):
             rol_texto = (
-                operador.rol.value
-                if isinstance(operador.rol, RolUsuario)
-                else str(operador.rol)
+                operador.rol.value if isinstance(operador.rol, RolUsuario) else str(operador.rol)
             )
             raise PermisoAuditoriaException(
                 f"El rol {rol_texto} no tiene permiso para la operación '{permiso.value}'."

@@ -508,9 +508,7 @@ def test_manual_sin_permiso_es_rechazado() -> None:
 
 
 def test_manual_operador_inactivo_es_rechazado() -> None:
-    inactivo = UsuarioOperador(
-        id=3, username="staff", rol=RolUsuario.ADMIN_STAFF, activo=False
-    )
+    inactivo = UsuarioOperador(id=3, username="staff", rol=RolUsuario.ADMIN_STAFF, activo=False)
     with pytest.raises(PermisoNotificacionException):
         _manual(inactivo)
 
@@ -629,9 +627,7 @@ def test_procesar_envio_reintenta_hasta_max_intentos(
     assert noti.intentos == 3
     assert noti.estado == EstadoNotificacion.FALLIDO
     assert "máximo de 3 intentos" in (noti.detalle_error or "")
-    assert {n.clave_idempotencia for n in proveedor.enviados} == {
-        "ast-001:PUNTUAL:2026-11-02"
-    }
+    assert {n.clave_idempotencia for n in proveedor.enviados} == {"ast-001:PUNTUAL:2026-11-02"}
 
 
 def test_procesar_envio_reintento_exitoso_tras_fallo(

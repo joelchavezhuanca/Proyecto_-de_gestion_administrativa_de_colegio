@@ -364,9 +364,7 @@ def test_promedio_general_redondea_half_up(staff, ficha, periodo_cerrado):
     assert boleta.escala_literal_general is EscalaLiteral.A
 
 
-def test_sin_asistencias_el_resumen_queda_en_cero(
-    staff, ficha, periodo_cerrado, cursos, promedios
-):
+def test_sin_asistencias_el_resumen_queda_en_cero(staff, ficha, periodo_cerrado, cursos, promedios):
     boleta = ServicioBoletas.emitir_boleta_individual(
         staff, ficha, periodo_cerrado, cursos, promedios, (), FECHA_EMISION
     )
@@ -486,9 +484,7 @@ def test_rechaza_boleta_oficial_sin_ninguna_nota(staff, ficha, periodo_cerrado, 
 # ---------------------------------------------------------------------------
 
 
-def test_deniega_usuario_sin_permiso_emitir_boletas(
-    ficha, periodo_cerrado, cursos, promedios
-):
+def test_deniega_usuario_sin_permiso_emitir_boletas(ficha, periodo_cerrado, cursos, promedios):
     coordinador = _usuario(2, RolUsuario.COORDINADOR)
     with pytest.raises(PermisoBoletaException):
         ServicioBoletas.emitir_boleta_individual(
@@ -593,7 +589,12 @@ def test_rechaza_curso_de_otro_anio_lectivo(staff, ficha, periodo_cerrado):
     )
     with pytest.raises(BoletaException, match="año lectivo"):
         ServicioBoletas.emitir_boleta_individual(
-            staff, ficha, periodo_cerrado, (curso_2025,), (_promedio(1, "15"),), (),
+            staff,
+            ficha,
+            periodo_cerrado,
+            (curso_2025,),
+            (_promedio(1, "15"),),
+            (),
             FECHA_EMISION,
         )
 
@@ -617,9 +618,7 @@ def test_rechaza_promedio_de_otro_alumno_o_periodo(
         )
 
 
-def test_rechaza_promedios_duplicados_por_curso(
-    staff, ficha, periodo_cerrado, cursos, promedios
-):
+def test_rechaza_promedios_duplicados_por_curso(staff, ficha, periodo_cerrado, cursos, promedios):
     with pytest.raises(BoletaException, match="duplicado"):
         ServicioBoletas.emitir_boleta_individual(
             staff,
@@ -635,7 +634,13 @@ def test_rechaza_promedios_duplicados_por_curso(
 def test_rechaza_fecha_emision_invalida(staff, ficha, periodo_cerrado, cursos, promedios):
     with pytest.raises(BoletaException):
         ServicioBoletas.emitir_boleta_individual(
-            staff, ficha, periodo_cerrado, cursos, promedios, (), date(2026, 5, 20)  # type: ignore[arg-type]
+            staff,
+            ficha,
+            periodo_cerrado,
+            cursos,
+            promedios,
+            (),
+            date(2026, 5, 20),  # type: ignore[arg-type]
         )
 
 

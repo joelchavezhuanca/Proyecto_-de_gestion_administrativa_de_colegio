@@ -29,16 +29,12 @@ def operador_admin() -> UsuarioOperador:
 
 @pytest.fixture
 def operador_coordinador() -> UsuarioOperador:
-    return UsuarioOperador(
-        id=2, username="coordinador", rol=RolUsuario.COORDINADOR, activo=True
-    )
+    return UsuarioOperador(id=2, username="coordinador", rol=RolUsuario.COORDINADOR, activo=True)
 
 
 @pytest.fixture
 def operador_admin_staff() -> UsuarioOperador:
-    return UsuarioOperador(
-        id=3, username="secretaria", rol=RolUsuario.ADMIN_STAFF, activo=True
-    )
+    return UsuarioOperador(id=3, username="secretaria", rol=RolUsuario.ADMIN_STAFF, activo=True)
 
 
 @pytest.fixture

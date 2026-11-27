@@ -130,9 +130,7 @@ class NotificadorMetaCloud:
         version_api: str = _VERSION_API,
     ) -> None:
         self._token = token
-        self._url = (
-            f"https://graph.facebook.com/{version_api}/{phone_number_id}/messages"
-        )
+        self._url = f"https://graph.facebook.com/{version_api}/{phone_number_id}/messages"
 
     # ------------------------------------------------------------------
     # Construcción del payload
@@ -151,9 +149,7 @@ class NotificadorMetaCloud:
                 "components": [
                     {
                         "type": "body",
-                        "parameters": [
-                            {"type": "text", "text": notificacion.contenido}
-                        ],
+                        "parameters": [{"type": "text", "text": notificacion.contenido}],
                     }
                 ],
             },

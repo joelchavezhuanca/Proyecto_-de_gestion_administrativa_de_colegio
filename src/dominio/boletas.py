@@ -319,9 +319,7 @@ class ServicioBoletas:
             lineas=lineas,
             promedio_general=promedio_general,
             escala_literal_general=escala_general,
-            resumen_asistencia=_resumir_asistencia(
-                ficha.alumno_id, periodo, asistencias_periodo
-            ),
+            resumen_asistencia=_resumir_asistencia(ficha.alumno_id, periodo, asistencias_periodo),
             es_oficial=es_oficial,
             etiqueta=ETIQUETA_OFICIAL if es_oficial else ETIQUETA_PRELIMINAR,
             codigo_verificacion=(

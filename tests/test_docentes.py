@@ -279,9 +279,7 @@ def test_asignar_docente_con_rol_dinamico_asignador_y_usuario_operador(
 
     assert asignacion.usuario_docente_id == 15
     assert asignacion.asignado_por == 5
-    assert asignacion.creado_en == datetime(
-        2026, 3, 2, 9, 0, tzinfo=timezone(timedelta(hours=-5))
-    )
+    assert asignacion.creado_en == datetime(2026, 3, 2, 9, 0, tzinfo=timezone(timedelta(hours=-5)))
 
 
 def test_bdd_escenario_2_validar_ambito_docente_permitido_y_denegado_auditado(
@@ -905,26 +903,20 @@ def test_validaciones_consistencia_curso_salon_revocacion_y_filtros(
     )
     todas = [revocada, a2]
     assert ServicioAsignacionDocente.listar_asignaciones_docente(None, todas) == [a2]
-    assert (
-        ServicioAsignacionDocente.listar_asignaciones_docente(
-            otro_docente_activo.id,
-            todas,
-            curso_id=curso_comunicacion.id,
-            salon_id=salon_3ro_b.id,
-            anio_lectivo=2026,
-        )
-        == [a2]
-    )
-    assert (
-        ServicioAsignacionDocente.listar_asignaciones_docente(
-            None,
-            todas,
-            solo_activas=False,
-            curso_id=curso_matematica.id,
-            salon_id=salon_3ro_a.id,
-        )
-        == [revocada]
-    )
+    assert ServicioAsignacionDocente.listar_asignaciones_docente(
+        otro_docente_activo.id,
+        todas,
+        curso_id=curso_comunicacion.id,
+        salon_id=salon_3ro_b.id,
+        anio_lectivo=2026,
+    ) == [a2]
+    assert ServicioAsignacionDocente.listar_asignaciones_docente(
+        None,
+        todas,
+        solo_activas=False,
+        curso_id=curso_matematica.id,
+        salon_id=salon_3ro_a.id,
+    ) == [revocada]
 
 
 def test_normalizacion_fecha_naive_a_lima() -> None:

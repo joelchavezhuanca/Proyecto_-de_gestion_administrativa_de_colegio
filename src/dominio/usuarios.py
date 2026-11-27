@@ -156,9 +156,7 @@ def validar_politica_password(
 ) -> None:
     """Valida la política mínima de credenciales del sistema (RN-05)."""
     if not isinstance(password, str) or len(password) < longitud_minima:
-        raise UsuarioException(
-            f"La contraseña debe tener al menos {longitud_minima} caracteres."
-        )
+        raise UsuarioException(f"La contraseña debe tener al menos {longitud_minima} caracteres.")
     if exigir_alfanumerico and not (
         any(caracter.isalpha() for caracter in password)
         and any(caracter.isdigit() for caracter in password)
@@ -320,8 +318,7 @@ class EventoAuditoriaUsuario:
         for clave in self.detalle:
             if str(clave).strip().lower() in _CLAVES_AUDITORIA_PROHIBIDAS:
                 raise UsuarioException(
-                    "El detalle de auditoría no puede incluir el campo "
-                    f"sensible '{clave}'."
+                    f"El detalle de auditoría no puede incluir el campo sensible '{clave}'."
                 )
 
 
@@ -464,11 +461,10 @@ class ServicioGestionUsuarios:
         rol_final = usuario_target.rol
         if nuevo_rol is not None:
             rol_validado = _validar_rol_asignable(nuevo_rol, roles or [])
-            if (
-                _codigo_rol(rol_validado) != RolUsuario.ADMIN.value
-                and ServicioGestionUsuarios._es_ultimo_admin_activo(
-                    usuario_target, usuarios_existentes
-                )
+            if _codigo_rol(
+                rol_validado
+            ) != RolUsuario.ADMIN.value and ServicioGestionUsuarios._es_ultimo_admin_activo(
+                usuario_target, usuarios_existentes
             ):
                 raise UltimoAdminException(
                     "No se puede quitar el rol ADMIN al último administrador activo."
@@ -518,13 +514,9 @@ class ServicioGestionUsuarios:
 
         if (
             nuevo_estado == EstadoUsuario.INACTIVO
-            and ServicioGestionUsuarios._es_ultimo_admin_activo(
-                usuario_target, usuarios_existentes
-            )
+            and ServicioGestionUsuarios._es_ultimo_admin_activo(usuario_target, usuarios_existentes)
         ):
-            raise UltimoAdminException(
-                "No se puede desactivar al último administrador activo."
-            )
+            raise UltimoAdminException("No se puede desactivar al último administrador activo.")
 
         usuario_actualizado = Usuario(
             id=usuario_target.id,
@@ -738,9 +730,7 @@ class ServicioGestionRoles:
         ServicioGestionRoles._validar_operador(operador, roles_existentes)
         codigo_normalizado = _normalizar_codigo_rol(codigo)
         codigos_ocupados = {rol.codigo for rol in roles_existentes}
-        codigos_ocupados.update(
-            rol.codigo for rol in ServicioGestionRoles.obtener_roles_base()
-        )
+        codigos_ocupados.update(rol.codigo for rol in ServicioGestionRoles.obtener_roles_base())
         if codigo_normalizado in codigos_ocupados:
             raise RolInvalidoException(f"El código de rol {codigo_normalizado} ya existe.")
 
@@ -835,9 +825,7 @@ class ServicioGestionRoles:
             )
 
         restantes = [
-            disponible
-            for disponible in roles_existentes
-            if disponible.codigo != rol.codigo
+            disponible for disponible in roles_existentes if disponible.codigo != rol.codigo
         ]
         auditoria = ServicioGestionRoles._auditoria(
             operador,
@@ -853,9 +841,7 @@ class ServicioAutenticacionYPermisos:
     """Implementa el control de acceso RBAC y manejo de sesiones del PBI-15."""
 
     @staticmethod
-    def _validar_rol_para_sesion(
-        rol: RolUsuario | str, roles: Sequence[Rol] | None
-    ) -> None:
+    def _validar_rol_para_sesion(rol: RolUsuario | str, roles: Sequence[Rol] | None) -> None:
         if isinstance(rol, RolUsuario):
             return
         codigo = _codigo_rol(rol)
@@ -988,6 +974,5 @@ class ServicioAutenticacionYPermisos:
         rol_efectivo: RolUsuario | str | Rol = rol_actual or sesion.rol
         if not ServicioAutenticacionYPermisos.tiene_permiso(rol_efectivo, permiso, roles):
             raise AccesoDenegadoException(
-                f"El rol {sesion.rol_codigo} no tiene permiso para "
-                f"la operación '{permiso.value}'."
+                f"El rol {sesion.rol_codigo} no tiene permiso para la operación '{permiso.value}'."
             )

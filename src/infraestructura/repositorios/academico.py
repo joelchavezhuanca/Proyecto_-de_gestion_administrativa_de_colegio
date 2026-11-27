@@ -449,11 +449,7 @@ class RepositorioCalificaciones:
     # -- Calificaciones -------------------------------------------------
     @staticmethod
     def _calificacion_a_dominio(modelo: CalificacionModel) -> Calificacion:
-        nota_ant = (
-            Decimal(str(modelo.nota_anterior))
-            if modelo.nota_anterior is not None
-            else None
-        )
+        nota_ant = Decimal(str(modelo.nota_anterior)) if modelo.nota_anterior is not None else None
         return Calificacion(
             id=modelo.id,
             actividad_id=modelo.actividad_id,
@@ -641,9 +637,7 @@ class RepositorioBoletas:
         modelos = self.sesion.scalars(stmt.order_by(BoletaEmitidaModel.periodo_id)).all()
         return [self._a_dominio(m) for m in modelos]
 
-    def listar_por_salon_y_periodo(
-        self, salon_id: int, periodo_id: int
-    ) -> list[BoletaEmitida]:
+    def listar_por_salon_y_periodo(self, salon_id: int, periodo_id: int) -> list[BoletaEmitida]:
         stmt = (
             select(BoletaEmitidaModel)
             .join(

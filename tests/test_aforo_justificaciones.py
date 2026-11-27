@@ -170,14 +170,15 @@ def test_aforo_consulta_permitida_roles_oficiales(
 
 def test_aforo_consulta_denegada_rol_invalido_o_inactivo(staff_op: UsuarioOperador) -> None:
     """Rechazar consulta de usuarios con rol no autorizado o cuenta inactiva."""
-    op_inactivo = UsuarioOperador(
-        id=9, username="inactivo", rol=RolUsuario.ADMIN, activo=False
-    )
+    op_inactivo = UsuarioOperador(id=9, username="inactivo", rol=RolUsuario.ADMIN, activo=False)
     with pytest.raises(PermisoAforoException, match="no tiene una cuenta activa"):
         ServicioAforo.validar_acceso_consulta(op_inactivo)
 
     op_portero = UsuarioOperador(
-        id=10, username="portero", rol="PORTERIA", activo=True  # type: ignore
+        id=10,
+        username="portero",
+        rol="PORTERIA",
+        activo=True,  # type: ignore
     )
     with pytest.raises(PermisoAforoException, match="no está autorizado"):
         ServicioAforo.validar_acceso_consulta(op_portero)
@@ -436,10 +437,14 @@ def test_aforo_roles_personalizados_consulta_y_configuracion(
         permisos=frozenset({PermisoOperacion.CONFIGURAR_CIERRE_ASISTENCIA}),
     )
     op_visor = UsuarioOperador(
-        id=20, username="sup_aforo", rol="SUPERVISOR_AFORO"  # type: ignore[arg-type]
+        id=20,
+        username="sup_aforo",
+        rol="SUPERVISOR_AFORO",  # type: ignore[arg-type]
     )
     op_config = UsuarioOperador(
-        id=21, username="gestor_cierre", rol="GESTOR_HORARIOS"  # type: ignore[arg-type]
+        id=21,
+        username="gestor_cierre",
+        rol="GESTOR_HORARIOS",  # type: ignore[arg-type]
     )
 
     metricas = ServicioAforo.calcular_metricas(
@@ -502,7 +507,9 @@ def test_aforo_cierre_automatico_acepta_system_cron_y_rol_personalizado(
         permisos=frozenset({PermisoOperacion.EJECUTAR_CIERRE_ASISTENCIA}),
     )
     op_cierre = UsuarioOperador(
-        id=30, username="op_cierre", rol="OPERADOR_CIERRE"  # type: ignore[arg-type]
+        id=30,
+        username="op_cierre",
+        rol="OPERADOR_CIERRE",  # type: ignore[arg-type]
     )
     nuevas_custom, evento_custom = ServicioAforo.ejecutar_cierre_automatico(
         operador_o_sistema=op_cierre,
@@ -537,9 +544,7 @@ def test_aforo_cierre_automatico_rechaza_actores_sin_permiso_doble_cierre_y_no_l
                 hora_cierre=time(9, 0, 0),
             )
 
-    op_inactivo = UsuarioOperador(
-        id=1, username="admin_off", rol=RolUsuario.ADMIN, activo=False
-    )
+    op_inactivo = UsuarioOperador(id=1, username="admin_off", rol=RolUsuario.ADMIN, activo=False)
     with pytest.raises(PermisoAforoException, match="no tiene una cuenta activa"):
         ServicioAforo.ejecutar_cierre_automatico(
             operador_o_sistema=op_inactivo,
@@ -856,20 +861,25 @@ def test_aforo_consultar_historial_modificaciones_filtros_y_permisos(
         permisos=frozenset({PermisoOperacion.CONSULTAR_DASHBOARD_AFORO}),
     )
     op_hist = UsuarioOperador(
-        id=40, username="aud_ast", rol="AUDITOR_ASISTENCIA"  # type: ignore[arg-type]
+        id=40,
+        username="aud_ast",
+        rol="AUDITOR_ASISTENCIA",  # type: ignore[arg-type]
     )
     op_sin_hist = UsuarioOperador(
-        id=41, username="solo_dash", rol="SOLO_DASHBOARD"  # type: ignore[arg-type]
+        id=41,
+        username="solo_dash",
+        rol="SOLO_DASHBOARD",  # type: ignore[arg-type]
     )
-    op_inactivo = UsuarioOperador(
-        id=42, username="inac", rol=RolUsuario.ADMIN, activo=False
-    )
+    op_inactivo = UsuarioOperador(id=42, username="inac", rol=RolUsuario.ADMIN, activo=False)
 
-    assert len(
-        ServicioAforo.consultar_historial_modificaciones(
-            op_hist, registros, roles=[rol_hist, rol_sin_hist]
+    assert (
+        len(
+            ServicioAforo.consultar_historial_modificaciones(
+                op_hist, registros, roles=[rol_hist, rol_sin_hist]
+            )
         )
-    ) == 2
+        == 2
+    )
 
     with pytest.raises(PermisoAforoException, match="no está autorizado"):
         ServicioAforo.consultar_historial_modificaciones(

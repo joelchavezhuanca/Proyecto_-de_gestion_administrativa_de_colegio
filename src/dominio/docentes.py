@@ -96,9 +96,7 @@ def _validar_texto_no_vacio(valor: object, campo: str) -> str:
 
 def _validar_anio_lectivo(anio_lectivo: object) -> int:
     if not isinstance(anio_lectivo, int) or isinstance(anio_lectivo, bool) or anio_lectivo < 2000:
-        raise AsignacionInvalidaException(
-            "El año lectivo debe ser un entero mayor o igual a 2000."
-        )
+        raise AsignacionInvalidaException("El año lectivo debe ser un entero mayor o igual a 2000.")
     return anio_lectivo
 
 
@@ -149,9 +147,7 @@ class AsignacionDocente:
             raise AsignacionInvalidaException("El indicador 'activa' debe ser booleano.")
         _validar_entero_no_negativo(self.asignado_por, "asignado_por")
 
-        creado_norm = (
-            _normalizar_fecha_hora(self.creado_en) if self.creado_en is not None else None
-        )
+        creado_norm = _normalizar_fecha_hora(self.creado_en) if self.creado_en is not None else None
         revocada_norm = (
             _normalizar_fecha_hora(self.revocada_en) if self.revocada_en is not None else None
         )
@@ -180,9 +176,7 @@ def _validar_consistencia_curso_salon(
     if not salon.activo:
         raise AsignacionInvalidaException("No se puede asignar un docente a un salón inactivo.")
     if curso.anio_lectivo != salon.anio_lectivo:
-        raise AsignacionInvalidaException(
-            "El año lectivo del curso y del salón debe coincidir."
-        )
+        raise AsignacionInvalidaException("El año lectivo del curso y del salón debe coincidir.")
     if anio_lectivo is not None:
         anio_validado = _validar_anio_lectivo(anio_lectivo)
         if anio_validado != salon.anio_lectivo:

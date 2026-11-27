@@ -161,7 +161,10 @@ def test_escenario_05_rol_no_reconocido_lanza_excepcion(
 ) -> None:
     """Verifica rechazo inmediato si el operador posee un rol no oficial."""
     operador_invalido = UsuarioOperador(
-        id=99, username="portero_antiguo", rol="PORTERIA", activo=True  # type: ignore
+        id=99,
+        username="portero_antiguo",
+        rol="PORTERIA",
+        activo=True,  # type: ignore
     )
     with pytest.raises(RolNoAutorizadoException, match="no está autorizado"):
         registrar_asistencia_unificada(
@@ -339,10 +342,7 @@ def test_escenario_11_corregir_asistencia_ausente(
     assert res.asistencia.estado == EstadoAsistencia.TARDANZA
     assert res.asistencia.minutos_tardanza == 10
     assert res.asistencia.estado_anterior == EstadoAsistencia.AUSENTE
-    assert (
-        res.asistencia.motivo_correccion
-        == "Alumno llegó tarde con autorización de coordinación"
-    )
+    assert res.asistencia.motivo_correccion == "Alumno llegó tarde con autorización de coordinación"
     assert res.auditoria.operacion == "CORRECCION_AUSENTE"
     assert res.auditoria.estado_anterior == EstadoAsistencia.AUSENTE
     assert res.auditoria.estado_nuevo == EstadoAsistencia.TARDANZA
@@ -648,9 +648,7 @@ def test_brecha_validar_operador_por_permiso_explicito(rol_auxiliar_registro: Ro
     validar_operador(operador, roles=[rol_auxiliar_registro])
     validar_operador(operador, PermisoOperacion.REGISTRAR_ASISTENCIA, [rol_auxiliar_registro])
     with pytest.raises(RolNoAutorizadoException):
-        validar_operador(
-            operador, PermisoOperacion.CORREGIR_AUSENTE, roles=[rol_auxiliar_registro]
-        )
+        validar_operador(operador, PermisoOperacion.CORREGIR_AUSENTE, roles=[rol_auxiliar_registro])
     validar_operador(
         UsuarioOperador(id=1, username="admin", rol=RolUsuario.ADMIN),
         PermisoOperacion.CORREGIR_AUSENTE,

@@ -706,9 +706,7 @@ def test_repositorio_justificaciones_periodos_y_calendario(
     suspension = date(2026, 8, 12)
     sabado_lectivo = date(2026, 11, 7)
     repo_cal.guardar_fecha(feriado, es_lectivo=False, descripcion="Fiestas Patrias")
-    repo_cal.guardar_fecha(
-        feriado, es_lectivo=False, descripcion="Fiestas Patrias Oficial"
-    )
+    repo_cal.guardar_fecha(feriado, es_lectivo=False, descripcion="Fiestas Patrias Oficial")
     repo_cal.guardar_fecha(
         suspension, es_lectivo=False, es_excepcion=True, descripcion="Suspensión excepcional"
     )
