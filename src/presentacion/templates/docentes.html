@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% from "_macros.html" import chip_estado %}
+
+{% block titulo %}Asignación docente{% endblock %}
+{% block eyebrow %}Aislamiento académico · PBI-11{% endblock %}
+{% block encabezado %}Asignación docente segura{% endblock %}
+{% block subtitulo %}
+  <p class="page-subtitle">Asigne docentes autorizados a cursos y salones específicos con trazabilidad de revocación.</p>
+{% endblock %}
+
+{% block contenido %}
+<section class="grid-dos">
+  <article class="card">
+    <div class="card-head">
+      <h2>Nueva asignación docente</h2>
+    </div>
+    <form class="form" method="post" action="{{ url_for('academico.asignar_docente') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="field">
+        <label for="docente_id">Usuario docente</label>
+        <select id="docente_id" name="docente_id" required>
+          <option value="">Seleccione un docente…</option>
+          {% for usr in usuarios %}
+            <option value="{{ usr.id }}">{{ usr.nombre_completo }} ({{ usr.rol|rol_legible }})</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="curso_id">Curso</label>
+        <select id="curso_id" name="curso_id" required>
+          <option value="">Seleccione un curso…</option>
+          {% for curso in cursos %}
+            <option value="{{ curso.id }}">
+              {{ curso.codigo }} · {{ curso.nombre }} ({{ curso.nivel.value }} {{ curso.grado }})
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="salon_id">Salón</label>
+        <select id="salon_id" name="salon_id" required>
+          <option value="">Seleccione un salón…</option>
+          {% for salon in salones %}
+            <option value="{{ salon.id }}">
+              {{ salon.nivel.value }} · {{ salon.grado }} "{{ salon.seccion }}" ({{ salon.anio_lectivo }})
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <button class="btn btn-primario" type="submit">Asignar docente</button>
+    </form>
+  </article>
+
+  <article class="card">
+    <div class="card-head">
+      <h2>Asignaciones registradas ({{ asignaciones|length }})</h2>
+    </div>
+    {% if asignaciones %}
+      <div class="tabla-scroll">
+        <table class="tabla">
+          <thead>
+            <tr>
+              <th>Docente</th>
+              <th>Curso</th>
+              <th>Salón</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for asig in asignaciones %}
+              {% set usr = mapa_usuarios.get(asig.usuario_docente_id) %}
+              {% set cur = mapa_cursos.get(asig.curso_id) %}
+              {% set sal = mapa_salones.get(asig.salon_id) %}
+              <tr>
+                <td>{{ usr.nombre_completo if usr else ('#' ~ asig.usuario_docente_id) }}</td>
+                <td>{{ cur.nombre if cur else ('#' ~ asig.curso_id) }}</td>
+                <td>{{ (sal.grado ~ ' "' ~ sal.seccion ~ '"') if sal else ('#' ~ asig.salon_id) }}</td>
+                <td>{{ chip_estado('ACTIVO' if asig.activa else 'INACTIVO') }}</td>
+                <td>
+                  {% if asig.activa %}
+                    <form class="form-inline" method="post" action="{{ url_for('academico.revocar_asignacion', asignacion_id=asig.id) }}">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <input name="motivo" type="text" placeholder="Motivo revocación">
+                      <button class="btn btn-secundario btn-pequeno" type="submit">Revocar</button>
+                    </form>
+                  {% endif %}
+                  <form class="form-inline" method="post" action="{{ url_for('academico.eliminar_asignacion', asignacion_id=asig.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-peligro-suave btn-pequeno" type="submit">Eliminar</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="empty-state">No hay asignaciones docentes registradas.</p>
+    {% endif %}
+  </article>
+</section>
+{% endblock %}
