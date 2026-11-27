@@ -4,17 +4,24 @@ Configura:
 - Application Factory crear_app(config=None).
 - Obligatoriedad estricta de SECRET_KEY.
 - Cookies de sesión seguras (HttpOnly, SameSite='Lax').
+- Persistencia SQLAlchemy y servicios de aplicación inyectados en ``app.extensions``.
+- Registro de los cinco blueprints web de la Ola 4.
 - Manejo defensivo de errores HTTP 400, 401, 403, 404 y 500 sin fuga de información sensible.
 - Filtros de plantilla y funciones globales seguras (safe_url_for, tiene_permiso, csrf_token).
 """
 
+import importlib
 import os
 from datetime import date, datetime, time
 from pathlib import Path
 
-from flask import Flask, current_app, g, render_template, url_for
+from flask import Blueprint, Flask, current_app, g, render_template, url_for
 
+from src.aplicacion.servicios_academico import ServicioAcademico
+from src.aplicacion.servicios_asistencia import ServicioAsistencia
+from src.aplicacion.servicios_seguridad import ServicioSeguridad
 from src.dominio.usuarios import RolUsuario
+from src.infraestructura.base_datos import crear_motor, crear_session_factory
 from src.presentacion.seguridad import (
     AlmacenSesiones,
     cargar_contexto_sesion,
@@ -25,6 +32,15 @@ from src.presentacion.seguridad import (
 from src.presentacion.tiempo import hora_institucional
 
 RAIZ_PRESENTACION = Path(__file__).resolve().parent
+
+#: Blueprints web de la Ola 4 que la fábrica integra cuando están disponibles.
+MODULOS_BLUEPRINTS = (
+    "bp_seguridad",
+    "bp_asistencia",
+    "bp_alumnos",
+    "bp_academico",
+    "bp_reportes",
+)
 
 _ROLES_LEGIBLES = {
     "ADMIN": "Administrador",
@@ -77,10 +93,15 @@ def crear_app(config: dict | None = None) -> Flask:
 
     app.config.setdefault("RELOJ", hora_institucional)
 
-    # 2. Extensiones y almacén de sesiones oficial en servidor
+    # 2. Persistencia, almacén de sesiones y servicios de aplicación
     app.extensions.setdefault("almacen_sesiones", AlmacenSesiones())
+    _configurar_persistencia(app)
+    _configurar_servicios(app)
 
-    # 3. Ciclo de petición y seguridad
+    # 3. Blueprints de la Ola 4
+    _registrar_blueprints(app)
+
+    # 4. Ciclo de petición, filtros y manejo de errores
     _registrar_ciclo_peticion(app)
     _registrar_filtros_y_contexto(app)
     _registrar_manejadores_error(app)
@@ -92,11 +113,112 @@ def crear_app(config: dict | None = None) -> Flask:
 create_app = crear_app
 
 
+def _configurar_persistencia(app: Flask) -> None:
+    """Inyecta una fábrica de sesiones SQLAlchemy en config y extensions.
+
+    El orden de resolución es: ``SESSION_FACTORY`` explícita, ``DATABASE_URL``
+    de la configuración y variable de entorno ``DATABASE_URL``. Si no hay
+    configuración explícita, la fábrica queda sin definir y los servicios se
+    crean de forma perezosa cuando el despliegue la proporcione.
+    """
+    fabrica = app.config.get("SESSION_FACTORY")
+    if fabrica is None:
+        url = app.config.get("DATABASE_URL") or os.environ.get("DATABASE_URL")
+        if url:
+            motor = crear_motor(url)
+            app.extensions["motor_bd"] = motor
+            fabrica = crear_session_factory(motor)
+            app.config["DATABASE_URL"] = url
+
+    if fabrica is not None:
+        app.config["SESSION_FACTORY"] = fabrica
+        app.extensions["session_factory"] = fabrica
+
+
+def _configurar_servicios(app: Flask) -> None:
+    """Construye una sola vez los servicios de aplicación de la Ola 4."""
+    fabrica = app.extensions.get("session_factory")
+    if fabrica is None:
+        return
+
+    reloj = app.config["RELOJ"]
+    if "servicio_seguridad" not in app.extensions:
+        app.extensions["servicio_seguridad"] = ServicioSeguridad(
+            fabrica, reloj=reloj
+        )
+    if "servicio_academico" not in app.extensions:
+        app.extensions["servicio_academico"] = ServicioAcademico(
+            fabrica, reloj=reloj
+        )
+    if "servicio_asistencia" not in app.extensions:
+        app.extensions["servicio_asistencia"] = ServicioAsistencia(
+            fabrica, reloj=reloj
+        )
+
+
+def _registrar_blueprints(app: Flask) -> None:
+    """Registra los blueprints web disponibles sin acoplar módulos ausentes."""
+    for nombre_modulo in MODULOS_BLUEPRINTS:
+        try:
+            modulo = importlib.import_module(f"src.presentacion.{nombre_modulo}")
+        except ModuleNotFoundError as exc:
+            if exc.name != f"src.presentacion.{nombre_modulo}":
+                raise
+            continue
+
+        registrador = getattr(
+            modulo,
+            f"registrar_blueprints_{nombre_modulo.removeprefix('bp_')}",
+            None,
+        )
+        if callable(registrador):
+            registrador(app)
+            continue
+
+        for atributo in vars(modulo).values():
+            if isinstance(atributo, Blueprint) and atributo.name not in app.blueprints:
+                app.register_blueprint(atributo)
+
+    # El blueprint de seguridad registra su propia carga de roles, que asume
+    # una fábrica de sesiones disponible. La fábrica centralizada de esta app
+    # reemplaza ese hook por uno tolerante a despliegues sin BD configurada.
+    funciones = app.before_request_funcs.get(None)
+    if funciones:
+        app.before_request_funcs[None] = [
+            funcion
+            for funcion in funciones
+            if getattr(funcion, "__name__", "") != "cargar_roles_disponibles"
+        ]
+
+
 def _registrar_ciclo_peticion(app: Flask) -> None:
     @app.before_request
     def antes_de_peticion() -> None:
         validar_csrf()
         cargar_contexto_sesion()
+        _cargar_roles_disponibles()
+
+
+def _cargar_roles_disponibles() -> None:
+    """Carga los roles vigentes para habilitar roles personalizados en el RBAC.
+
+    Si la aplicación no tiene una fábrica de servicios configurada (por
+    ejemplo, una app creada solo con ``SECRET_KEY`` para pruebas unitarias),
+    la lista queda en ``None``: el RBAC deniega por defecto sin romper la
+    petición. Los roles base siguen resolviéndose con la matriz del dominio.
+    """
+    g.roles_disponibles = None
+    if getattr(g, "sesion_servidor", None) is None:
+        return
+
+    servicio = current_app.extensions.get("servicio_seguridad")
+    if not isinstance(servicio, ServicioSeguridad):
+        return
+
+    try:
+        g.roles_disponibles = servicio.listar_roles()
+    except Exception:  # noqa: BLE001 - fail-closed si la BD aún no está lista
+        g.roles_disponibles = None
 
 
 def _registrar_filtros_y_contexto(app: Flask) -> None:

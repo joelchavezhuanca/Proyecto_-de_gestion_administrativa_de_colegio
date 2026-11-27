@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icono %}
+
+{% block titulo %}Boletas de calificaciones{% endblock %}
+{% block eyebrow %}Reportes · PBI-14{% endblock %}
+{% block encabezado %}Emisión de boletas de calificaciones{% endblock %}
+{% block subtitulo %}
+  <p class="muted">
+    Las boletas de un período abierto se emiten como PRELIMINARES; al cerrar el período
+    se generan como OFICIALES con código de verificación.
+  </p>
+{% endblock %}
+
+{% block head %}
+<style>
+  .boletas-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 18px;
+  }
+  .boleta-card {
+    border: 1px solid var(--borde);
+    border-radius: var(--radio-md);
+    padding: 16px;
+    background: var(--superficie);
+  }
+  .boleta-preliminar { border-left: 5px solid var(--advertencia); }
+  .boleta-oficial { border-left: 5px solid var(--exito); }
+  .boleta-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .boleta-titulo { font-size: 1rem; }
+</style>
+{% endblock %}
+
+{% block contenido %}
+<div class="grid-dos">
+  <section class="card">
+    <div class="card-head">
+      <h2>{{ icono('usuarios') }} Emisión individual</h2>
+    </div>
+    <form method="post" action="{{ url_for('reportes.emitir_boleta_individual') }}" class="filtros-grid">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="field">
+        <label for="alumno_id_individual">Identificador del alumno</label>
+        <input id="alumno_id_individual" name="alumno_id" type="number" min="1" required>
+      </div>
+      <div class="field">
+        <label for="periodo_individual">Período académico</label>
+        <select id="periodo_individual" name="periodo_id" required>
+          {% for periodo in periodos %}
+          <option value="{{ periodo.id }}">
+            {{ periodo.nombre }}{{ ' · cerrado' if periodo.cerrado else ' · abierto' }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="filtros-actions">
+        <button class="btn btn-primario" type="submit">Emitir boleta individual</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>{{ icono('asistencia') }} Emisión masiva</h2>
+    </div>
+    <form method="post" action="{{ url_for('reportes.emitir_boletas_salon') }}" class="filtros-grid">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="field">
+        <label for="anio_lectivo">Año lectivo</label>
+        <input id="anio_lectivo" name="anio_lectivo" type="number" min="2000" max="2100"
+               value="{{ anio_lectivo }}" required>
+      </div>
+      <div class="field">
+        <label for="nivel_masivo">Nivel</label>
+        <select id="nivel_masivo" name="nivel" required>
+          {% for nivel in niveles %}
+          <option value="{{ nivel.value }}">{{ nivel.value }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="grado_masivo">Grado</label>
+        <input id="grado_masivo" name="grado" type="text" maxlength="20" required
+               placeholder="Ej. 3ro">
+      </div>
+      <div class="field">
+        <label for="seccion_masiva">Sección</label>
+        <input id="seccion_masiva" name="seccion" type="text" maxlength="10" required
+               placeholder="Ej. A">
+      </div>
+      <div class="field">
+        <label for="periodo_masivo">Período académico</label>
+        <select id="periodo_masivo" name="periodo_id" required>
+          {% for periodo in periodos %}
+          <option value="{{ periodo.id }}">
+            {{ periodo.nombre }}{{ ' · cerrado' if periodo.cerrado else ' · abierto' }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="filtros-actions">
+        <button class="btn btn-primario" type="submit">Emitir boletas del salón</button>
+      </div>
+    </form>
+  </section>
+</div>
+
+{% if boletas %}
+<section class="card">
+  <div class="card-head">
+    <h2>Boletas emitidas</h2>
+  </div>
+
+  <div class="boletas-grid">
+    {% for boleta in boletas %}
+    <article class="boleta-card {{ 'boleta-oficial' if boleta.es_oficial else 'boleta-preliminar' }}">
+      <header class="boleta-head">
+        <div>
+          <h3 class="boleta-titulo">Alumno {{ boleta.alumno_id }}</h3>
+          <p class="muted">
+            Año lectivo {{ boleta.anio_lectivo }} · Período {{ boleta.periodo_id }}
+          </p>
+        </div>
+        <span class="chip {{ 'chip-ok' if boleta.es_oficial else 'chip-warn' }}">
+          {{ boleta.etiqueta }}
+        </span>
+      </header>
+
+      <table class="tabla">
+        <thead><tr><th>Curso</th><th>Nota</th><th>Literal</th></tr></thead>
+        <tbody>
+          {% for linea in boleta.lineas %}
+          <tr>
+            <td>{{ linea.curso_nombre }}</td>
+            <td>{{ '%.2f'|format(linea.nota) }}</td>
+            <td>{{ linea.literal }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <dl class="detalle-lista">
+        <div>
+          <dt>Promedio general</dt>
+          <dd>{{ '%.2f'|format(boleta.promedio_general) }}</dd>
+        </div>
+        <div>
+          <dt>Asistencia</dt>
+          <dd>
+            P {{ boleta.resumen_asistencia.puntual }} ·
+            T {{ boleta.resumen_asistencia.tardanza }} ·
+            A {{ boleta.resumen_asistencia.ausente }} ·
+            J {{ boleta.resumen_asistencia.justificado }}
+          </dd>
+        </div>
+        {% if boleta.es_oficial and boleta.codigo_verificacion %}
+        <div>
+          <dt>Código de verificación</dt>
+          <dd><code>{{ boleta.codigo_verificacion }}</code></dd>
+        </div>
+        {% endif %}
+      </dl>
+
+      <div class="filtros-actions">
+        <a class="btn btn-secundario"
+           href="{{ url_for('reportes.descargar_boleta', boleta_id=boleta.id) }}">
+          Descargar boleta
+        </a>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% else %}
+<section class="card">
+  <p class="muted">Aún no se emitieron boletas en esta sesión.</p>
+</section>
+{% endif %}
+{% endblock %}

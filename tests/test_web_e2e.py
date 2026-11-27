@@ -29,7 +29,12 @@ from sqlalchemy.orm import Session, sessionmaker
 from src.aplicacion.servicios_academico import ServicioAcademico
 from src.aplicacion.servicios_asistencia import ServicioAsistencia
 from src.aplicacion.servicios_seguridad import ServicioSeguridad
-from src.dominio.usuarios import PermisoOperacion, hashear_password
+from src.dominio.exportacion_asistencia import ExportacionException
+from src.dominio.usuarios import (
+    AccesoDenegadoException,
+    PermisoOperacion,
+    hashear_password,
+)
 from src.infraestructura.base_datos import (
     crear_motor,
     crear_session_factory,
@@ -53,6 +58,7 @@ from src.infraestructura.modelos import (
     UsuarioModel,
 )
 from src.presentacion.app import crear_app
+from src.presentacion.bp_reportes import registrar_blueprints_reportes
 from src.presentacion.tiempo import ZONA_HORARIA_LIMA
 
 PASSWORD = "ClaveSegura123"
@@ -844,3 +850,127 @@ def test_boleta_no_es_accesible_por_otro_operador(entorno: SimpleNamespace) -> N
 
     cliente_staff = _loguear(entorno, "staff")
     assert cliente_staff.get(enlace.group(1)).status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Rutas defensivas y ramas de error adicionales
+# ---------------------------------------------------------------------------
+
+
+def test_registrar_blueprints_reportes_es_idempotente(
+    entorno: SimpleNamespace,
+) -> None:
+    registrar_blueprints_reportes(entorno.app)
+    registrar_blueprints_reportes(entorno.app)
+    assert entorno.app.extensions["blueprints_reportes_registrados"] is True
+
+
+def test_emision_individual_sin_alumno_devuelve_400(
+    entorno: SimpleNamespace,
+) -> None:
+    cliente = _loguear(entorno, "admin")
+    respuesta = cliente.post(
+        "/reportes/boletas/individual",
+        data={
+            "csrf_token": _token_csrf(cliente),
+            "alumno_id": "",
+            "periodo_id": str(entorno.datos.periodo_abierto_id),
+        },
+    )
+    assert respuesta.status_code == 400
+    assert "alumno_id" in respuesta.get_data(as_text=True)
+
+
+def test_emision_masiva_con_anio_invalido_devuelve_400(
+    entorno: SimpleNamespace,
+) -> None:
+    cliente = _loguear(entorno, "admin")
+    respuesta = cliente.post(
+        "/reportes/boletas/salon",
+        data={
+            "csrf_token": _token_csrf(cliente),
+            "anio_lectivo": "",
+            "nivel": "Primaria",
+            "grado": "3ro",
+            "seccion": "A",
+            "periodo_id": str(entorno.datos.periodo_abierto_id),
+        },
+    )
+    assert respuesta.status_code == 400
+    assert "anio_lectivo" in respuesta.get_data(as_text=True)
+
+
+def test_emision_masiva_sin_ubicacion_devuelve_400(
+    entorno: SimpleNamespace,
+) -> None:
+    cliente = _loguear(entorno, "admin")
+    respuesta = cliente.post(
+        "/reportes/boletas/salon",
+        data={
+            "csrf_token": _token_csrf(cliente),
+            "anio_lectivo": "2026",
+            "nivel": "",
+            "grado": "",
+            "seccion": "",
+            "periodo_id": str(entorno.datos.periodo_abierto_id),
+        },
+    )
+    assert respuesta.status_code == 400
+    assert "salón" in respuesta.get_data(as_text=True)
+
+
+class _ServicioQueFalla:
+    """Doble de servicio que lanza una excepción de dominio controlada."""
+
+    def __init__(self, excepcion: Exception) -> None:
+        self._excepcion = excepcion
+
+    def construir_ficha_alumno(self, *_args: object) -> None:
+        raise self._excepcion
+
+    def exportar_asistencias(self, *_args: object) -> None:
+        raise self._excepcion
+
+
+def test_ficha_con_acceso_denegado_de_servicio_devuelve_403(
+    entorno: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cliente = _loguear(entorno, "admin")
+    monkeypatch.setitem(
+        entorno.app.extensions,
+        "servicio_academico",
+        _ServicioQueFalla(AccesoDenegadoException("Denegado por el dominio.")),
+    )
+    respuesta = cliente.get(_url_ficha(entorno.datos))
+    assert respuesta.status_code == 403
+
+
+def test_ficha_con_error_de_dominio_generico_devuelve_400(
+    entorno: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cliente = _loguear(entorno, "admin")
+    monkeypatch.setitem(
+        entorno.app.extensions,
+        "servicio_academico",
+        _ServicioQueFalla(ValueError("Datos académicos inconsistentes.")),
+    )
+    respuesta = cliente.get(_url_ficha(entorno.datos))
+    assert respuesta.status_code == 400
+    assert "inconsistentes" in respuesta.get_data(as_text=True)
+
+
+def test_exportacion_con_fallo_de_servicio_devuelve_400(
+    entorno: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cliente = _loguear(entorno, "admin")
+    monkeypatch.setitem(
+        entorno.app.extensions,
+        "servicio_academico",
+        _ServicioQueFalla(ExportacionException("No fue posible exportar.")),
+    )
+    respuesta = cliente.post(
+        "/reportes/asistencias/exportar",
+        data={"csrf_token": _token_csrf(cliente), **_datos_exportacion()},
+    )
+    assert respuesta.status_code == 400
+    assert "exportar" in respuesta.get_data(as_text=True)

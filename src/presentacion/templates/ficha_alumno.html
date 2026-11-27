@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icono %}
+
+{% block titulo %}Ficha del alumno{% endblock %}
+{% block eyebrow %}Reportes · PBI-12{% endblock %}
+{% block encabezado %}Ficha informativa del alumno{% endblock %}
+{% block subtitulo %}
+  <p class="muted">Información consolidada de matrícula, asistencia y rendimiento.</p>
+{% endblock %}
+
+{% block contenido %}
+<section class="card">
+  <div class="card-head">
+    <h2>{{ icono('usuarios') }} Consultar ficha</h2>
+  </div>
+  <form class="filtros-grid" method="get" action="{{ url_for('reportes.buscar_ficha') }}">
+    <div class="field">
+      <label for="alumno_id">Identificador del alumno</label>
+      <input id="alumno_id" name="alumno_id" type="number" min="1" required
+             value="{{ alumno_id if alumno_id is not none else '' }}"
+             placeholder="Ej. 1">
+    </div>
+    <div class="filtros-actions">
+      <button class="btn btn-primario" type="submit">Ver ficha</button>
+    </div>
+  </form>
+</section>
+
+{% if ficha %}
+<section class="card">
+  <div class="card-head">
+    <div>
+      <h2>{{ ficha.apellidos }}, {{ ficha.nombres }}</h2>
+      <p class="muted">Código {{ ficha.codigo }} · DNI {{ ficha.dni }}</p>
+    </div>
+    <span class="chip chip-neutral">{{ ficha.estado_academico|estado_texto }}</span>
+  </div>
+
+  <dl class="detalle-lista">
+    <div><dt>Nivel</dt><dd>{{ ficha.nivel }}</dd></div>
+    <div><dt>Grado</dt><dd>{{ ficha.grado }}</dd></div>
+    <div><dt>Sección</dt><dd>{{ ficha.seccion }}</dd></div>
+    <div><dt>Carnet activo</dt><dd>{{ ficha.carnet_codigo or 'Sin carnet activo' }}</dd></div>
+  </dl>
+</section>
+
+<section class="card">
+  <div class="card-head">
+    <h2>Resumen de asistencia</h2>
+  </div>
+  <dl class="detalle-lista">
+    <div><dt>Puntual</dt><dd>{{ ficha.resumen_asistencia.puntual }}</dd></div>
+    <div><dt>Tardanza</dt><dd>{{ ficha.resumen_asistencia.tardanza }}</dd></div>
+    <div><dt>Ausente</dt><dd>{{ ficha.resumen_asistencia.ausente }}</dd></div>
+    <div><dt>Justificado</dt><dd>{{ ficha.resumen_asistencia.justificado }}</dd></div>
+    <div>
+      <dt>Porcentaje de asistencia</dt>
+      <dd>{{ '%.2f'|format(ficha.resumen_asistencia.porcentaje_asistencia) }} %</dd>
+    </div>
+  </dl>
+</section>
+
+<section class="card">
+  <div class="card-head">
+    <h2>Apoderados</h2>
+  </div>
+  {% if ficha.apoderados %}
+  <div class="tabla-scroll">
+    <table class="tabla">
+      <thead>
+        <tr><th>Apoderado</th><th>Parentesco</th><th>Teléfono</th><th>Principal</th></tr>
+      </thead>
+      <tbody>
+        {% for apoderado in ficha.apoderados %}
+        <tr>
+          <td>{{ apoderado.apellidos }}, {{ apoderado.nombres }}</td>
+          <td>{{ apoderado.parentesco }}</td>
+          <td>{{ apoderado.telefono }}</td>
+          <td>{{ 'Sí' if apoderado.es_principal else 'No' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">No hay apoderados registrados.</p>
+  {% endif %}
+</section>
+
+<section class="card">
+  <div class="card-head">
+    <h2>Rendimiento por curso</h2>
+  </div>
+  {% if ficha.resumen_promedios %}
+  <div class="tabla-scroll">
+    <table class="tabla">
+      <thead><tr><th>Curso</th><th>Nota</th><th>Literal</th></tr></thead>
+      <tbody>
+        {% for promedio in ficha.resumen_promedios %}
+        <tr>
+          <td>{{ promedio.curso_nombre }}</td>
+          <td>{{ '%.2f'|format(promedio.nota) }}</td>
+          <td>{{ promedio.literal }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">Aún no hay promedios registrados para el período vigente.</p>
+  {% endif %}
+</section>
+
+{# Bloque financiero con segregación estricta: solo existe si el servicio lo expone. #}
+{% if ficha.resumen_pagos is not none %}
+<section class="card">
+  <div class="card-head">
+    <h2>Resumen financiero</h2>
+  </div>
+  <dl class="detalle-lista">
+    <div><dt>Obligaciones pendientes</dt><dd>{{ ficha.resumen_pagos.pendientes }}</dd></div>
+    <div><dt>Obligaciones vencidas</dt><dd>{{ ficha.resumen_pagos.vencidas }}</dd></div>
+    <div>
+      <dt>Monto pendiente</dt>
+      <dd>S/ {{ '%.2f'|format(ficha.resumen_pagos.monto_pendiente) }}</dd>
+    </div>
+    <div><dt>Alertas activas</dt><dd>{{ ficha.resumen_pagos.alertas_activas }}</dd></div>
+  </dl>
+</section>
+{% endif %}
+{% endif %}
+{% endblock %}
