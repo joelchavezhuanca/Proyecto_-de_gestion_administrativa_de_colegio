@@ -22,3 +22,10 @@ env/
 *.swo
 Thumbs.db
 Desktop.ini
+
+# Bases de datos locales y secretos
+*.db
+*.sqlite3
+datos_locales/
+data/
+.env
