@@ -6,9 +6,8 @@ import secrets
 import uuid
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass, replace
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from enum import StrEnum
-from typing import Final
 
 from src.dominio.asistencia import UsuarioOperador
 from src.dominio.estados_academicos import EstadoAcademico
@@ -17,10 +16,6 @@ from src.dominio.usuarios import (
     Rol,
     ServicioAutenticacionYPermisos,
 )
-
-ZONA_HORARIA_LIMA: Final[timezone] = timezone(timedelta(hours=-5))
-MAX_INTENTOS_GENERACION_QR: Final[int] = 10
-PREFIJO_CODIGO_QR: Final[str] = "DSV"
 
 
 class EstadoCarnet(StrEnum):
@@ -68,52 +63,14 @@ class CarnetInactivoOAnuladoException(CarnetException):
     """Lanzada cuando un carnet anulado intenta usarse para el ingreso."""
 
 
-def _es_entero_positivo(valor: object) -> bool:
-    return isinstance(valor, int) and not isinstance(valor, bool) and valor > 0
-
-
-def _validar_texto_no_vacio(valor: object, campo: str) -> str:
-    if not isinstance(valor, str) or not valor.strip():
-        raise CarnetException(
-            f"El campo '{campo}' es obligatorio y no puede estar vacío."
-        )
-    return valor.strip()
-
-
-def _normalizar_fecha_hora(fecha_hora: datetime) -> datetime:
-    """Normaliza una marca temporal al huso institucional America/Lima (UTC-5)."""
-    if not isinstance(fecha_hora, datetime):
-        raise CarnetException("La fecha y hora del carnet debe ser un datetime válido.")
-    if fecha_hora.tzinfo is None:
-        return fecha_hora.replace(tzinfo=ZONA_HORARIA_LIMA)
-    return fecha_hora.astimezone(ZONA_HORARIA_LIMA)
-
-
-def _normalizar_motivo(motivo: object) -> MotivoAnulacionCarnet:
+def _validar_motivo(motivo: object) -> MotivoAnulacionCarnet:
     if isinstance(motivo, MotivoAnulacionCarnet):
         return motivo
-    texto = str(motivo).strip().upper() if isinstance(motivo, str) else ""
-    if not texto:
-        raise MotivoAnulacionRequeridoException(
-            "El motivo de anulación del carnet es obligatorio."
-        )
     try:
-        return MotivoAnulacionCarnet(texto)
-    except ValueError as exc:
+        return MotivoAnulacionCarnet(motivo)
+    except (TypeError, ValueError) as exc:
         raise MotivoAnulacionRequeridoException(
             f"El motivo de anulación '{motivo}' no es válido."
-        ) from exc
-
-
-def _normalizar_estado_academico(estado: object) -> EstadoAcademico:
-    if isinstance(estado, EstadoAcademico):
-        return estado
-    texto = str(estado).strip().upper() if isinstance(estado, str) else ""
-    try:
-        return EstadoAcademico(texto)
-    except ValueError as exc:
-        raise AlumnoNoHabilitadoCarnetException(
-            f"El estado académico '{estado}' no habilita la emisión de carnet."
         ) from exc
 
 
@@ -131,77 +88,6 @@ class CarnetEscolar:
     motivo_anulacion: MotivoAnulacionCarnet | None = None
     detalle_anulacion: str | None = None
 
-    def __post_init__(self) -> None:
-        id_limpio = _validar_texto_no_vacio(self.id, "id")
-        codigo_limpio = _validar_texto_no_vacio(self.codigo_qr, "codigo_qr")
-        if not _es_entero_positivo(self.alumno_id):
-            raise CarnetException(
-                "El identificador del alumno debe ser un entero positivo."
-            )
-        if not _es_entero_positivo(self.emitido_por):
-            raise CarnetException(
-                "El identificador del emisor debe ser un entero positivo."
-            )
-        if not isinstance(self.emitido_en, datetime):
-            raise CarnetException("La fecha de emisión del carnet es obligatoria.")
-
-        estado = self._normalizar_estado(self.estado)
-        motivo = self._normalizar_motivo(self.motivo_anulacion)
-        detalle = self._normalizar_detalle(self.detalle_anulacion)
-
-        if self.anulado_en is not None and not isinstance(self.anulado_en, datetime):
-            raise CarnetException("La fecha de anulación debe ser un datetime válido.")
-
-        if estado == EstadoCarnet.ANULADO:
-            if self.anulado_en is None or motivo is None:
-                raise CarnetException(
-                    "Un carnet anulado requiere fecha y motivo de anulación."
-                )
-        elif self.anulado_en is not None or motivo is not None or detalle is not None:
-            raise CarnetException(
-                "Un carnet activo no puede tener datos de anulación."
-            )
-
-        object.__setattr__(self, "id", id_limpio)
-        object.__setattr__(self, "codigo_qr", codigo_limpio.upper())
-        object.__setattr__(self, "estado", estado)
-        object.__setattr__(self, "motivo_anulacion", motivo)
-        object.__setattr__(self, "detalle_anulacion", detalle)
-
-    @staticmethod
-    def _normalizar_estado(estado: object) -> EstadoCarnet:
-        if isinstance(estado, EstadoCarnet):
-            return estado
-        texto = str(estado).strip().upper() if isinstance(estado, str) else ""
-        try:
-            return EstadoCarnet(texto)
-        except ValueError as exc:
-            raise CarnetException(
-                f"El estado '{estado}' del carnet no es válido."
-            ) from exc
-
-    @staticmethod
-    def _normalizar_motivo(motivo: object) -> MotivoAnulacionCarnet | None:
-        if motivo is None:
-            return None
-        if isinstance(motivo, MotivoAnulacionCarnet):
-            return motivo
-        texto = str(motivo).strip().upper() if isinstance(motivo, str) else ""
-        try:
-            return MotivoAnulacionCarnet(texto)
-        except ValueError as exc:
-            raise CarnetException(
-                f"El motivo de anulación '{motivo}' no es válido."
-            ) from exc
-
-    @staticmethod
-    def _normalizar_detalle(detalle: object) -> str | None:
-        if detalle is None:
-            return None
-        if not isinstance(detalle, str):
-            raise CarnetException("El detalle de anulación debe ser texto.")
-        return detalle.strip() or None
-
 
 @dataclass(frozen=True)
 class ResultadoEmisionCarnet:
@@ -209,16 +95,6 @@ class ResultadoEmisionCarnet:
 
     carnet_nuevo: CarnetEscolar
     carnet_anulado: CarnetEscolar | None
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.carnet_nuevo, CarnetEscolar):
-            raise CarnetException("El carnet nuevo debe ser un CarnetEscolar.")
-        if self.carnet_anulado is not None and not isinstance(
-            self.carnet_anulado, CarnetEscolar
-        ):
-            raise CarnetException(
-                "El carnet anulado debe ser un CarnetEscolar o None."
-            )
 
 
 class ServicioCarnets:
@@ -230,7 +106,7 @@ class ServicioCarnets:
         roles: Sequence[Rol] | None = None,
     ) -> None:
         """Valida que el operador esté activo y tenga permiso de gestión (RN-01)."""
-        if operador is None or not getattr(operador, "activo", False):
+        if not operador.activo:
             raise PermisoCarnetException(
                 "El operador no cuenta con una cuenta activa."
             )
@@ -249,21 +125,11 @@ class ServicioCarnets:
         codigos_existentes: Collection[str] = (),
     ) -> str:
         """Genera un código QR opaco y único para el año lectivo (RN-05)."""
-        if not _es_entero_positivo(anio_lectivo):
-            raise CarnetException("El año lectivo debe ser un entero positivo.")
-        existentes = {
-            str(codigo).strip().upper() for codigo in (codigos_existentes or ())
-        }
-        for _ in range(MAX_INTENTOS_GENERACION_QR):
-            codigo = (
-                f"{PREFIJO_CODIGO_QR}-{anio_lectivo}-"
-                f"{secrets.token_hex(6).upper()}"
-            )
+        existentes = set(codigos_existentes)
+        while True:
+            codigo = f"DSV-{anio_lectivo}-{secrets.token_hex(6).upper()}"
             if codigo not in existentes:
                 return codigo
-        raise CarnetException(
-            "No fue posible generar un código QR único para el carnet."
-        )
 
     @classmethod
     def emitir_carnet(
@@ -280,38 +146,34 @@ class ServicioCarnets:
     ) -> ResultadoEmisionCarnet:
         """Emite un carnet nuevo y anula el activo previo si hay reposición (RN-02 a RN-05)."""
         cls.validar_operador(operador, roles)
-        if not _es_entero_positivo(alumno_id):
-            raise CarnetException(
-                "El identificador del alumno debe ser un entero positivo."
-            )
 
-        estado = _normalizar_estado_academico(estado_alumno)
-        if estado != EstadoAcademico.ACTIVO:
+        if estado_alumno != EstadoAcademico.ACTIVO and estado_alumno != "ACTIVO":
             raise AlumnoNoHabilitadoCarnetException(
-                f"El alumno en estado {estado.value} no puede recibir carnet."
+                "Solo los alumnos en estado ACTIVO pueden recibir un carnet escolar."
             )
 
-        carnets = list(carnets_existentes or ())
-        activos = [
-            carnet
-            for carnet in carnets
-            if carnet.alumno_id == alumno_id
-            and carnet.estado == EstadoCarnet.ACTIVO
-        ]
-        if len(activos) > 1:
-            raise CarnetException(
-                "El alumno tiene más de un carnet activo; "
-                "regularice su estado antes de emitir."
-            )
+        carnets = list(carnets_existentes)
+        carnet_activo = next(
+            (
+                carnet
+                for carnet in carnets
+                if carnet.alumno_id == alumno_id
+                and carnet.estado == EstadoCarnet.ACTIVO
+            ),
+            None,
+        )
 
         carnet_anulado: CarnetEscolar | None = None
-        if activos:
-            motivo = _normalizar_motivo(motivo_reposicion)
+        if carnet_activo is not None:
+            if motivo_reposicion is None:
+                raise MotivoAnulacionRequeridoException(
+                    "La reposición de carnet exige un motivo de anulación."
+                )
             carnet_anulado = replace(
-                activos[0],
+                carnet_activo,
                 estado=EstadoCarnet.ANULADO,
-                anulado_en=_normalizar_fecha_hora(fecha_hora),
-                motivo_anulacion=motivo,
+                anulado_en=fecha_hora,
+                motivo_anulacion=_validar_motivo(motivo_reposicion),
                 detalle_anulacion=detalle_anulacion,
             )
 
@@ -325,7 +187,7 @@ class ServicioCarnets:
             codigo_qr=codigo_qr,
             estado=EstadoCarnet.ACTIVO,
             emitido_por=operador.id,
-            emitido_en=_normalizar_fecha_hora(fecha_hora),
+            emitido_en=fecha_hora,
         )
         return ResultadoEmisionCarnet(
             carnet_nuevo=carnet_nuevo,
@@ -344,17 +206,14 @@ class ServicioCarnets:
     ) -> CarnetEscolar:
         """Anula un carnet activo dejando su trazabilidad completa (RN-04)."""
         cls.validar_operador(operador, roles)
-        if not isinstance(carnet, CarnetEscolar):
-            raise CarnetException("El carnet proporcionado no es válido.")
         if carnet.estado == EstadoCarnet.ANULADO:
             raise CarnetYaAnuladoException("El carnet ya se encuentra anulado.")
 
-        motivo_normalizado = _normalizar_motivo(motivo)
         return replace(
             carnet,
             estado=EstadoCarnet.ANULADO,
-            anulado_en=_normalizar_fecha_hora(fecha_hora),
-            motivo_anulacion=motivo_normalizado,
+            anulado_en=fecha_hora,
+            motivo_anulacion=motivo,
             detalle_anulacion=detalle,
         )
 
@@ -364,13 +223,8 @@ class ServicioCarnets:
         carnets_existentes: Collection[CarnetEscolar],
     ) -> CarnetEscolar:
         """Valida un carnet para el registro de asistencia (RN-06)."""
-        codigo = codigo_qr.strip().upper() if isinstance(codigo_qr, str) else ""
-        if not codigo:
-            raise CarnetNoEncontradoException(
-                "El código QR del carnet es obligatorio."
-            )
-        for carnet in carnets_existentes or ():
-            if carnet.codigo_qr.strip().upper() == codigo:
+        for carnet in carnets_existentes:
+            if carnet.codigo_qr == codigo_qr:
                 if carnet.estado == EstadoCarnet.ANULADO:
                     raise CarnetInactivoOAnuladoException(
                         "El carnet se encuentra anulado y no habilita el ingreso."
