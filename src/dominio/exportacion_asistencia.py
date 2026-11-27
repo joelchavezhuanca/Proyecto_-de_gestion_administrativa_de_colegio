@@ -129,7 +129,9 @@ class FiltroExportacionAsistencia:
         if not isinstance(self.formato, FormatoExportacion):
             raise FiltroExportacionInvalidoException("El formato de exportación no es válido.")
         if self.estado is not None and not isinstance(self.estado, EstadoAsistencia):
-            raise FiltroExportacionInvalidoException("El estado de asistencia del filtro no es válido.")
+            raise FiltroExportacionInvalidoException(
+                "El estado de asistencia del filtro no es válido."
+            )
         if self.alumno_id is not None and (
             isinstance(self.alumno_id, bool)
             or not isinstance(self.alumno_id, int)
@@ -199,6 +201,10 @@ def _indexar_alumnos(alumnos: Mapping[int, Alumno] | Iterable[Alumno]) -> Mappin
     if isinstance(alumnos, Mapping):
         return alumnos
     return {alumno.id: alumno for alumno in alumnos}
+
+
+def _texto_exportable(valor: str, es_tabular: bool) -> str:
+    return sanitizar_celda_tabular(valor) if es_tabular else valor
 
 
 def _resolver_usuario_responsable(
@@ -288,20 +294,19 @@ class ServicioExportacionAsistencia:
                 apellidos_nombres.casefold(),
             )
 
-            sanitizar = sanitizar_celda_tabular if es_tabular else (lambda texto: texto)
             fila = FilaExportacionAsistencia(
-                codigo_alumno=sanitizar(alumno.codigo),
-                dni=sanitizar(alumno.dni),
-                apellidos_nombres=sanitizar(apellidos_nombres),
-                nivel=sanitizar(nivel),
-                grado=sanitizar(grado),
-                seccion=sanitizar(seccion),
+                codigo_alumno=_texto_exportable(alumno.codigo, es_tabular),
+                dni=_texto_exportable(alumno.dni, es_tabular),
+                apellidos_nombres=_texto_exportable(apellidos_nombres, es_tabular),
+                nivel=_texto_exportable(nivel, es_tabular),
+                grado=_texto_exportable(grado, es_tabular),
+                seccion=_texto_exportable(seccion, es_tabular),
                 fecha_escolar=asistencia.fecha_escolar,
                 hora_efectiva=asistencia.hora_efectiva,
                 estado=asistencia.estado,
                 minutos_tardanza=asistencia.minutos_tardanza,
                 metodo=asistencia.metodo,
-                usuario_responsable=sanitizar(usuario_responsable),
+                usuario_responsable=_texto_exportable(usuario_responsable, es_tabular),
             )
             registros_ordenables.append((clave_orden, fila))
 
