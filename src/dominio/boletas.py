@@ -211,6 +211,51 @@ def _indexar_promedios(
     return notas
 
 
+def _cursos_vigentes(
+    ficha: FichaMatricula,
+    periodo: PeriodoAcademico,
+    cursos_obligatorios: Sequence[Curso],
+) -> list[Curso]:
+    """Valida año lectivo de período y cursos; devuelve los cursos activos de la malla."""
+    if periodo.anio_lectivo and periodo.anio_lectivo != ficha.anio_lectivo:
+        raise BoletaException("El año lectivo del período no coincide con el de la matrícula.")
+    cursos = [curso for curso in cursos_obligatorios if curso.activo]
+    if not cursos:
+        raise BoletaException("Se requiere al menos un curso obligatorio activo.")
+    for curso in cursos:
+        if curso.anio_lectivo != ficha.anio_lectivo:
+            raise BoletaException(
+                f"El curso {curso.codigo} no pertenece al año lectivo {ficha.anio_lectivo}."
+            )
+    return cursos
+
+
+def _construir_linea(curso: Curso, nota: Decimal | None) -> LineaCursoBoleta:
+    nota_redondeada = _redondear(nota) if nota is not None else None
+    return LineaCursoBoleta(
+        curso_id=curso.id,
+        codigo_curso=curso.codigo,
+        nombre_curso=curso.nombre,
+        nota=nota_redondeada,
+        escala_literal=(
+            ServicioCalificaciones.convertir_a_literal(nota_redondeada)
+            if nota_redondeada is not None
+            else None
+        ),
+    )
+
+
+def _calcular_promedio_general(
+    lineas: Sequence[LineaCursoBoleta],
+) -> tuple[Decimal | None, EscalaLiteral | None]:
+    """Promedio aritmético de los cursos calificados (ROUND_HALF_UP) y su literal."""
+    calificadas = [linea.nota for linea in lineas if linea.nota is not None]
+    if not calificadas:
+        return None, None
+    promedio = _redondear(sum(calificadas, Decimal("0")) / Decimal(len(calificadas)))
+    return promedio, ServicioCalificaciones.convertir_a_literal(promedio)
+
+
 # ---------------------------------------------------------------------------
 # Servicio de dominio
 # ---------------------------------------------------------------------------
@@ -243,19 +288,7 @@ class ServicioBoletas:
         codigos_usados: set[str],
     ) -> BoletaCalificaciones:
         """Arma la boleta sin efectos secundarios (la auditoría se registra aparte)."""
-        if periodo.anio_lectivo and periodo.anio_lectivo != ficha.anio_lectivo:
-            raise BoletaException(
-                "El año lectivo del período no coincide con el de la matrícula."
-            )
-        cursos = [curso for curso in cursos_obligatorios if curso.activo]
-        if not cursos:
-            raise BoletaException("Se requiere al menos un curso obligatorio activo.")
-        for curso in cursos:
-            if curso.anio_lectivo != ficha.anio_lectivo:
-                raise BoletaException(
-                    f"El curso {curso.codigo} no pertenece al año lectivo {ficha.anio_lectivo}."
-                )
-
+        cursos = _cursos_vigentes(ficha, periodo, cursos_obligatorios)
         notas = _indexar_promedios(ficha, periodo, promedios_periodo)
         es_oficial = periodo.cerrado
         if es_oficial:
@@ -266,31 +299,8 @@ class ServicioBoletas:
                     f"obligatorios: {', '.join(faltantes)}."
                 )
 
-        lineas: list[LineaCursoBoleta] = []
-        for curso in cursos:
-            nota = notas.get(curso.id)
-            lineas.append(
-                LineaCursoBoleta(
-                    curso_id=curso.id,
-                    codigo_curso=curso.codigo,
-                    nombre_curso=curso.nombre,
-                    nota=_redondear(nota) if nota is not None else None,
-                    escala_literal=(
-                        ServicioCalificaciones.convertir_a_literal(nota)
-                        if nota is not None
-                        else None
-                    ),
-                )
-            )
-
-        calificadas = [linea.nota for linea in lineas if linea.nota is not None]
-        promedio_general: Decimal | None = None
-        escala_general: EscalaLiteral | None = None
-        if calificadas:
-            promedio_general = _redondear(
-                sum(calificadas, Decimal("0")) / Decimal(len(calificadas))
-            )
-            escala_general = ServicioCalificaciones.convertir_a_literal(promedio_general)
+        lineas = tuple(_construir_linea(curso, notas.get(curso.id)) for curso in cursos)
+        promedio_general, escala_general = _calcular_promedio_general(lineas)
 
         return BoletaCalificaciones(
             id=f"bol-{uuid.uuid4().hex[:12]}",
@@ -306,7 +316,7 @@ class ServicioBoletas:
             seccion=ficha.seccion,
             periodo_id=periodo.id,
             periodo_nombre=periodo.nombre,
-            lineas=tuple(lineas),
+            lineas=lineas,
             promedio_general=promedio_general,
             escala_literal_general=escala_general,
             resumen_asistencia=_resumir_asistencia(
