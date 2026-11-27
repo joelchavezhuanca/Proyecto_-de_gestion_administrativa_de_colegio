@@ -182,9 +182,13 @@ def sembrar_admin_inicial(
 
 def inicializar_bd(engine: Engine) -> None:
     """Crea el esquema completo del DER v2 y siembra seguridad base de forma idempotente."""
+    from src.infraestructura.semilla_demo import debe_sembrar_demo, sembrar_datos_demo
+
     Base.metadata.create_all(bind=engine)
     session_factory = crear_session_factory(engine)
     with session_factory() as session:
         sembrar_seguridad_base(session)
         sembrar_admin_inicial(session)
+        if debe_sembrar_demo():
+            sembrar_datos_demo(session)
         session.commit()
