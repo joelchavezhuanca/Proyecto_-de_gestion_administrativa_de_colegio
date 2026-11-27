@@ -72,6 +72,14 @@ def _es_entero_positivo(valor: object) -> bool:
     return isinstance(valor, int) and not isinstance(valor, bool) and valor > 0
 
 
+def _validar_texto_no_vacio(valor: object, campo: str) -> str:
+    if not isinstance(valor, str) or not valor.strip():
+        raise CarnetException(
+            f"El campo '{campo}' es obligatorio y no puede estar vacío."
+        )
+    return valor.strip()
+
+
 def _normalizar_fecha_hora(fecha_hora: datetime) -> datetime:
     """Normaliza una marca temporal al huso institucional America/Lima (UTC-5)."""
     if not isinstance(fecha_hora, datetime):
@@ -124,14 +132,12 @@ class CarnetEscolar:
     detalle_anulacion: str | None = None
 
     def __post_init__(self) -> None:
-        if not isinstance(self.id, str) or not self.id.strip():
-            raise CarnetException("El identificador del carnet es obligatorio.")
+        id_limpio = _validar_texto_no_vacio(self.id, "id")
+        codigo_limpio = _validar_texto_no_vacio(self.codigo_qr, "codigo_qr")
         if not _es_entero_positivo(self.alumno_id):
             raise CarnetException(
                 "El identificador del alumno debe ser un entero positivo."
             )
-        if not isinstance(self.codigo_qr, str) or not self.codigo_qr.strip():
-            raise CarnetException("El código QR del carnet es obligatorio.")
         if not _es_entero_positivo(self.emitido_por):
             raise CarnetException(
                 "El identificador del emisor debe ser un entero positivo."
@@ -156,8 +162,8 @@ class CarnetEscolar:
                 "Un carnet activo no puede tener datos de anulación."
             )
 
-        object.__setattr__(self, "id", self.id.strip())
-        object.__setattr__(self, "codigo_qr", self.codigo_qr.strip().upper())
+        object.__setattr__(self, "id", id_limpio)
+        object.__setattr__(self, "codigo_qr", codigo_limpio.upper())
         object.__setattr__(self, "estado", estado)
         object.__setattr__(self, "motivo_anulacion", motivo)
         object.__setattr__(self, "detalle_anulacion", detalle)
