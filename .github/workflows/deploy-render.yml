@@ -1,0 +1,23 @@
+name: Deploy a Producción (Render)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy-render:
+    name: Disparar despliegue en Render.com
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar Deploy Hook de Render
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "Aviso: el secreto RENDER_DEPLOY_HOOK_URL aún no está configurado en Settings → Secrets → Actions."
+            echo "Se omite el despliegue automático sin fallar el workflow."
+            exit 0
+          fi
+          curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL" > /dev/null
+          echo "Despliegue en Render disparado correctamente."

@@ -13,6 +13,7 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin2026!}
       ADMIN_NOMBRE_COMPLETO: ${ADMIN_NOMBRE_COMPLETO:-Administrador Colegio Domingo Savio}
       FLASK_ENV: ${FLASK_ENV:-development}
+      SEMBRAR_DATOS_DEMO: ${SEMBRAR_DATOS_DEMO:-false}
     volumes:
       - ./datos_locales:/app/data
 
