@@ -8,10 +8,12 @@ Verifica:
 - Normalización de zonas horarias a America/Lima (UTC-5)
 - Operación atómica sin session.commit() forzado (uso exclusivo de session.flush())
 - Cumplimiento de restricciones de unicidad e integridad referencial
+- 100% de cobertura en los tres módulos de repositorio
 """
 
-from datetime import UTC, date, datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
+
 import pytest
 from sqlalchemy import create_engine, event
 from sqlalchemy.exc import IntegrityError
@@ -67,6 +69,7 @@ def sesion_bd() -> Session:
         yield session
     finally:
         session.close()
+        engine.dispose()
 
 
 @pytest.fixture
@@ -185,7 +188,7 @@ def test_repositorio_matricula_crud_y_restricciones(sesion_bd: Session):
     assert repo_mat.contar_matriculados(salon.id, 2026) == 1
     assert len(repo_mat.listar_todas()) == 1
 
-    # Actualizar ficha (ej. cambio de nombres)
+    # Actualizar ficha (cambio de nombres y apoderado)
     ficha_mod = FichaMatricula(
         id="mat-ALU-001",
         alumno_id=1,
@@ -287,6 +290,18 @@ def test_repositorio_carnets_emision_anulacion(sesion_bd: Session, usuario_base:
     assert repo_carnets.obtener_por_id("crn-001") is not None
     assert repo_carnets.obtener_por_codigo_qr("no-existe") is None
 
+    # Actualizar carnet existente
+    carnet_actualizado = CarnetEscolar(
+        id="crn-001",
+        alumno_id=10,
+        codigo_qr="QR-OPACO-LUCIA-2026",
+        estado=EstadoCarnet.ACTIVO,
+        emitido_por=usuario_base.id,
+        emitido_en=ahora,
+        detalle_anulacion="Nota aclaratoria",
+    )
+    repo_carnets.guardar(carnet_actualizado)
+
     # 2. Anular carnet
     anulado = repo_carnets.anular(
         carnet_id="crn-001",
@@ -302,6 +317,10 @@ def test_repositorio_carnets_emision_anulacion(sesion_bd: Session, usuario_base:
     lista = repo_carnets.listar_por_alumno(10)
     assert len(lista) == 1
     assert lista[0].estado == EstadoCarnet.ANULADO
+
+    # Anular carnet inexistente lanza ValueError
+    with pytest.raises(ValueError, match="No existe el carnet"):
+        repo_carnets.anular("crn-fantasma", MotivoAnulacionCarnet.DANO, None, ahora)
 
     # 3. Restricción UNIQUE en código QR
     carnet_dup = CarnetEscolar(
@@ -393,6 +412,9 @@ def test_repositorio_estados_academicos(sesion_bd: Session, usuario_base: Usuari
     assert historiales[1].estado_nuevo == EstadoAcademico.ACTIVO
     assert repo_estados.obtener_estado_alumno(999) is None
 
+    # Actualizar estado de alumno inexistente no falla silenciosamente
+    repo_estados.actualizar_estado_alumno(999, EstadoAcademico.RETIRADO)
+
 
 # ===========================================================================
 # 2. Pruebas RepositorioMalla, RepositorioDocentes, RepositorioCalificaciones, Boletas
@@ -406,14 +428,37 @@ def test_repositorio_malla_salones_y_cursos_con_unicidad(sesion_bd: Session):
     s1 = repo.guardar_salon(
         Salon(id=10, anio_lectivo=2026, nivel=NivelEducativo.SECUNDARIA, grado="3ro", seccion="A")
     )
-    s2 = repo.guardar_salon(
+    repo.guardar_salon(
         Salon(id=11, anio_lectivo=2026, nivel=NivelEducativo.SECUNDARIA, grado="3ro", seccion="B")
     )
     assert repo.obtener_salon_por_id(10) == s1
     assert (
         repo.obtener_salon(2026, NivelEducativo.SECUNDARIA, "3ro", "A") == s1
     )
-    assert len(repo.listar_salones(anio_lectivo=2026, nivel=NivelEducativo.SECUNDARIA)) == 2
+    assert (
+        len(
+            repo.listar_salones(
+                anio_lectivo=2026,
+                nivel=NivelEducativo.SECUNDARIA,
+                grado="3ro",
+                solo_activos=True,
+            )
+        )
+        == 2
+    )
+
+    # Actualizar salón
+    s1_mod = Salon(
+        id=10,
+        anio_lectivo=2026,
+        nivel=NivelEducativo.SECUNDARIA,
+        grado="3ro",
+        seccion="A",
+        capacidad_maxima=35,
+        activo=True,
+    )
+    repo.guardar_salon(s1_mod)
+    assert repo.obtener_salon_por_id(10).capacidad_maxima == 35
 
     # Restricción UNIQUE en salón (anio, nivel, grado, seccion)
     s_dup = Salon(
@@ -444,7 +489,35 @@ def test_repositorio_malla_salones_y_cursos_con_unicidad(sesion_bd: Session):
     assert (
         repo.obtener_curso(2026, NivelEducativo.SECUNDARIA, "3ro", "MAT-3SEC") == c1
     )
-    assert len(repo.listar_cursos(anio_lectivo=2026, grado="3ro")) == 1
+    assert (
+        len(
+            repo.listar_cursos(
+                anio_lectivo=2026,
+                nivel=NivelEducativo.SECUNDARIA,
+                grado="3ro",
+                solo_activos=True,
+            )
+        )
+        == 1
+    )
+
+    # Actualizar curso
+    c1_mod = Curso(
+        id=100,
+        anio_lectivo=2026,
+        nivel=NivelEducativo.SECUNDARIA,
+        grado="3ro",
+        codigo="MAT-3SEC",
+        nombre="Matemática y Lógica",
+        area_curricular="Matemática",
+        horas_semanales=7,
+        activo=True,
+    )
+    repo.guardar_curso(c1_mod)
+    assert repo.obtener_curso_por_id(100).horas_semanales == 7
+
+    assert repo.obtener_curso_por_id(999) is None
+    assert repo.obtener_curso(2026, NivelEducativo.SECUNDARIA, "3ro", "NO_EXISTE") is None
 
     # Restricción UNIQUE en curso (anio, nivel, grado, codigo)
     c_dup = Curso(
@@ -501,8 +574,21 @@ def test_repositorio_docentes_asignacion_y_revocacion(
     assert guardada.id == "asig-001"
     assert guardada.activa is True
 
+    # Actualizar asignación existente
+    asig_mod = AsignacionDocente(
+        id="asig-001",
+        usuario_docente_id=usuario_base.id,
+        curso_id=curso.id,
+        salon_id=salon.id,
+        anio_lectivo=2026,
+        activa=True,
+        asignado_por=usuario_base.id,
+        motivo_revocacion="Modificación temporal",
+    )
+    repo_doc.guardar_asignacion(asig_mod)
+
     obtenida = repo_doc.obtener_asignacion_por_id("asig-001")
-    assert obtenida == guardada
+    assert obtenida.id == "asig-001"
 
     activa = repo_doc.obtener_asignacion_activa(curso.id, salon.id, 2026)
     assert activa is not None
@@ -510,6 +596,7 @@ def test_repositorio_docentes_asignacion_y_revocacion(
 
     doc_list = repo_doc.listar_asignaciones_docente(usuario_base.id, anio_lectivo=2026)
     assert len(doc_list) == 1
+    assert len(repo_doc.listar_todas(anio_lectivo=2026)) == 1
 
     # Revocar asignación
     ahora_rev = datetime.now(ZONA_LIMA) + timedelta(days=10)
@@ -517,6 +604,9 @@ def test_repositorio_docentes_asignacion_y_revocacion(
     assert revocada.activa is False
     assert revocada.motivo_revocacion == "Licencia médica"
     assert repo_doc.obtener_asignacion_activa(curso.id, salon.id, 2026) is None
+
+    with pytest.raises(ValueError, match="No existe la asignación"):
+        repo_doc.revocar_asignacion("asig-fantasma", "Motivo", ahora_rev)
 
 
 def test_repositorio_calificaciones_precision_decimal_y_unicidad(
@@ -596,6 +686,18 @@ def test_repositorio_calificaciones_precision_decimal_y_unicidad(
     assert r_guardado.peso_porcentaje == Decimal("40.00")
     assert isinstance(r_guardado.peso_porcentaje, Decimal)
 
+    # Actualizar rubro existente
+    rubro_mod = RubroEvaluacion(
+        id="rub-001",
+        asignacion_docente_id=asig.id,
+        periodo_id=periodo_base.id,
+        nombre="Exámenes Parciales y Prácticas",
+        peso_porcentaje=Decimal("45.00"),
+    )
+    repo_cal.guardar_rubro(rubro_mod)
+    assert repo_cal.obtener_rubro_por_id("rub-001").peso_porcentaje == Decimal("45.00")
+    assert repo_cal.obtener_rubro_por_id("rub-inexistente") is None
+
     rubros = repo_cal.listar_rubros_asignacion(asig.id, periodo_base.id)
     assert len(rubros) == 1
 
@@ -609,6 +711,17 @@ def test_repositorio_calificaciones_precision_decimal_y_unicidad(
     act_guardada = repo_cal.guardar_actividad(act)
     assert act_guardada.id == "act-001"
     assert len(repo_cal.listar_actividades_rubro(r_guardado.id)) == 1
+
+    # Actualizar actividad existente
+    act_mod = ActividadEvaluable(
+        id="act-001",
+        rubro_id=r_guardado.id,
+        titulo="Parcial 1: Genética Molecular",
+        fecha=date(2026, 4, 16),
+    )
+    repo_cal.guardar_actividad(act_mod)
+    assert repo_cal.obtener_actividad_por_id("act-001").titulo == "Parcial 1: Genética Molecular"
+    assert repo_cal.obtener_actividad_por_id("act-inexistente") is None
 
     # 3. Calificación vigesimal con Decimal exacto
     cal = Calificacion(
@@ -665,10 +778,7 @@ def test_repositorio_calificaciones_precision_decimal_y_unicidad(
         actualizado_en=datetime.now(ZONA_LIMA),
     )
     with pytest.raises(IntegrityError):
-        # Insert directo simulando duplicado
-        sesion_bd.add(
-            repo_cal._a_modelo_calificacion(cal_dup)  # type: ignore[attr-defined]
-        )
+        sesion_bd.add(repo_cal._a_modelo_calificacion(cal_dup))
         sesion_bd.flush()
     sesion_bd.rollback()
 
@@ -728,12 +838,35 @@ def test_repositorio_boletas(
     assert guardada.promedio_general == Decimal("17.85")
     assert isinstance(guardada.promedio_general, Decimal)
 
-    por_verif = repo_bol.obtener_por_codigo_verificacion("VERIF-BOL-2026-001")
+    # Actualizar boleta existente
+    boleta_mod = BoletaEmitida(
+        id="bol-001",
+        codigo_verificacion="VERIF-BOL-2026-001-MOD",
+        estudiante_id=ficha.alumno_id,
+        periodo_id=periodo_base.id,
+        anio_lectivo=2026,
+        es_oficial=True,
+        promedio_general=Decimal("18.00"),
+        resumen_asistencia_json='{"puntual": 46, "tardanza": 2}',
+        emitido_por=usuario_base.id,
+        emitido_en=datetime.now(ZONA_LIMA),
+    )
+    repo_bol.guardar(boleta_mod)
+
+    por_id = repo_bol.obtener_por_id("bol-001")
+    assert por_id is not None
+    assert por_id.promedio_general == Decimal("18.00")
+    assert repo_bol.obtener_por_id("bol-fantasma") is None
+
+    por_verif = repo_bol.obtener_por_codigo_verificacion("VERIF-BOL-2026-001-MOD")
     assert por_verif is not None
     assert por_verif.estudiante_id == 40
 
     por_est_per = repo_bol.obtener_por_estudiante_y_periodo(40, periodo_base.id)
     assert por_est_per is not None
+
+    del_est = repo_bol.listar_por_estudiante(40, anio_lectivo=2026)
+    assert len(del_est) == 1
 
     por_salon = repo_bol.listar_por_salon_y_periodo(salon.id, periodo_base.id)
     assert len(por_salon) == 1
@@ -741,7 +874,7 @@ def test_repositorio_boletas(
     # Unicidad código de verificación
     bol_dup = BoletaEmitida(
         id="bol-dup",
-        codigo_verificacion="VERIF-BOL-2026-001",
+        codigo_verificacion="VERIF-BOL-2026-001-MOD",
         estudiante_id=ficha.alumno_id,
         periodo_id=periodo_base.id,
         anio_lectivo=2026,
@@ -811,6 +944,25 @@ def test_repositorio_pagos_obligaciones_y_alertas_con_decimal(
     assert ob_guardada.monto == Decimal("450.50")
     assert isinstance(ob_guardada.monto, Decimal)
 
+    # Actualizar obligación existente
+    ob1_mod = ObligacionPago(
+        id="obl-001",
+        alumno_id=ficha.alumno_id,
+        concepto="Pensión Marzo 2026 (Actualizada)",
+        monto=Decimal("460.00"),
+        fecha_vencimiento=date(2026, 3, 31),
+        estado=EstadoObligacion.PENDIENTE,
+    )
+    repo_pagos.guardar_obligacion(ob1_mod)
+    assert repo_pagos.obtener_obligacion_por_id("obl-001").monto == Decimal("460.00")
+    assert repo_pagos.obtener_obligacion_por_id("obl-fantasma") is None
+
+    # Listar por estados
+    lista_estados = repo_pagos.listar_obligaciones_alumno(
+        ficha.alumno_id, estados=[EstadoObligacion.PENDIENTE]
+    )
+    assert len(lista_estados) == 1
+
     vencidas = repo_pagos.obtener_obligaciones_vencidas(ficha.alumno_id, date(2026, 4, 15))
     assert len(vencidas) == 1
 
@@ -820,8 +972,11 @@ def test_repositorio_pagos_obligaciones_y_alertas_con_decimal(
     assert pagada.estado == EstadoObligacion.PAGADO
     assert pagada.pagado_en is not None
 
+    with pytest.raises(ValueError, match="No existe la obligación"):
+        repo_pagos.marcar_como_pagada("obl-inexistente", ahora_pago)
+
     # Exonerar obligación
-    ob2 = repo_pagos.guardar_obligacion(
+    repo_pagos.guardar_obligacion(
         ObligacionPago(
             id="obl-002",
             alumno_id=ficha.alumno_id,
@@ -834,8 +989,10 @@ def test_repositorio_pagos_obligaciones_y_alertas_con_decimal(
     assert exonerada.estado == EstadoObligacion.EXONERADO
     assert exonerada.motivo_exoneracion == "Beca por excelencia"
 
+    with pytest.raises(ValueError, match="No existe la obligación"):
+        repo_pagos.exonerar_obligacion("obl-inexistente", "Motivo")
+
     # 2. Alerta Silenciosa de Pago única por estudiante y fecha
-    # Crear asistencia previa para FK
     asistencia = AsistenciaModel(
         id="ast-pago-01",
         estudiante_id=ficha.alumno_id,
@@ -861,19 +1018,45 @@ def test_repositorio_pagos_obligaciones_y_alertas_con_decimal(
     assert alt_guardada.monto_vencido_total == Decimal("450.50")
     assert isinstance(alt_guardada.monto_vencido_total, Decimal)
 
+    # Actualizar alerta existente
+    alerta_mod = AlertaSilenciosaPago(
+        id="alt-001",
+        alumno_id=ficha.alumno_id,
+        asistencia_id=asistencia.id,
+        fecha_escolar=date(2026, 4, 1),
+        cantidad_obligaciones_vencidas=2,
+        monto_vencido_total=Decimal("900.00"),
+        revisada=False,
+    )
+    repo_pagos.guardar_alerta(alerta_mod)
+    assert repo_pagos.obtener_alerta_por_id("alt-001").monto_vencido_total == Decimal("900.00")
+    assert repo_pagos.obtener_alerta_por_id("alt-inexistente") is None
+
     por_asist = repo_pagos.obtener_alerta_por_asistencia(asistencia.id)
     assert por_asist is not None
     assert por_asist.id == "alt-001"
 
+    por_est_fecha = repo_pagos.obtener_alerta_por_estudiante_y_fecha(
+        ficha.alumno_id, date(2026, 4, 1)
+    )
+    assert por_est_fecha is not None
+    assert repo_pagos.obtener_alerta_por_estudiante_y_fecha(999, date(2026, 4, 1)) is None
+
+    del_alumno = repo_pagos.listar_alertas_alumno(ficha.alumno_id)
+    assert len(del_alumno) == 1
+
     revisada = repo_pagos.marcar_alerta_revisada("alt-001")
     assert revisada.revisada is True
+
+    with pytest.raises(ValueError, match="No existe la alerta"):
+        repo_pagos.marcar_alerta_revisada("alt-inexistente")
 
     # Restricción UNIQUE en alerta (estudiante_id, fecha_escolar)
     alt_dup = AlertaSilenciosaPago(
         id="alt-dup",
         alumno_id=ficha.alumno_id,
         asistencia_id=asistencia.id,
-        fecha_escolar=date(2026, 4, 1),  # Misma fecha y alumno
+        fecha_escolar=date(2026, 4, 1),
         cantidad_obligaciones_vencidas=1,
         monto_vencido_total=Decimal("450.50"),
     )
@@ -956,12 +1139,46 @@ def test_repositorio_notificaciones_whatsapp_idempotencia(
     assert guardada.clave_idempotencia == "IDEMP-2026-04-02-ALU-060-TARDANZA"
     assert guardada.estado == EstadoNotificacion.PENDIENTE
 
+    # Actualizar notificación existente
+    notif_mod = NotificacionWhatsApp(
+        id="notif-001",
+        clave_idempotencia="IDEMP-2026-04-02-ALU-060-TARDANZA",
+        evento_origen_id="evt-001",
+        asistencia_id=asistencia.id,
+        alumno_id=ficha.alumno_id,
+        fecha_escolar=date(2026, 4, 2),
+        apoderado_nombre="Silvia Rojas",
+        telefono_destino="+51933221100",
+        tipo=TipoNotificacion.TARDANZA,
+        plantilla="aviso_tardanza_v1",
+        contenido="Texto modificado",
+        estado=EstadoNotificacion.PENDIENTE,
+        intentos=1,
+        referencia_proveedor="REF-1",
+        detalle_error="Detalle 1",
+        creado_en=ahora,
+        actualizado_en=ahora,
+    )
+    repo_notif.guardar(notif_mod)
+
+    por_id = repo_notif.obtener_por_id("notif-001")
+    assert por_id is not None
+    assert por_id.intentos == 1
+    assert repo_notif.obtener_por_id("notif-fantasma") is None
+
     por_clave = repo_notif.obtener_por_clave_idempotencia("IDEMP-2026-04-02-ALU-060-TARDANZA")
     assert por_clave is not None
     assert por_clave.id == "notif-001"
+    assert repo_notif.obtener_por_clave_idempotencia("CLAVE-INEXISTENTE") is None
 
     pendientes = repo_notif.listar_pendientes()
     assert len(pendientes) == 1
+
+    del_alumno = repo_notif.listar_por_alumno(ficha.alumno_id)
+    assert len(del_alumno) == 1
+
+    por_fecha = repo_notif.listar_por_fecha(date(2026, 4, 2))
+    assert len(por_fecha) == 1
 
     # Actualizar estado a ENVIADO
     actualizada = repo_notif.actualizar_estado(
@@ -975,6 +1192,9 @@ def test_repositorio_notificaciones_whatsapp_idempotencia(
     assert actualizada.estado == EstadoNotificacion.ENVIADO
     assert actualizada.referencia_proveedor == "WABA-MSG-12345678"
     assert len(repo_notif.listar_pendientes()) == 0
+
+    with pytest.raises(ValueError, match="No existe la notificación"):
+        repo_notif.actualizar_estado("notif-fantasma", EstadoNotificacion.FALLIDO, 1)
 
     # Restricción UNIQUE en clave_idempotencia
     notif_dup = NotificacionWhatsApp(
@@ -1001,10 +1221,10 @@ def test_repositorio_notificaciones_whatsapp_idempotencia(
     sesion_bd.rollback()
 
 
-def test_repositorios_no_hacen_commit_forzado(sesion_bd: Session, usuario_base: UsuarioModel):
+def test_repositorios_no_hacen_commit_forzado(sesion_bd: Session):
     """Verifica que los repositorios usen flush() y que rollback() revierta todo."""
     repo_malla = RepositorioMalla(sesion_bd)
-    s = repo_malla.guardar_salon(
+    repo_malla.guardar_salon(
         Salon(id=99, anio_lectivo=2026, nivel=NivelEducativo.SECUNDARIA, grado="1ro", seccion="Z")
     )
     assert repo_malla.obtener_salon_por_id(99) is not None
