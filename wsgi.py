@@ -38,6 +38,3 @@ def crear_app_produccion() -> Flask:
             "SESSION_FACTORY": crear_session_factory(motor),
         }
     )
-
-
-app: Flask | None = crear_app_produccion() if os.environ.get("SECRET_KEY") else None
