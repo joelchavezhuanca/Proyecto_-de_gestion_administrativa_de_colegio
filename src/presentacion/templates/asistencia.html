@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% from "_macros.html" import chip_estado, icono %}
+
+{% block titulo %}Registro de asistencia{% endblock %}
+{% block eyebrow %}Asistencia diaria{% endblock %}
+{% block encabezado %}Registro de asistencia{% endblock %}
+{% block subtitulo %}<p class="page-subtitle">La hora oficial la fija el servidor (America/Lima).</p>{% endblock %}
+
+{% block contenido %}
+<div class="grid-dos-amplio">
+  <section class="card registro-unificado" aria-labelledby="registro-titulo">
+    <div class="card-head">
+      <h2 id="registro-titulo">{{ icono('asistencia') }} Registro unificado</h2>
+    </div>
+
+    <form class="form" method="post" action="{{ url_for('asistencia.registrar_asistencia') }}"
+          data-registro-asistencia>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <fieldset class="field">
+        <legend>Método de registro</legend>
+        <div class="radio-cards radio-cards-tres">
+          {% for metodo in metodos %}
+          <label class="radio-card">
+            <input type="radio" name="metodo" value="{{ metodo.value }}" {% if loop.first %}checked{% endif %}>
+            <span>
+              {% if metodo.value == 'CARNET' %}Carnet (QR / código)
+              {% elif metodo.value == 'MANUAL_DNI' %}DNI manual
+              {% else %}Búsqueda por nombre o código{% endif %}
+            </span>
+          </label>
+          {% endfor %}
+        </div>
+      </fieldset>
+
+      <div class="field field-grande">
+        <label for="valor-registro">Código, DNI o criterio de búsqueda</label>
+        <input id="valor-registro" class="registro-input" name="valor" type="text" required
+               autocomplete="off" autofocus maxlength="120">
+      </div>
+
+      <div class="field">
+        <label for="motivo-correccion">Motivo de corrección <span class="opcional">(solo si el alumno figura como ausente)</span></label>
+        <input id="motivo-correccion" name="motivo_correccion" type="text" maxlength="250">
+      </div>
+
+      <button class="btn btn-primario btn-bloque" type="submit">Registrar asistencia</button>
+    </form>
+
+    <div class="resultado-detalle" data-resultado-registro aria-live="polite" hidden></div>
+  </section>
+
+  {% if tiene_permiso('CONSULTAR_HISTORIAL_ASISTENCIA') %}
+  <section class="card filtros-card" aria-labelledby="historial-titulo">
+    <div class="card-head">
+      <h2 id="historial-titulo">Historial de modificaciones</h2>
+    </div>
+    <form class="form filtros-grid" method="get" action="{{ url_for('asistencia.historial_asistencia') }}">
+      <div class="field">
+        <label for="h-desde">Desde</label>
+        <input id="h-desde" name="fecha_desde" type="date" value="{{ filtros.get('fecha_desde', '') }}">
+      </div>
+      <div class="field">
+        <label for="h-hasta">Hasta</label>
+        <input id="h-hasta" name="fecha_hasta" type="date" value="{{ filtros.get('fecha_hasta', '') }}">
+      </div>
+      <div class="field">
+        <label for="h-alumno">ID de alumno</label>
+        <input id="h-alumno" name="alumno_id" type="number" min="1" value="{{ filtros.get('alumno_id', '') }}">
+      </div>
+      <div class="filtros-actions">
+        <button class="btn btn-secundario" type="submit">Consultar</button>
+      </div>
+    </form>
+  </section>
+  {% endif %}
+</div>
+
+{% if historial is not none %}
+<section class="card" aria-labelledby="tabla-historial">
+  <div class="card-head"><h2 id="tabla-historial">Correcciones registradas</h2></div>
+  {% if historial %}
+  <div class="tabla-scroll">
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th scope="col">Fecha</th>
+          <th scope="col">Alumno</th>
+          <th scope="col">Estado anterior</th>
+          <th scope="col">Estado actual</th>
+          <th scope="col">Hora</th>
+          <th scope="col">Motivo</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for registro in historial %}
+        <tr>
+          <td>{{ registro.fecha_escolar|fecha_corta }}</td>
+          <td class="mono">{{ registro.alumno_id }}</td>
+          <td>{% if registro.estado_anterior %}{{ chip_estado(registro.estado_anterior) }}{% else %}—{% endif %}</td>
+          <td>{{ chip_estado(registro.estado) }}</td>
+          <td>{{ registro.hora_efectiva|hora_corta }}</td>
+          <td class="celda-motivo">{{ registro.motivo_correccion or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty-state">No hay modificaciones para los filtros seleccionados.</p>
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/asistencia.js') }}" defer></script>
+{% endblock %}

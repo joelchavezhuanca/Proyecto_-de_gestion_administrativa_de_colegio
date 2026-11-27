@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% from "_macros.html" import chip_estado, icono %}
+
+{% block titulo %}Dashboard de aforo{% endblock %}
+{% block eyebrow %}Asistencia en tiempo real{% endblock %}
+{% block encabezado %}Dashboard de aforo{% endblock %}
+{% block subtitulo %}
+  {% if metricas %}
+  <p class="page-subtitle">
+    {{ metricas.fecha_escolar|fecha_corta }} · consulta {{ metricas.hora_consulta|hora_corta }} ·
+    cierre oficial {{ metricas.hora_cierre_oficial|hora_corta }}
+  </p>
+  {% endif %}
+{% endblock %}
+
+{% block contenido %}
+<section class="card filtros-card" aria-label="Filtros del dashboard">
+  <form class="form filtros-grid" method="get" action="{{ url_for('asistencia.aforo') }}" data-auto-filtro>
+    <div class="field">
+      <label for="f-fecha">Fecha</label>
+      <input id="f-fecha" name="fecha" type="date" value="{{ filtros.get('fecha', '') }}">
+    </div>
+    <div class="field">
+      <label for="f-nivel">Nivel</label>
+      <select id="f-nivel" name="nivel">
+        <option value="">Todos</option>
+        {% for nivel in ['Primaria', 'Secundaria'] %}
+        <option value="{{ nivel }}" {% if filtros.get('nivel') == nivel %}selected{% endif %}>{{ nivel }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="f-grado">Grado</label>
+      <input id="f-grado" name="grado" type="text" maxlength="10" placeholder="3ro" value="{{ filtros.get('grado', '') }}">
+    </div>
+    <div class="field">
+      <label for="f-seccion">Sección</label>
+      <input id="f-seccion" name="seccion" type="text" maxlength="5" placeholder="A" value="{{ filtros.get('seccion', '') }}">
+    </div>
+    <div class="filtros-actions">
+      <button class="btn btn-secundario" type="submit">Aplicar</button>
+    </div>
+  </form>
+</section>
+
+{% if metricas %}
+<section class="kpi-grid" aria-label="Indicadores de asistencia"
+         data-metricas-aforo data-url="{{ url_for('asistencia.metricas_aforo', **filtros) }}">
+  <article class="kpi-card kpi-highlight">
+    <span class="kpi-label">Aforo actual del plantel</span>
+    <span class="kpi-value" data-kpi="aforo_actual_plantel">{{ metricas.aforo_actual_plantel }}</span>
+    <span class="kpi-hint">de {{ metricas.total_matriculados }} matriculados</span>
+  </article>
+  <article class="kpi-card kpi-ok">
+    <span class="kpi-label">Puntuales</span>
+    <span class="kpi-value" data-kpi="presentes">{{ metricas.presentes }}</span>
+  </article>
+  <article class="kpi-card kpi-warn">
+    <span class="kpi-label">Tardanzas</span>
+    <span class="kpi-value" data-kpi="tardanzas">{{ metricas.tardanzas }}</span>
+  </article>
+  <article class="kpi-card kpi-danger">
+    <span class="kpi-label">Ausentes</span>
+    <span class="kpi-value" data-kpi="ausentes">{{ metricas.ausentes }}</span>
+  </article>
+  <article class="kpi-card kpi-info">
+    <span class="kpi-label">Justificados</span>
+    <span class="kpi-value" data-kpi="justificados">{{ metricas.justificados }}</span>
+  </article>
+  <article class="kpi-card kpi-neutral">
+    <span class="kpi-label">Pendientes</span>
+    <span class="kpi-value" data-kpi="pendientes">{{ metricas.pendientes }}</span>
+    <span class="kpi-hint"><span data-kpi="porcentaje_asistencia">{{ '%.1f'|format(metricas.porcentaje_asistencia) }}</span>% de asistencia</span>
+  </article>
+</section>
+
+<section class="card" aria-labelledby="salones-titulo">
+  <div class="card-head"><h2 id="salones-titulo">Asistencia por salón</h2></div>
+  {% if metricas.desglose_salones %}
+  <div class="tabla-scroll">
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th scope="col">Salón</th>
+          <th scope="col" class="texto-derecha">Matriculados</th>
+          <th scope="col" class="texto-derecha">Puntuales</th>
+          <th scope="col" class="texto-derecha">Tardanzas</th>
+          <th scope="col" class="texto-derecha">Ausentes</th>
+          <th scope="col" class="texto-derecha">Justificados</th>
+          <th scope="col" class="texto-derecha">Pendientes</th>
+          <th scope="col" class="texto-derecha">% asistencia</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for salon in metricas.desglose_salones %}
+        <tr>
+          <td>
+            <a href="{{ url_for('asistencia.aforo', nivel=salon.nivel, grado=salon.grado, seccion=salon.seccion, fecha=filtros.get('fecha', '')) }}">
+              {{ salon.nivel }} · {{ salon.grado }} «{{ salon.seccion }}»
+            </a>
+          </td>
+          <td class="texto-derecha">{{ salon.total_matriculados }}</td>
+          <td class="texto-derecha">{{ salon.presentes }}</td>
+          <td class="texto-derecha">{{ salon.tardanzas }}</td>
+          <td class="texto-derecha">{{ salon.ausentes }}</td>
+          <td class="texto-derecha">{{ salon.justificados }}</td>
+          <td class="texto-derecha">{{ salon.pendientes }}</td>
+          <td class="texto-derecha">{{ '%.1f'|format(salon.porcentaje_asistencia) }}%</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty-state">No hay alumnos matriculados para los filtros seleccionados.</p>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if detalle is not none %}
+<section class="card salon-detalle" aria-labelledby="detalle-titulo">
+  <div class="card-head">
+    <h2 id="detalle-titulo">Detalle de {{ filtros.get('nivel') }} · {{ filtros.get('grado') }} «{{ filtros.get('seccion') }}»</h2>
+  </div>
+  {% if detalle %}
+  <div class="tabla-scroll">
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th scope="col">Código</th>
+          <th scope="col">Alumno</th>
+          <th scope="col">Estado</th>
+          <th scope="col">Hora</th>
+          <th scope="col" class="texto-derecha">Min. tardanza</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for alumno in detalle %}
+        <tr>
+          <td class="mono">{{ alumno.codigo }}</td>
+          <td>{{ alumno.nombre_completo }}</td>
+          <td>{{ chip_estado(alumno.estado) }}</td>
+          <td>{{ alumno.hora_efectiva|hora_corta }}</td>
+          <td class="texto-derecha">{{ alumno.minutos_tardanza }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty-state">El salón no tiene alumnos activos.</p>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if tiene_permiso('CONFIGURAR_CIERRE_ASISTENCIA') or tiene_permiso('EJECUTAR_CIERRE_ASISTENCIA') %}
+<div class="grid-dos">
+  {% if tiene_permiso('CONFIGURAR_CIERRE_ASISTENCIA') %}
+  <section class="card card-cierre" aria-labelledby="hora-cierre-titulo">
+    <div class="card-head"><h2 id="hora-cierre-titulo">{{ icono('reloj') }} Hora oficial de cierre</h2></div>
+    <form class="form form-inline" method="post" action="{{ url_for('asistencia.configurar_hora_cierre') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="field">
+        <label for="hora-cierre">Nueva hora</label>
+        <input id="hora-cierre" name="hora_cierre" type="time" required
+               value="{{ metricas.hora_cierre_oficial.strftime('%H:%M') if metricas else '09:00' }}">
+      </div>
+      <button class="btn btn-secundario" type="submit">Guardar</button>
+    </form>
+  </section>
+  {% endif %}
+
+  {% if tiene_permiso('EJECUTAR_CIERRE_ASISTENCIA') %}
+  <section class="card card-cierre" aria-labelledby="cierre-titulo">
+    <div class="card-head"><h2 id="cierre-titulo">{{ icono('candado') }} Cierre de jornada</h2></div>
+    <p class="muted">Marca como ausentes a los alumnos pendientes. Es idempotente y queda auditado.</p>
+    <form class="form" method="post" action="{{ url_for('asistencia.ejecutar_cierre') }}"
+          data-confirmar="¿Confirma el cierre de la jornada? Los alumnos pendientes quedarán como ausentes.">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="fecha" value="{{ filtros.get('fecha', '') }}">
+      <button class="btn btn-peligro" type="submit">Ejecutar cierre</button>
+    </form>
+  </section>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/asistencia.js') }}" defer></script>
+{% endblock %}
