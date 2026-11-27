@@ -768,7 +768,19 @@ def test_docentes_y_calificaciones_3_niveles_y_bloqueo_fecha_limite(
         == 404
     )
 
-    # Docente2 (ajeno al grupo) intenta calificar -> 403
+    # Docente2 (ajeno al grupo) intenta crear actividad y calificar -> 403
+    assert (
+        cli_doc2.post(
+            "/calificaciones/actividades",
+            data={
+                "csrf_token": csrf_doc2,
+                "rubro_id": rubro_practicas.id,
+                "titulo": "Actividad ajena",
+                "fecha_actividad": "2026-04-21",
+            },
+        ).status_code
+        == 403
+    )
     assert (
         cli_doc2.post(
             "/calificaciones/notas",
@@ -826,6 +838,19 @@ def test_docentes_y_calificaciones_3_niveles_y_bloqueo_fecha_limite(
                 "alumno_id": str(ficha.alumno_id),
                 "nota": "18",
                 "motivo_modificacion": "Fuera de plazo",
+            },
+        ).status_code
+        == 409
+    )
+    assert (
+        cli_doc1_tarde.post(
+            "/calificaciones/rubros",
+            data={
+                "csrf_token": csrf_doc1_tarde,
+                "asignacion_id": asignacion.id,
+                "periodo_id": str(periodo.id),
+                "rubro_nombre": ["Tardío"],
+                "rubro_peso": ["100"],
             },
         ).status_code
         == 409
