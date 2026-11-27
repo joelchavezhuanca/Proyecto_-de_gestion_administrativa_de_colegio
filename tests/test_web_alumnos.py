@@ -626,7 +626,9 @@ def test_pagos_y_alertas_silenciosas_flujo_completo(entorno_web: dict[str, Any])
             monto_vencido_total=Decimal("640.00"),
             revisada=False,
         )
-        session.add_all([ast, alerta])
+        session.add(ast)
+        session.flush()
+        session.add(alerta)
         session.commit()
 
     # Rol personalizado TESORERIA registra 2 obligaciones, paga 1 y exonera 1

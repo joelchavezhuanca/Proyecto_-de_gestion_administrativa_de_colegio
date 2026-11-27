@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% from "_macros.html" import chip_estado %}
+
+{% block titulo %}Estados académicos{% endblock %}
+{% block eyebrow %}Control de acceso escolar · PBI-08{% endblock %}
+{% block encabezado %}Estados académicos de acceso{% endblock %}
+{% block subtitulo %}
+  <p class="page-subtitle">Gestione suspensiones temporales, retiros, traslados y egresos con trazabilidad y anulación automática de carnet.</p>
+{% endblock %}
+
+{% block contenido %}
+<section class="grid-dos">
+  <article class="card">
+    <div class="card-head">
+      <h2>Estudiantes registrados</h2>
+    </div>
+    {% if alumnos %}
+      <div class="tabla-scroll">
+        <table class="tabla">
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Estudiante</th>
+              <th>Estado actual</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for alumno in alumnos %}
+              <tr>
+                <td class="mono">{{ alumno.codigo_estudiante }}</td>
+                <td>{{ alumno.nombres }} {{ alumno.apellidos }}</td>
+                <td>{{ chip_estado(alumno.estado) }}</td>
+                <td>
+                  <a class="btn btn-secundario btn-pequeno" href="{{ url_for('alumnos.ver_estados', alumno_id=alumno.alumno_id) }}">
+                    Gestionar
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="empty-state">No hay estudiantes registrados.</p>
+    {% endif %}
+  </article>
+
+  <article class="card">
+    <div class="card-head">
+      <h2>Cambiar estado académico</h2>
+    </div>
+
+    {% if alumno_seleccionado %}
+      <form class="form" method="post" action="{{ url_for('alumnos.cambiar_estado', alumno_id=alumno_seleccionado) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="field">
+          <label for="nuevo_estado">Nuevo estado</label>
+          <select id="nuevo_estado" name="nuevo_estado" required>
+            {% for estado in estados_posibles %}
+              <option value="{{ estado.value }}">{{ estado.value }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="motivo">Motivo obligatorio</label>
+          <input id="motivo" name="motivo" type="text" required placeholder="Describa el sustento administrativo">
+        </div>
+
+        <div class="grid-dos">
+          <div class="field">
+            <label for="fecha_inicio_suspension">Inicio suspensión (si aplica)</label>
+            <input id="fecha_inicio_suspension" name="fecha_inicio_suspension" type="date">
+          </div>
+          <div class="field">
+            <label for="fecha_fin_suspension">Fin suspensión (si aplica)</label>
+            <input id="fecha_fin_suspension" name="fecha_fin_suspension" type="date">
+          </div>
+        </div>
+
+        <button class="btn btn-primario" type="submit">Aplicar cambio de estado</button>
+      </form>
+    {% else %}
+      <p class="empty-state">Seleccione un estudiante de la lista para registrar un cambio de estado.</p>
+    {% endif %}
+  </article>
+</section>
+
+{% if alumno_seleccionado %}
+<section class="card">
+  <div class="card-head">
+    <h2>Historial de transiciones</h2>
+  </div>
+  {% if historial %}
+    <div class="tabla-scroll">
+      <table class="tabla">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Anterior</th>
+            <th>Nuevo</th>
+            <th>Motivo</th>
+            <th>Suspensión</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in historial %}
+            <tr>
+              <td>{{ item.fecha_hora|fecha_corta }}</td>
+              <td>{{ item.estado_anterior.value }}</td>
+              <td>{{ chip_estado(item.estado_nuevo) }}</td>
+              <td>{{ item.motivo }}</td>
+              <td>
+                {% if item.fecha_inicio_suspension %}
+                  {{ item.fecha_inicio_suspension|fecha_corta }} – {{ item.fecha_fin_suspension|fecha_corta }}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="empty-state">Sin cambios de estado registrados para este estudiante.</p>
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}

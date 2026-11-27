@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% from "_macros.html" import chip_estado %}
+
+{% block titulo %}Carnets escolares QR{% endblock %}
+{% block eyebrow %}Identificación institucional · PBI-06{% endblock %}
+{% block encabezado %}Emisión y control de carnets QR{% endblock %}
+{% block subtitulo %}
+  <p class="page-subtitle">Emita carnets con código QR opaco, valide accesos y anule credenciales con trazabilidad.</p>
+{% endblock %}
+
+{% block contenido %}
+<section class="grid-dos">
+  <article class="card">
+    <div class="card-head">
+      <h2>Emitir o reponer carnet QR</h2>
+    </div>
+    <form class="form" method="post" action="{{ url_for('alumnos.emitir_carnet') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="field">
+        <label for="alumno_id">Estudiante</label>
+        <select id="alumno_id" name="alumno_id" required>
+          <option value="">Seleccione un estudiante…</option>
+          {% for alumno in alumnos %}
+            <option value="{{ alumno.alumno_id }}" {{ 'selected' if alumno_seleccionado == alumno.alumno_id }}>
+              {{ alumno.codigo_estudiante }} · {{ alumno.nombres }} {{ alumno.apellidos }} ({{ alumno.estado.value }})
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="grid-dos">
+        <div class="field">
+          <label for="anio_lectivo">Año lectivo</label>
+          <input id="anio_lectivo" name="anio_lectivo" type="number" value="{{ anio_actual }}" required>
+        </div>
+        <div class="field">
+          <label for="motivo_reposicion">Motivo (solo reposición)</label>
+          <select id="motivo_reposicion" name="motivo_reposicion">
+            <option value="">Primera emisión</option>
+            {% for motivo in motivos_anulacion %}
+              <option value="{{ motivo.value }}">{{ motivo.value }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="detalle_anulacion">Detalle adicional</label>
+        <input id="detalle_anulacion" name="detalle_anulacion" type="text" placeholder="Opcional">
+      </div>
+
+      <button class="btn btn-primario" type="submit">Emitir carnet QR</button>
+    </form>
+  </article>
+
+  <article class="card">
+    <div class="card-head">
+      <h2>Validar código QR</h2>
+    </div>
+    <form class="form" method="post" action="{{ url_for('alumnos.validar_carnet') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="field">
+        <label for="codigo_qr">Código QR del carnet</label>
+        <input id="codigo_qr" name="codigo_qr" type="text" required placeholder="DSV-2026-...">
+      </div>
+      <button class="btn btn-secundario" type="submit">Verificar habilitación</button>
+    </form>
+
+    {% if carnet_validado %}
+      <div class="alert alert-success" role="status">
+        <span class="alert-text">
+          Carnet <strong class="mono">{{ carnet_validado.codigo_qr }}</strong> válido · Estado {{ carnet_validado.estado.value }}.
+        </span>
+      </div>
+    {% endif %}
+  </article>
+</section>
+
+<section class="card">
+  <div class="card-head">
+    <h2>Historial de carnets por estudiante</h2>
+    <form class="form-inline" method="get" action="{{ url_for('alumnos.ver_carnets') }}">
+      <select name="alumno_id" aria-label="Seleccionar estudiante">
+        <option value="">Seleccione estudiante…</option>
+        {% for alumno in alumnos %}
+          <option value="{{ alumno.alumno_id }}" {{ 'selected' if alumno_seleccionado == alumno.alumno_id }}>
+            {{ alumno.codigo_estudiante }} · {{ alumno.nombres }} {{ alumno.apellidos }}
+          </option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-secundario btn-pequeno" type="submit">Consultar</button>
+    </form>
+  </div>
+
+  {% if carnets %}
+    <div class="tabla-scroll">
+      <table class="tabla">
+        <thead>
+          <tr>
+            <th>Código QR</th>
+            <th>Estado</th>
+            <th>Emitido</th>
+            <th>Motivo anulación</th>
+            <th>Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for carnet in carnets %}
+            <tr>
+              <td class="mono">{{ carnet.codigo_qr }}</td>
+              <td>{{ chip_estado(carnet.estado) }}</td>
+              <td>{{ carnet.emitido_en|fecha_corta }}</td>
+              <td>{{ carnet.motivo_anulacion.value if carnet.motivo_anulacion else "—" }}</td>
+              <td>
+                {% if carnet.estado.value == "ACTIVO" %}
+                  <form class="form-inline" method="post" action="{{ url_for('alumnos.anular_carnet', carnet_id=carnet.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="alumno_id" value="{{ carnet.alumno_id }}">
+                    <select name="motivo" aria-label="Motivo de anulación" required>
+                      {% for motivo in motivos_anulacion %}
+                        <option value="{{ motivo.value }}">{{ motivo.value }}</option>
+                      {% endfor %}
+                    </select>
+                    <input name="detalle" type="text" placeholder="Detalle">
+                    <button class="btn btn-peligro-suave btn-pequeno" type="submit">Anular</button>
+                  </form>
+                {% else %}
+                  <span class="muted small">Anulado</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="empty-state">Seleccione un estudiante para consultar o anular sus carnets QR.</p>
+  {% endif %}
+</section>
+{% endblock %}
