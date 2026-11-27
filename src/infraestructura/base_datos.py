@@ -60,10 +60,13 @@ _MODULO_POR_PERMISO: Final[dict[PermisoOperacion, str]] = {
 
 
 def obtener_database_url(database_url: str | None = None) -> str:
-    """Resuelve la URL de conexión desde argumento explícito, entorno o SQLite por defecto."""
-    if database_url:
-        return database_url
-    return os.environ.get("DATABASE_URL") or DATABASE_URL_DEFECTO
+    """Resuelve y normaliza la URL de conexión (SQLite o PostgreSQL con psycopg v3)."""
+    url = database_url or os.environ.get("DATABASE_URL") or DATABASE_URL_DEFECTO
+    if url.startswith("postgres://"):
+        return "postgresql+psycopg://" + url.removeprefix("postgres://")
+    if url.startswith("postgresql://"):
+        return "postgresql+psycopg://" + url.removeprefix("postgresql://")
+    return url
 
 
 def _activar_pragma_foreign_keys(dbapi_connection: object, _connection_record: object) -> None:

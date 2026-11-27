@@ -15,7 +15,8 @@ import os
 from datetime import date, datetime, time
 from pathlib import Path
 
-from flask import Blueprint, Flask, current_app, g, render_template, url_for
+from flask import Blueprint, Flask, current_app, g, jsonify, render_template, url_for
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from src.aplicacion.servicios_academico import ServicioAcademico
 from src.aplicacion.servicios_asistencia import ServicioAsistencia
@@ -91,7 +92,18 @@ def crear_app(config: dict | None = None) -> Flask:
     if config:
         app.config.update(config)
 
+    if os.environ.get("FLASK_ENV") == "production":
+        if not config or "SESSION_COOKIE_SECURE" not in config:
+            app.config["SESSION_COOKIE_SECURE"] = True
+        app.wsgi_app = ProxyFix(  # type: ignore[method-assign]
+            app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1
+        )
+
     app.config.setdefault("RELOJ", hora_institucional)
+
+    @app.get("/health")
+    def healthcheck():
+        return jsonify({"status": "ok"}), 200
 
     # 2. Persistencia, almacén de sesiones y servicios de aplicación
     app.extensions.setdefault("almacen_sesiones", AlmacenSesiones())

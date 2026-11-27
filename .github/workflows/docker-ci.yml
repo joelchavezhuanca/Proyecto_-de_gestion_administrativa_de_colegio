@@ -1,0 +1,28 @@
+name: Docker CI
+
+on:
+  pull_request:
+    branches: [main, dev]
+  push:
+    branches: [main, dev]
+
+jobs:
+  pruebas-en-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construir la imagen
+        run: docker compose --profile pruebas build
+      - name: Ejecutar las pruebas en el contenedor
+        run: docker compose --profile pruebas run --rm pruebas
+      - name: Arrancar la aplicación y comprobar que responde
+        run: |
+          docker compose up -d --build
+          sleep 2
+          if ! curl --retry 20 --retry-delay 3 --retry-all-errors -fsS \
+            http://localhost:5000/health > /dev/null; then
+            docker compose logs app
+            docker compose down
+            exit 1
+          fi
+          docker compose down

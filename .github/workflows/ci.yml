@@ -33,6 +33,9 @@ jobs:
       - name: Verificación de Formato con Ruff
         run: ruff format --check .
 
+      - name: Pruebas de Aceptación ATDD (pytest-bdd · PBI-01 y PBI-10)
+        run: pytest -v tests/acceptance
+
       - name: Ejecutar Pruebas Automatizadas y Cobertura ≥ 70 % (sin capa de presentación)
         run: >
           pytest -v

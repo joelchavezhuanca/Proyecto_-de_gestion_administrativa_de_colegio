@@ -1,0 +1,22 @@
+name: domingo-savio
+
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${PORT:-5000}:5000"
+    environment:
+      SECRET_KEY: ${SECRET_KEY:-clave-local-docker-domingo-savio-2026-cambiar-en-produccion}
+      DATABASE_URL: ${DATABASE_URL:-sqlite:////app/data/colegio.db}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin2026!}
+      ADMIN_NOMBRE_COMPLETO: ${ADMIN_NOMBRE_COMPLETO:-Administrador Colegio Domingo Savio}
+      FLASK_ENV: ${FLASK_ENV:-development}
+    volumes:
+      - ./datos_locales:/app/data
+
+  pruebas:
+    build: .
+    command: pytest
+    profiles: ["pruebas"]
