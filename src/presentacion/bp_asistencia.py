@@ -45,6 +45,7 @@ from src.dominio.asistencia import (
     AlumnoNoEncontradoException,
     AsistenciaException,
     AsistenciaJustificadaException,
+    FaltaMotivoCorreccionException,
     MetodoRegistro,
     RegistroDuplicadoException,
     RolNoAutorizadoException,
@@ -188,7 +189,10 @@ def traducir_error(error: Exception) -> ErrorWeb:
 
 def _respuesta_json_error(error: Exception) -> tuple[Response, int]:
     web = traducir_error(error)
-    return jsonify({"ok": False, "error": web.mensaje}), web.codigo
+    cuerpo: dict[str, Any] = {"ok": False, "error": web.mensaje}
+    if isinstance(error, FaltaMotivoCorreccionException):
+        cuerpo["requiere_motivo"] = True
+    return jsonify(cuerpo), web.codigo
 
 
 def _pagina_con_error(error: Exception, renderizar: Callable[[], str]) -> tuple[str, int]:
@@ -262,19 +266,27 @@ def _enum(enum_cls: Any, valor: str | None, etiqueta: str) -> Any:
 def _parametros_registro(datos: Mapping[str, Any]) -> dict[str, Any]:
     """Traduce el formulario unificado a argumentos de ``registrar_asistencia``."""
     metodo = _enum(MetodoRegistro, _obligatorio(datos, "metodo", "Método"), "Método")
+    motivo = _texto(datos, "motivo_correccion") or _texto(datos, "motivo")
     parametros: dict[str, Any] = {
         "metodo": metodo,
-        "motivo_correccion": _texto(datos, "motivo_correccion"),
+        "motivo_correccion": motivo,
     }
+    valor = _texto(datos, "valor") or _texto(datos, "identificador")
     alumno_id = _entero(_texto(datos, "alumno_id"), "Alumno")
     if metodo == MetodoRegistro.CARNET:
-        parametros["codigo_carnet"] = _obligatorio(datos, "valor", "Código de carnet")
+        if valor is None:
+            raise SolicitudInvalidaError("El campo «Código de carnet» es obligatorio.")
+        parametros["codigo_carnet"] = valor
     elif metodo == MetodoRegistro.MANUAL_DNI:
-        parametros["dni_manual"] = _obligatorio(datos, "valor", "DNI")
+        if valor is None:
+            raise SolicitudInvalidaError("El campo «DNI» es obligatorio.")
+        parametros["dni_manual"] = valor
     elif alumno_id is not None:
         parametros["alumno_id"] = alumno_id
     else:
-        parametros["criterio_busqueda"] = _obligatorio(datos, "valor", "Búsqueda")
+        if valor is None:
+            raise SolicitudInvalidaError("El campo «Búsqueda» es obligatorio.")
+        parametros["criterio_busqueda"] = valor
     return parametros
 
 
@@ -333,10 +345,35 @@ def _metricas_a_json(metricas: Any) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
+def _serializar_alumno(alumno: Any) -> dict[str, Any] | None:
+    if alumno is None:
+        return None
+    salon = " · ".join(
+        parte for parte in (alumno.nivel, alumno.grado, f"Sección {alumno.seccion}") if parte
+    )
+    return {
+        "id": alumno.id,
+        "codigo": alumno.codigo,
+        "dni": alumno.dni,
+        "carnet": alumno.carnet_codigo,
+        "nombre": f"{alumno.nombres} {alumno.apellidos}".strip(),
+        "salon": salon,
+    }
+
+
 def _render_asistencia(historial: list[Any] | None = None) -> str:
+    servicio = _servicio()
+    momento = servicio.ahora()
+    recientes = [
+        {"asistencia": asistencia, "alumno": alumno}
+        for asistencia, alumno in servicio.listar_registros_del_dia()
+    ]
     return render_template(
         "asistencia.html",
         metodos=list(MetodoRegistro),
+        fecha=momento.date(),
+        hora_sistema=momento.time(),
+        recientes=recientes,
         historial=historial,
         filtros=request.args,
     )
@@ -346,6 +383,16 @@ def _render_asistencia(historial: list[Any] | None = None) -> str:
 @permiso_requerido(PermisoOperacion.REGISTRAR_ASISTENCIA)
 def ver_asistencia():
     return _render_asistencia()
+
+
+@bp_asistencia.get("/api/alumnos")
+@permiso_requerido(PermisoOperacion.REGISTRAR_ASISTENCIA)
+def buscar_alumnos_api():
+    criterio = (request.args.get("q") or "").strip()
+    if len(criterio) < 2:
+        return jsonify({"resultados": []}), 200
+    resultados = [_serializar_alumno(a) for a in _servicio().buscar_alumnos(criterio, limite=12)]
+    return jsonify({"resultados": resultados}), 200
 
 
 @bp_asistencia.post("/asistencia/registrar")
@@ -365,12 +412,18 @@ def registrar_asistencia():
             jsonify(
                 {
                     "ok": True,
+                    "estado": asistencia.estado.value,
+                    "hora": asistencia.hora_efectiva.strftime("%H:%M"),
+                    "minutos_tardanza": asistencia.minutos_tardanza,
+                    "metodo": asistencia.metodo.value,
+                    "alumno": _serializar_alumno(getattr(resultado, "alumno", None)),
                     "asistencia": {
                         "id": asistencia.id,
                         "alumno_id": asistencia.alumno_id,
                         "estado": asistencia.estado.value,
                         "hora_efectiva": asistencia.hora_efectiva.isoformat(),
                         "minutos_tardanza": asistencia.minutos_tardanza,
+                        "metodo": asistencia.metodo.value,
                         "nivel": asistencia.nivel,
                         "grado": asistencia.grado,
                         "seccion": asistencia.seccion,

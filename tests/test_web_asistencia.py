@@ -847,3 +847,73 @@ def test_error_de_permiso_de_dominio_en_json_responde_403(admin: FlaskClient, ap
     respuesta = admin.get("/aforo/metricas")
     assert respuesta.status_code == 403
     assert respuesta.get_json() == {"ok": False, "error": MENSAJE_PROHIBIDO}
+
+
+# ---------------------------------------------------------------------------
+# Registro unificado con escáner QR, búsqueda asistida y tabla del día
+# ---------------------------------------------------------------------------
+
+
+def test_pagina_asistencia_muestra_escaner_qr_y_tabla_del_dia(
+    admin: FlaskClient, alumno_id: int
+) -> None:
+    inicial = _texto(admin.get("/asistencia"))
+    assert "lector-qr" in inicial
+    assert "js/vendor/html5-qrcode.min.js" in inicial
+    assert "data-form-unificado" in inicial
+    assert "Últimos registros de hoy" in inicial
+    assert "Avisos por WhatsApp" not in inicial
+
+    respuesta = _post_json(admin, "/asistencia/registrar", {"metodo": "CARNET", "valor": CARNET})
+    assert respuesta.status_code == 201
+    datos = respuesta.get_json()
+    assert datos["alumno"]["id"] == alumno_id
+    assert datos["alumno"]["nombre"] == "Eduardo Luna Lezano"
+    assert datos["hora"] == "07:05"
+    assert datos["estado"] == "PUNTUAL"
+
+    actualizada = _texto(admin.get("/asistencia"))
+    assert "Eduardo Luna Lezano" in actualizada
+    assert "07:05" in actualizada
+
+
+def test_api_buscar_alumnos_filtra_y_protege_acceso(
+    app: Flask, admin: FlaskClient, usuarios, alumno_id: int
+) -> None:
+    assert app.test_client().get("/api/alumnos?q=Luna").status_code == 401
+    assert _login(app, usuarios["monitor"]).get("/api/alumnos?q=Luna").status_code == 403
+
+    corto = admin.get("/api/alumnos?q=L")
+    assert corto.status_code == 200
+    assert corto.get_json() == {"resultados": []}
+
+    coincidencias = admin.get("/api/alumnos?q=Luna")
+    assert coincidencias.status_code == 200
+    lista = coincidencias.get_json()["resultados"]
+    assert len(lista) == 1
+    assert lista[0]["id"] == alumno_id
+    assert lista[0]["nombre"] == "Eduardo Luna Lezano"
+    assert lista[0]["carnet"] == CARNET
+    assert lista[0]["dni"] == DNI
+
+
+def test_corregir_ausente_json_solicita_motivo_y_luego_confirma(
+    admin: FlaskClient, servicio: ServicioAsistencia, usuarios, alumno_id: int
+) -> None:
+    servicio.ejecutar_cierre_diario(usuarios["admin"].id, fecha_escolar=FECHA)
+    sin_motivo = _post_json(admin, "/asistencia/registrar", {"metodo": "CARNET", "valor": CARNET})
+    assert sin_motivo.status_code == 400
+    assert sin_motivo.get_json()["requiere_motivo"] is True
+
+    corregido = _post_json(
+        admin,
+        "/asistencia/registrar",
+        {
+            "metodo": "CARNET",
+            "valor": CARNET,
+            "motivo_correccion": "Autorización de dirección",
+        },
+    )
+    assert corregido.status_code == 201
+    assert corregido.get_json()["asistencia"]["alumno_id"] == alumno_id
+    assert servicio.buscar_alumnos("   ") == []
