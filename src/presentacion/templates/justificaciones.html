@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% from "_macros.html" import chip_estado, icono %}
+
+{% block titulo %}Justificaciones{% endblock %}
+{% block eyebrow %}Asistencia{% endblock %}
+{% block encabezado %}Justificaciones de inasistencia{% endblock %}
+{% block subtitulo %}<p class="page-subtitle">Al registrar una justificación la asistencia pasa a JUSTIFICADO y queda auditada.</p>{% endblock %}
+
+{% block contenido %}
+{% if tiene_permiso('ADMINISTRAR_PERIODOS') %}
+<div class="page-actions">
+  <a class="btn btn-secundario" href="{{ url_for('justificaciones.ver_periodos') }}">Períodos académicos</a>
+</div>
+{% endif %}
+
+<div class="grid-dos-amplio">
+  <section class="card" aria-labelledby="nueva-justificacion">
+    <div class="card-head"><h2 id="nueva-justificacion">{{ icono('justificaciones') }} Nueva justificación</h2></div>
+    <form class="form" method="post" action="{{ url_for('justificaciones.registrar_justificacion') }}"
+          enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="field">
+        <label for="j-asistencia">ID del registro de asistencia</label>
+        <input id="j-asistencia" name="asistencia_id" type="text" required maxlength="64" class="mono">
+        <p class="field-help">Solo se justifican registros AUSENTE o TARDANZA.</p>
+      </div>
+      <div class="field">
+        <label for="j-categoria">Categoría</label>
+        <select id="j-categoria" name="categoria" required>
+          {% for categoria in categorias %}
+          <option value="{{ categoria.value }}">{{ categoria.value|replace('_', ' ')|capitalize }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="j-motivo">Motivo</label>
+        <textarea id="j-motivo" name="motivo" required maxlength="500" rows="3"></textarea>
+      </div>
+      <div class="field">
+        <label for="j-periodo">ID de período <span class="opcional">(opcional)</span></label>
+        <input id="j-periodo" name="periodo_id" type="number" min="1">
+      </div>
+      <div class="field">
+        <label for="j-adjuntos">Adjuntos <span class="opcional">(PDF, JPG o PNG · máx. 3 · 5 MB c/u)</span></label>
+        <input id="j-adjuntos" name="adjuntos" type="file" multiple accept=".pdf,.jpg,.jpeg,.png">
+      </div>
+      <button class="btn btn-primario" type="submit">Registrar y aprobar</button>
+    </form>
+  </section>
+
+  <section class="card filtros-card" aria-labelledby="filtros-justificaciones">
+    <div class="card-head"><h2 id="filtros-justificaciones">Filtros</h2></div>
+    <form class="form filtros-grid" method="get" action="{{ url_for('justificaciones.ver_justificaciones') }}">
+      <div class="field">
+        <label for="fj-estado">Estado</label>
+        <select id="fj-estado" name="estado">
+          <option value="">Todos</option>
+          {% for estado in estados %}
+          <option value="{{ estado.value }}" {% if filtros.get('estado') == estado.value %}selected{% endif %}>{{ estado|estado_texto }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="fj-categoria">Categoría</label>
+        <select id="fj-categoria" name="categoria">
+          <option value="">Todas</option>
+          {% for categoria in categorias %}
+          <option value="{{ categoria.value }}" {% if filtros.get('categoria') == categoria.value %}selected{% endif %}>{{ categoria.value|replace('_', ' ')|capitalize }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="fj-desde">Desde</label>
+        <input id="fj-desde" name="fecha_desde" type="date" value="{{ filtros.get('fecha_desde', '') }}">
+      </div>
+      <div class="field">
+        <label for="fj-hasta">Hasta</label>
+        <input id="fj-hasta" name="fecha_hasta" type="date" value="{{ filtros.get('fecha_hasta', '') }}">
+      </div>
+      <div class="filtros-actions">
+        <button class="btn btn-secundario" type="submit">Filtrar</button>
+      </div>
+    </form>
+  </section>
+</div>
+
+<section class="card" aria-labelledby="lista-justificaciones">
+  <div class="card-head"><h2 id="lista-justificaciones">Justificaciones registradas</h2></div>
+  {% if justificaciones %}
+  <div class="tabla-scroll">
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th scope="col">Solicitud</th>
+          <th scope="col">Alumno</th>
+          <th scope="col">Salón</th>
+          <th scope="col">Categoría</th>
+          <th scope="col">Motivo</th>
+          <th scope="col">Estado</th>
+          <th scope="col"><span class="sr-only">Acciones</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for j in justificaciones %}
+        <tr>
+          <td>{{ j.fecha_solicitud|fecha_corta }}</td>
+          <td class="mono">{{ j.alumno_id }}</td>
+          <td>{{ j.nivel }} {{ j.grado }} {{ j.seccion }}</td>
+          <td>{{ j.categoria.value|replace('_', ' ')|capitalize }}</td>
+          <td class="celda-motivo">{{ j.motivo }}</td>
+          <td>{{ chip_estado(j.estado) }}</td>
+          <td class="texto-derecha">
+            {% if j.estado.value == 'APROBADA' %}
+            <form method="post" action="{{ url_for('justificaciones.anular_justificacion', justificacion_id=j.id) }}"
+                  data-confirmar="¿Anular esta justificación? La asistencia volverá a su estado original.">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-peligro-suave btn-pequeno" type="submit">Anular</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty-state">No hay justificaciones para los filtros seleccionados.</p>
+  {% endif %}
+</section>
+{% endblock %}

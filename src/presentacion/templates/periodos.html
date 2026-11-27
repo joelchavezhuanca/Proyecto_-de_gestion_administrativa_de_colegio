@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icono %}
+
+{% block titulo %}Períodos académicos{% endblock %}
+{% block eyebrow %}Configuración académica{% endblock %}
+{% block encabezado %}Períodos académicos{% endblock %}
+{% block subtitulo %}<p class="page-subtitle">Bimestres, trimestres o semestres con su fecha límite de notas.</p>{% endblock %}
+
+{% block contenido %}
+<div class="page-actions">
+  <a class="btn btn-secundario" href="{{ url_for('justificaciones.ver_justificaciones') }}">Volver a justificaciones</a>
+</div>
+
+<div class="grid-dos-amplio">
+  <section class="card" aria-labelledby="nuevo-periodo">
+    <div class="card-head"><h2 id="nuevo-periodo">Nuevo período</h2></div>
+    <form class="form" method="post" action="{{ url_for('justificaciones.crear_periodo') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="field">
+        <label for="p-nombre">Nombre</label>
+        <input id="p-nombre" name="nombre" type="text" required maxlength="80" placeholder="I Bimestre 2026">
+      </div>
+      <div class="grid-dos">
+        <div class="field">
+          <label for="p-tipo">Tipo</label>
+          <select id="p-tipo" name="tipo_periodo" required>
+            {% for tipo in tipos %}
+            <option value="{{ tipo.value }}">{{ tipo.value|capitalize }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="p-orden">Orden</label>
+          <input id="p-orden" name="orden" type="number" min="1" value="1" required>
+        </div>
+        <div class="field">
+          <label for="p-anio">Año lectivo</label>
+          <input id="p-anio" name="anio_lectivo" type="number" min="2000" value="{{ anio_actual }}" required>
+        </div>
+        <div class="field">
+          <label for="p-limite">Fecha límite de notas <span class="opcional">(opcional)</span></label>
+          <input id="p-limite" name="fecha_limite_notas" type="date">
+        </div>
+        <div class="field">
+          <label for="p-inicio">Inicio</label>
+          <input id="p-inicio" name="fecha_inicio" type="date" required>
+        </div>
+        <div class="field">
+          <label for="p-fin">Fin</label>
+          <input id="p-fin" name="fecha_fin" type="date" required>
+        </div>
+      </div>
+      <button class="btn btn-primario" type="submit">Crear período</button>
+    </form>
+  </section>
+
+  <section class="card filtros-card" aria-labelledby="filtro-periodos">
+    <div class="card-head"><h2 id="filtro-periodos">Filtrar</h2></div>
+    <form class="form form-inline" method="get" action="{{ url_for('justificaciones.ver_periodos') }}">
+      <div class="field">
+        <label for="fp-anio">Año lectivo</label>
+        <input id="fp-anio" name="anio_lectivo" type="number" min="2000" value="{{ filtros.get('anio_lectivo', '') }}">
+      </div>
+      <button class="btn btn-secundario" type="submit">Filtrar</button>
+    </form>
+  </section>
+</div>
+
+<section class="card" aria-labelledby="lista-periodos">
+  <div class="card-head"><h2 id="lista-periodos">Períodos registrados</h2></div>
+  {% if periodos %}
+  <div class="tabla-scroll">
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th scope="col">Período</th>
+          <th scope="col">Año</th>
+          <th scope="col">Vigencia</th>
+          <th scope="col">Límite de notas</th>
+          <th scope="col">Estado</th>
+          <th scope="col"><span class="sr-only">Acciones</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in periodos %}
+        <tr>
+          <td>{{ p.orden }}. {{ p.nombre }} <span class="muted small">{{ p.tipo_periodo.value|capitalize }}</span></td>
+          <td>{{ p.anio_lectivo }}</td>
+          <td>{{ p.fecha_inicio|fecha_corta }} – {{ p.fecha_fin|fecha_corta }}</td>
+          <td>
+            <form class="form-inline" method="post" action="{{ url_for('justificaciones.prorrogar_fecha_limite', periodo_id=p.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <label class="sr-only" for="limite-{{ p.id }}">Fecha límite de notas de {{ p.nombre }}</label>
+              <input id="limite-{{ p.id }}" name="fecha_limite_notas" type="date" required
+                     value="{{ p.fecha_limite_notas.isoformat() if p.fecha_limite_notas else '' }}">
+              <button class="btn btn-secundario btn-pequeno" type="submit">Actualizar</button>
+            </form>
+          </td>
+          <td>
+            {% if p.cerrado %}
+            <span class="chip chip-danger"><span class="chip-dot" aria-hidden="true"></span>{{ icono('candado') }} Cerrado</span>
+            {% else %}
+            <span class="chip chip-ok"><span class="chip-dot" aria-hidden="true"></span>Abierto</span>
+            {% endif %}
+          </td>
+          <td class="texto-derecha">
+            <form class="form-inline" method="post" action="{{ url_for('justificaciones.cambiar_estado_periodo', periodo_id=p.id) }}"
+                  data-confirmar="{{ '¿Reabrir' if p.cerrado else '¿Cerrar' }} el período «{{ p.nombre }}»?">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="cerrado" value="{{ '0' if p.cerrado else '1' }}">
+              <button class="btn btn-secundario btn-pequeno" type="submit">{{ 'Reabrir' if p.cerrado else 'Cerrar' }}</button>
+            </form>
+            <form class="form-inline" method="post" action="{{ url_for('justificaciones.eliminar_periodo', periodo_id=p.id) }}"
+                  data-confirmar="¿Eliminar el período «{{ p.nombre }}»? Solo es posible si no tiene uso.">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-peligro-suave btn-pequeno" type="submit">Eliminar</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty-state">Aún no hay períodos registrados.</p>
+  {% endif %}
+</section>
+{% endblock %}
