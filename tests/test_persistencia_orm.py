@@ -10,7 +10,7 @@ from sqlalchemy import func, inspect, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from src.dominio.usuarios import MATRIZ_PERMISOS, PermisoOperacion, RolUsuario
+from src.dominio.usuarios import MATRIZ_PERMISOS, PermisoOperacion
 from src.infraestructura import (
     Base,
     crear_motor,
@@ -497,12 +497,32 @@ def test_bloque2_estructura_academica_matricula_carnets_y_unicos(
     db_session.add_all([vinculo, historial_estado, carnet])
     db_session.commit()
 
-    assert db_session.scalars(select(CarnetModel).filter_by(codigo_qr="DSV-2026-ABCDEF123456")).one().id == "car-001"
-    assert db_session.scalars(select(AsignacionDocenteModel).filter_by(id="asg-001")).one().curso_id == curso.id
+    carnet_db = db_session.scalars(
+        select(CarnetModel).filter_by(codigo_qr="DSV-2026-ABCDEF123456")
+    ).one()
+    asig_db = db_session.scalars(select(AsignacionDocenteModel).filter_by(id="asg-001")).one()
+    assert carnet_db.id == "car-001"
+    assert asig_db.curso_id == curso.id
 
     # UNIQUE(anio_lectivo, nivel, grado, seccion) en salones
     db_session.add(
         SalonModel(anio_lectivo=2026, nivel="Secundaria", grado="3ro", seccion="A")
+    )
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()
+
+    # UNIQUE(anio_lectivo, nivel, grado, codigo) en cursos
+    db_session.add(
+        CursoModel(
+            anio_lectivo=2026,
+            nivel="Secundaria",
+            grado="3ro",
+            codigo="MAT-301",
+            nombre="Matemática Duplicada",
+            area_curricular="Matemática",
+            horas_semanales=4,
+        )
     )
     with pytest.raises(IntegrityError):
         db_session.commit()
@@ -631,6 +651,20 @@ def test_bloque3_asistencias_unicas_periodos_adjuntos_calendario_y_cierres(
             estado="TARDANZA",
             minutos_tardanza=15,
             metodo="MANUAL_DNI",
+        )
+    )
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()
+
+    # UNIQUE(fecha_escolar) en cierres_diarios
+    db_session.add(
+        CierreDiarioModel(
+            evento_id="evt-cie-002",
+            fecha_escolar=date(2026, 4, 10),
+            hora_cierre=time(9, 5, 0),
+            total_ausentes_marcados=0,
+            actor_ejecutante="SYSTEM_CRON",
         )
     )
     with pytest.raises(IntegrityError):
@@ -835,6 +869,23 @@ def test_bloque5_libro_calificaciones_3_niveles_boletas_y_fk_estricta(
             periodo_id=periodo.id,
             nombre="Inválido",
             peso_porcentaje=Decimal("50.00"),
+        )
+    )
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()
+
+    # UNIQUE(codigo_verificacion) en boletas_emitidas
+    db_session.add(
+        BoletaEmitidaModel(
+            id="bol-dup",
+            codigo_verificacion="BOL-2026-ABCDEF",
+            estudiante_id=estudiante_ejemplo.id,
+            periodo_id=periodo.id,
+            anio_lectivo=2026,
+            es_oficial=True,
+            promedio_general=Decimal("18.50"),
+            emitido_por=usuario_operador.id,
         )
     )
     with pytest.raises(IntegrityError):
