@@ -1,7 +1,7 @@
 """Pruebas BDD y unitarias del PBI-12: Ficha Informativa del Alumno."""
 
 from dataclasses import FrozenInstanceError
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 
 import pytest
@@ -28,7 +28,7 @@ from src.dominio.matricula import Apoderado, FichaMatricula
 from src.dominio.pagos import EstadoObligacion, ObligacionPago
 from src.dominio.usuarios import PermisoOperacion, Rol, RolUsuario
 
-FECHA_REFERENCIA = datetime(2026, 3, 31, 12, 0)
+FECHA_REFERENCIA = datetime(2026, 3, 31, 12, 0, tzinfo=timezone(timedelta(hours=-5)))
 ALUMNO_ID = 10
 
 
