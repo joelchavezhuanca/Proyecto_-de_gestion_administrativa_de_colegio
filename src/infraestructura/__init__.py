@@ -6,6 +6,7 @@ from src.infraestructura.base_datos import (
     crear_session_factory,
     inicializar_bd,
     obtener_database_url,
+    sembrar_admin_inicial,
     sembrar_seguridad_base,
 )
 from src.infraestructura.modelos import Base
@@ -17,5 +18,6 @@ __all__ = [
     "crear_session_factory",
     "inicializar_bd",
     "obtener_database_url",
+    "sembrar_admin_inicial",
     "sembrar_seguridad_base",
 ]

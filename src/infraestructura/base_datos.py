@@ -9,8 +9,21 @@ from sqlalchemy import create_engine, event, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from src.dominio.usuarios import PermisoOperacion, ServicioGestionRoles
-from src.infraestructura.modelos import Base, PermisoModel, RolModel, RolPermisoModel
+from src.dominio.usuarios import (
+    EstadoUsuario,
+    PermisoOperacion,
+    RolUsuario,
+    ServicioGestionRoles,
+    hashear_password,
+    validar_politica_password,
+)
+from src.infraestructura.modelos import (
+    Base,
+    PermisoModel,
+    RolModel,
+    RolPermisoModel,
+    UsuarioModel,
+)
 
 DATABASE_URL_DEFECTO: Final[str] = "sqlite:///domingo_savio.db"
 
@@ -117,10 +130,64 @@ def sembrar_seguridad_base(session: Session) -> None:
     session.flush()
 
 
+def sembrar_admin_inicial(
+    session: Session,
+    *,
+    username: str | None = None,
+    password: str | None = None,
+    nombre_completo: str | None = None,
+) -> bool:
+    """Crea de forma idempotente un usuario ADMIN inicial usando variables de entorno.
+
+    Requiere ``ADMIN_USERNAME`` y ``ADMIN_PASSWORD`` (o argumentos explícitos).
+    Si ya existe al menos un usuario ADMIN activo o faltan credenciales, no crea nada.
+    """
+    usr = (username if username is not None else os.environ.get("ADMIN_USERNAME") or "").strip()
+    pwd = password if password is not None else (os.environ.get("ADMIN_PASSWORD") or "")
+    if not usr or not pwd:
+        return False
+
+    admin_existente = session.scalar(
+        select(UsuarioModel.id).where(
+            UsuarioModel.rol == RolUsuario.ADMIN.value,
+            UsuarioModel.activo.is_(True),
+        )
+    )
+    if admin_existente is not None:
+        return False
+
+    validar_politica_password(pwd)
+    pwd_hash, salt = hashear_password(pwd)
+    rol_admin_id = session.scalar(
+        select(RolModel.id).where(RolModel.codigo == RolUsuario.ADMIN.value)
+    )
+    nombre = (
+        nombre_completo
+        or os.environ.get("ADMIN_NOMBRE_COMPLETO")
+        or "Administrador del Sistema"
+    ).strip()
+
+    session.add(
+        UsuarioModel(
+            username=usr.lower(),
+            nombre_completo=nombre,
+            password_hash=pwd_hash,
+            salt=salt,
+            rol_id=rol_admin_id,
+            rol=RolUsuario.ADMIN.value,
+            estado=EstadoUsuario.ACTIVO.value,
+            activo=True,
+        )
+    )
+    session.flush()
+    return True
+
+
 def inicializar_bd(engine: Engine) -> None:
     """Crea el esquema completo del DER v2 y siembra seguridad base de forma idempotente."""
     Base.metadata.create_all(bind=engine)
     session_factory = crear_session_factory(engine)
     with session_factory() as session:
         sembrar_seguridad_base(session)
+        sembrar_admin_inicial(session)
         session.commit()

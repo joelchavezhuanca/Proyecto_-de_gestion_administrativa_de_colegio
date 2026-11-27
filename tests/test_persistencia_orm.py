@@ -893,3 +893,37 @@ def test_bloque5_libro_calificaciones_3_niveles_boletas_y_fk_estricta(
     db_session.rollback()
 
     assert Base.metadata.tables["calificaciones"] is not None
+
+
+def test_sembrar_admin_inicial_idempotente_y_por_entorno(
+    db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.dominio.usuarios import UsuarioException, verificar_password
+    from src.infraestructura.base_datos import sembrar_admin_inicial, sembrar_seguridad_base
+
+    sembrar_seguridad_base(db_session)
+    monkeypatch.delenv("ADMIN_USERNAME", raising=False)
+    monkeypatch.delenv("ADMIN_PASSWORD", raising=False)
+
+    # Sin variables de entorno no crea ningún usuario
+    assert sembrar_admin_inicial(db_session) is False
+
+    # Política mínima de contraseña (8 caracteres)
+    with pytest.raises(UsuarioException):
+        sembrar_admin_inicial(db_session, username="admin", password="123")
+
+    # Con variables de entorno válidas crea el ADMIN inicial con hash PBKDF2
+    monkeypatch.setenv("ADMIN_USERNAME", "AdminPrincipal")
+    monkeypatch.setenv("ADMIN_PASSWORD", "AdminSeguro2026!")
+    assert sembrar_admin_inicial(db_session) is True
+
+    creado = db_session.scalars(
+        select(UsuarioModel).where(UsuarioModel.username == "adminprincipal")
+    ).one()
+    assert creado.rol == "ADMIN"
+    assert creado.activo is True
+    assert verificar_password("AdminSeguro2026!", creado.password_hash, creado.salt) is True
+
+    # Segunda ejecución es idempotente y no duplica
+    assert sembrar_admin_inicial(db_session) is False
+

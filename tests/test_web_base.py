@@ -614,11 +614,23 @@ def test_base_html_navegacion_dinamica_segun_permisos():
     assert res_admin.status_code == 200
     html_admin = res_admin.get_data(as_text=True)
 
-    # 5 módulos presentes
+    # Módulos completos visibles para ADMIN
     assert "Dashboard de aforo" in html_admin
     assert "Registro de asistencia" in html_admin
     assert "Justificaciones" in html_admin
+    assert "Períodos académicos" in html_admin
+    assert "Matrícula digital" in html_admin
+    assert "Carnets QR" in html_admin
+    assert "Estados académicos" in html_admin
+    assert "Pagos y alertas" in html_admin
+    assert "Malla curricular" in html_admin
+    assert "Asignación docente" in html_admin
+    assert "Calificaciones" in html_admin
+    assert "Ficha del alumno" in html_admin
+    assert "Exportar asistencia" in html_admin
+    assert "Boletas" in html_admin
     assert "Gestión de usuarios" in html_admin
+    assert "Roles y permisos" in html_admin
     assert "Auditoría" in html_admin
 
     # Sin banners demo
@@ -626,7 +638,7 @@ def test_base_html_navegacion_dinamica_segun_permisos():
     assert "demo-banner" not in html_admin
     assert "demo-pill" not in html_admin
 
-    # Caso 2: COORDINADOR (no debe ver Gestión de usuarios ni Auditoría)
+    # Caso 2: COORDINADOR (no debe ver módulos administrativos/financieros/seguridad)
     coord = _crear_usuario(21, "coord_test", RolUsuario.COORDINADOR)
     sesion_coord = _crear_sesion(coord)
     almacen.guardar(sesion_coord, coord)
@@ -640,5 +652,13 @@ def test_base_html_navegacion_dinamica_segun_permisos():
     assert "Dashboard de aforo" in html_coord
     assert "Registro de asistencia" in html_coord
     assert "Justificaciones" in html_coord
+    assert "Carnets QR" in html_coord
+    assert "Calificaciones" in html_coord
+    assert "Ficha del alumno" in html_coord
+    assert "Exportar asistencia" in html_coord
+    assert "Matrícula digital" not in html_coord
+    assert "Pagos y alertas" not in html_coord
+    assert "Malla curricular" not in html_coord
     assert "Gestión de usuarios" not in html_coord
+    assert "Roles y permisos" not in html_coord
     assert "Auditoría" not in html_coord
