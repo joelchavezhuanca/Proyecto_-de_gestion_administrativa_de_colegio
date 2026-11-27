@@ -7,11 +7,13 @@ Verifica:
 - Protección CSRF estricta con token por sesión en servidor y bypass configurable
 - Validación de sesiones en servidor (no confiar solo en la cookie)
 - Control de acceso RBAC con 401 (no autenticado) y 403 (permiso denegado)
-- Manejo defensivo de errores (401, 403, 404, 500) sin fuga de datos sensibles
+- Manejo defensivo de errores (400, 401, 403, 404, 500) sin fuga de datos sensibles
 - Renderizado de base.html con navegación dinámica para los 5 módulos sin banner demo
+- Filtros de plantilla y funciones globales auxiliares
 """
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
+
 import pytest
 from flask import Blueprint, abort, render_template
 
@@ -22,12 +24,13 @@ from src.dominio.usuarios import (
     SesionUsuario,
     Usuario,
 )
-from src.presentacion.app import crear_app
+from src.presentacion.app import crear_app, create_app
 from src.presentacion.seguridad import (
     AlmacenSesiones,
     generar_token_csrf,
     login_requerido,
     permiso_requerido,
+    tiene_permiso,
 )
 from src.presentacion.tiempo import (
     DESPLAZAMIENTO_PERU,
@@ -50,8 +53,13 @@ def _crear_usuario(id_: int, username: str, rol: RolUsuario, activo: bool = True
     )
 
 
-def _crear_sesion(usuario: Usuario, activa: bool = True, expirada: bool = False) -> SesionUsuario:
-    ahora = datetime.now(UTC)
+def _crear_sesion(
+    usuario: Usuario,
+    activa: bool = True,
+    expirada: bool = False,
+    naive: bool = False,
+) -> SesionUsuario:
+    ahora = datetime.now(UTC) if not naive else datetime.now(UTC).replace(tzinfo=None)
     if expirada:
         inicio = ahora - timedelta(hours=2)
         expira = ahora - timedelta(hours=1)
@@ -83,7 +91,7 @@ def test_zona_horaria_oficial_lima():
 
     inst = hora_institucional()
     assert inst is not None
-    assert isinstance(hora_actual(), datetime.time().__class__)
+    assert isinstance(hora_actual(), time)
 
 
 # ----------------------------------------------------------------------
@@ -100,6 +108,7 @@ def test_crear_app_con_secret_key_configuracion():
     assert app.config["SECRET_KEY"] == "clave-secreta-de-prueba-12345"
     assert app.config["SESSION_COOKIE_HTTPONLY"] is True
     assert app.config["SESSION_COOKIE_SAMESITE"] == "Lax"
+    assert create_app is crear_app
 
 
 # ----------------------------------------------------------------------
@@ -131,21 +140,36 @@ def test_csrf_permite_post_con_token_valido():
         return "operacion-exitosa"
 
     cliente = app.test_client()
-    # Primera petición GET inicializa la sesión y obtiene token
     res_get = cliente.get("/formulario")
     assert res_get.status_code == 200
 
     with cliente.session_transaction() as sess:
         token = sess["_csrf_token"]
 
-    # Envío en formulario
+    # Envío en formulario (csrf_token)
     res_post = cliente.post("/accion", data={"csrf_token": token, "campo": "valor"})
     assert res_post.status_code == 200
     assert "operacion-exitosa" in res_post.get_data(as_text=True)
 
+    # Envío en formulario (_csrf_token)
+    res_post_alt = cliente.post("/accion", data={"_csrf_token": token, "campo": "valor"})
+    assert res_post_alt.status_code == 200
+
+    # Envío en JSON
+    res_json = cliente.post("/accion", json={"csrf_token": token, "dato": "xyz"})
+    assert res_json.status_code == 200
+
     # Envío por cabecera X-CSRF-Token
     res_header = cliente.post("/accion", headers={"X-CSRF-Token": token})
     assert res_header.status_code == 200
+
+    # Envío por cabecera X-CSRFToken
+    res_header2 = cliente.post("/accion", headers={"X-CSRFToken": token})
+    assert res_header2.status_code == 200
+
+    # Token inválido
+    res_invalido = cliente.post("/accion", data={"csrf_token": "token-falso"})
+    assert res_invalido.status_code == 400
 
 
 def test_csrf_permite_desactivacion_en_tests():
@@ -162,7 +186,34 @@ def test_csrf_permite_desactivacion_en_tests():
 
 
 # ----------------------------------------------------------------------
-# 4. Control de Acceso RBAC y Validación de Sesión en Servidor
+# 4. Almacén de Sesiones y Funcionalidades
+# ----------------------------------------------------------------------
+def test_almacen_sesiones_operaciones():
+    almacen = AlmacenSesiones()
+    usuario = _crear_usuario(1, "testusr", RolUsuario.ADMIN)
+    sesion = _crear_sesion(usuario)
+
+    almacen.guardar(sesion, usuario)
+    assert almacen.obtener_sesion(sesion.token) == sesion
+    assert almacen.obtener_usuario(usuario.id) == usuario
+
+    # Revocar sesión existente
+    almacen.revocar(sesion.token)
+    sesion_revocada = almacen.obtener_sesion(sesion.token)
+    assert sesion_revocada is not None
+    assert sesion_revocada.activa is False
+
+    # Revocar sesión inexistente no falla
+    almacen.revocar("tok-inexistente")
+
+    # Limpiar almacén
+    almacen.limpiar()
+    assert almacen.obtener_sesion(sesion.token) is None
+    assert almacen.obtener_usuario(usuario.id) is None
+
+
+# ----------------------------------------------------------------------
+# 5. Control de Acceso RBAC y Validación de Sesión en Servidor
 # ----------------------------------------------------------------------
 def test_login_requerido_sin_sesion_devuelve_401():
     app = crear_app({"SECRET_KEY": "test-key", "WTF_CSRF_ENABLED": False})
@@ -200,12 +251,84 @@ def test_login_requerido_con_sesion_activa_servidor():
     assert "zona-privada-autorizada" in respuesta.get_data(as_text=True)
 
 
+def test_login_requerido_usuario_inactivo_devuelve_401():
+    app = crear_app({"SECRET_KEY": "test-key", "WTF_CSRF_ENABLED": False})
+    almacen: AlmacenSesiones = app.extensions["almacen_sesiones"]
+
+    usuario_inactivo = _crear_usuario(2, "inactivo", RolUsuario.COORDINADOR, activo=False)
+    sesion = _crear_sesion(usuario_inactivo)
+    almacen.guardar(sesion, usuario_inactivo)
+
+    @app.route("/privado-inactivo")
+    @login_requerido
+    def privado_inactivo():
+        return "no-debe-verse"
+
+    cliente = app.test_client()
+    with cliente.session_transaction() as sess:
+        sess["token"] = sesion.token
+
+    respuesta = cliente.get("/privado-inactivo")
+    assert respuesta.status_code == 401
+
+
+def test_login_requerido_con_reloj_aware_y_sesion_naive():
+    # Cobertura de ramas de normalización de zonas horarias en login_requerido
+    app = crear_app({
+        "SECRET_KEY": "test-key",
+        "WTF_CSRF_ENABLED": False,
+        "RELOJ": lambda: datetime.now(UTC),
+    })
+    almacen: AlmacenSesiones = app.extensions["almacen_sesiones"]
+
+    usuario = _crear_usuario(3, "usr_naive", RolUsuario.ADMIN)
+    sesion_naive = _crear_sesion(usuario, naive=True)
+    almacen.guardar(sesion_naive, usuario)
+
+    @app.route("/privado-naive")
+    @login_requerido
+    def privado_naive():
+        return "ok-naive"
+
+    cliente = app.test_client()
+    with cliente.session_transaction() as sess:
+        sess["token"] = sesion_naive.token
+
+    respuesta = cliente.get("/privado-naive")
+    assert respuesta.status_code == 200
+
+
+def test_login_requerido_con_reloj_naive_y_sesion_aware():
+    # Cobertura de rama inversa: reloj naive y sesión aware
+    app = crear_app({
+        "SECRET_KEY": "test-key",
+        "WTF_CSRF_ENABLED": False,
+        "RELOJ": lambda: datetime.now(UTC).replace(tzinfo=None),
+    })
+    almacen: AlmacenSesiones = app.extensions["almacen_sesiones"]
+
+    usuario = _crear_usuario(4, "usr_aware", RolUsuario.ADMIN)
+    sesion_aware = _crear_sesion(usuario, naive=False)
+    almacen.guardar(sesion_aware, usuario)
+
+    @app.route("/privado-aware")
+    @login_requerido
+    def privado_aware():
+        return "ok-aware"
+
+    cliente = app.test_client()
+    with cliente.session_transaction() as sess:
+        sess["token"] = sesion_aware.token
+
+    respuesta = cliente.get("/privado-aware")
+    assert respuesta.status_code == 200
+
+
 def test_no_confiar_en_rol_de_cookie_si_servidor_indica_lo_contrario():
     app = crear_app({"SECRET_KEY": "test-key", "WTF_CSRF_ENABLED": False})
     almacen: AlmacenSesiones = app.extensions["almacen_sesiones"]
 
-    # Usuario en el servidor es COORDINADOR
-    usuario = _crear_usuario(2, "coord_pepe", RolUsuario.COORDINADOR)
+    usuario = _crear_usuario(5, "coord_pepe", RolUsuario.COORDINADOR)
     sesion = _crear_sesion(usuario)
     almacen.guardar(sesion, usuario)
 
@@ -219,7 +342,6 @@ def test_no_confiar_en_rol_de_cookie_si_servidor_indica_lo_contrario():
         sess["token"] = sesion.token
         sess["rol"] = "ADMIN"  # Intento de suplantación en cookie
 
-    # El servidor evalúa contra el registro del servidor y rechaza con 403
     respuesta = cliente.get("/solo-admin")
     assert respuesta.status_code == 403
     assert "403" in respuesta.get_data(as_text=True)
@@ -229,7 +351,7 @@ def test_permiso_requerido_exitoso_para_admin():
     app = crear_app({"SECRET_KEY": "test-key", "WTF_CSRF_ENABLED": False})
     almacen: AlmacenSesiones = app.extensions["almacen_sesiones"]
 
-    admin = _crear_usuario(3, "superadmin", RolUsuario.ADMIN)
+    admin = _crear_usuario(6, "superadmin", RolUsuario.ADMIN)
     sesion = _crear_sesion(admin)
     almacen.guardar(sesion, admin)
 
@@ -247,11 +369,83 @@ def test_permiso_requerido_exitoso_para_admin():
     assert "gestion-usuarios-ok" in respuesta.get_data(as_text=True)
 
 
-def test_sesion_expirada_o_inactiva_devuelve_401():
+def test_permiso_requerido_normaliza_tz_naive_reloj():
+    app = crear_app({
+        "SECRET_KEY": "test-key",
+        "WTF_CSRF_ENABLED": False,
+        "RELOJ": lambda: datetime.now(UTC).replace(tzinfo=None),
+    })
+    almacen: AlmacenSesiones = app.extensions["almacen_sesiones"]
+
+    admin = _crear_usuario(7, "admin_tz", RolUsuario.ADMIN)
+    sesion = _crear_sesion(admin, naive=False)
+    almacen.guardar(sesion, admin)
+
+    @app.route("/gestion-tz")
+    @permiso_requerido(PermisoOperacion.GESTIONAR_USUARIOS)
+    def gestion_tz():
+        return "tz-ok"
+
+    cliente = app.test_client()
+    with cliente.session_transaction() as sess:
+        sess["token"] = sesion.token
+
+    respuesta = cliente.get("/gestion-tz")
+    assert respuesta.status_code == 200
+
+
+def test_permiso_requerido_normaliza_tz_aware_reloj_y_sesion_naive():
+    app = crear_app({
+        "SECRET_KEY": "test-key",
+        "WTF_CSRF_ENABLED": False,
+        "RELOJ": lambda: datetime.now(UTC),
+    })
+    almacen: AlmacenSesiones = app.extensions["almacen_sesiones"]
+
+    admin = _crear_usuario(8, "admin_tz2", RolUsuario.ADMIN)
+    sesion = _crear_sesion(admin, naive=True)
+    almacen.guardar(sesion, admin)
+
+    @app.route("/gestion-tz2")
+    @permiso_requerido(PermisoOperacion.GESTIONAR_USUARIOS)
+    def gestion_tz2():
+        return "tz2-ok"
+
+    cliente = app.test_client()
+    with cliente.session_transaction() as sess:
+        sess["token"] = sesion.token
+
+    respuesta = cliente.get("/gestion-tz2")
+    assert respuesta.status_code == 200
+
+
+def test_permiso_requerido_sesion_invalida_en_validar_permiso():
     app = crear_app({"SECRET_KEY": "test-key", "WTF_CSRF_ENABLED": False})
     almacen: AlmacenSesiones = app.extensions["almacen_sesiones"]
 
-    usuario = _crear_usuario(4, "vencido", RolUsuario.ADMIN)
+    usuario1 = _crear_usuario(9, "user1", RolUsuario.ADMIN)
+    sesion = _crear_sesion(usuario1)
+    usuario_modificado = _crear_usuario(9, "user1", RolUsuario.COORDINADOR)
+    almacen.guardar(sesion, usuario_modificado)
+
+    @app.route("/ruta-mismatch")
+    @permiso_requerido(PermisoOperacion.GESTIONAR_USUARIOS)
+    def ruta_mismatch():
+        return "no-debe-verse"
+
+    cliente = app.test_client()
+    with cliente.session_transaction() as sess:
+        sess["token"] = sesion.token
+
+    respuesta = cliente.get("/ruta-mismatch")
+    assert respuesta.status_code == 401
+
+
+def test_sesion_expirada_devuelve_401():
+    app = crear_app({"SECRET_KEY": "test-key", "WTF_CSRF_ENABLED": False})
+    almacen: AlmacenSesiones = app.extensions["almacen_sesiones"]
+
+    usuario = _crear_usuario(10, "vencido", RolUsuario.ADMIN)
     sesion = _crear_sesion(usuario, expirada=True)
     almacen.guardar(sesion, usuario)
 
@@ -268,8 +462,38 @@ def test_sesion_expirada_o_inactiva_devuelve_401():
     assert respuesta.status_code == 401
 
 
+def test_tiene_permiso_evaluaciones():
+    app = crear_app({"SECRET_KEY": "test-key", "WTF_CSRF_ENABLED": False})
+    almacen: AlmacenSesiones = app.extensions["almacen_sesiones"]
+
+    # Sin sesión de servidor
+    with app.test_request_context():
+        assert tiene_permiso(PermisoOperacion.REGISTRAR_ASISTENCIA) is False
+
+    # Con sesión activa de COORDINADOR
+    usuario = _crear_usuario(11, "coord_eval", RolUsuario.COORDINADOR)
+    sesion = _crear_sesion(usuario)
+    almacen.guardar(sesion, usuario)
+
+    cliente = app.test_client()
+    with cliente.session_transaction() as sess:
+        sess["token"] = sesion.token
+
+    @app.route("/test-permisos")
+    def test_permisos():
+        p1 = tiene_permiso(PermisoOperacion.REGISTRAR_ASISTENCIA)
+        p2 = tiene_permiso("REGISTRAR_ASISTENCIA")
+        p3 = tiene_permiso("GESTIONAR_USUARIOS")
+        p4 = tiene_permiso("PERMISO_TOTALMENTE_INVALIDO")
+        p5 = tiene_permiso(12345)
+        return f"{p1}|{p2}|{p3}|{p4}|{p5}"
+
+    res = cliente.get("/test-permisos")
+    assert res.get_data(as_text=True) == "True|True|False|False|False"
+
+
 # ----------------------------------------------------------------------
-# 5. Páginas de Error Defensivas (401, 403, 404, 500)
+# 6. Páginas de Error Defensivas (400, 401, 403, 404, 500)
 # ----------------------------------------------------------------------
 def test_manejadores_error_renderizan_sin_fuga_de_datos():
     app = crear_app({"SECRET_KEY": "test-key", "WTF_CSRF_ENABLED": False})
@@ -278,7 +502,25 @@ def test_manejadores_error_renderizan_sin_fuga_de_datos():
     def provocar_500():
         abort(500)
 
+    @app.route("/error-400")
+    def provocar_400():
+        abort(400)
+
+    @app.route("/error-403")
+    def provocar_403():
+        abort(403)
+
     cliente = app.test_client()
+
+    # 400
+    r_400 = cliente.get("/error-400")
+    assert r_400.status_code == 400
+    assert "400" in r_400.get_data(as_text=True)
+
+    # 403
+    r_403 = cliente.get("/error-403")
+    assert r_403.status_code == 403
+    assert "403" in r_403.get_data(as_text=True)
 
     # 404
     r_404 = cliente.get("/ruta-que-no-existe-xyz")
@@ -291,12 +533,60 @@ def test_manejadores_error_renderizan_sin_fuga_de_datos():
     assert r_500.status_code == 500
     assert "500" in r_500.get_data(as_text=True)
     assert "Error interno" in r_500.get_data(as_text=True)
-    # Sin fuga de traza
     assert "Traceback" not in r_500.get_data(as_text=True)
 
 
 # ----------------------------------------------------------------------
-# 6. Renderizado de base.html: Navegación Dinámica para 5 Módulos
+# 7. Filtros Jinja2 y Helpers de Presentación
+# ----------------------------------------------------------------------
+def test_filtros_y_helpers_jinja():
+    app = crear_app({"SECRET_KEY": "test-key", "WTF_CSRF_ENABLED": False})
+
+    @app.route("/render-filtros")
+    def render_filtros():
+        plantilla = (
+            "{{ f1|fecha_corta }}|"
+            "{{ f2|fecha_corta }}|"
+            "{{ h1|hora_corta }}|"
+            "{{ h2|hora_corta }}|"
+            "{{ h3|hora_corta }}|"
+            "{{ r1|rol_legible }}|"
+            "{{ r2|rol_legible }}|"
+            "{{ e1|estado_texto }}|"
+            "{{ e2|estado_texto }}|"
+            "{{ c1|estado_clase }}|"
+            "{{ c2|estado_clase }}|"
+            "{{ safe_url_for('ruta_invalida', '/fallback') }}"
+        )
+        return render_template(
+            app.jinja_env.from_string(plantilla),
+            f1=date(2026, 11, 26),
+            f2=None,
+            h1=time(8, 30),
+            h2=datetime(2026, 11, 26, 8, 30, 45),
+            h3=None,
+            r1=RolUsuario.ADMIN,
+            r2="DOCENTE_EXTERNO",
+            e1=EstadoUsuario.ACTIVO,
+            e2="OTRO_ESTADO",
+            c1=EstadoUsuario.ACTIVO,
+            c2="DESCONOCIDO",
+        )
+
+    cliente = app.test_client()
+    res = cliente.get("/render-filtros")
+    assert res.status_code == 200
+    esperado = (
+        "26/11/2026|—|08:30|08:30:45|—|"
+        "Administrador|DOCENTE_EXTERNO|"
+        "Activa|OTRO_ESTADO|"
+        "ok|neutral|/fallback"
+    )
+    assert res.get_data(as_text=True) == esperado
+
+
+# ----------------------------------------------------------------------
+# 8. Renderizado de base.html: Navegación Dinámica para 5 Módulos
 # ----------------------------------------------------------------------
 def test_base_html_navegacion_dinamica_segun_permisos():
     app = crear_app({"SECRET_KEY": "test-key", "WTF_CSRF_ENABLED": False})
@@ -313,7 +603,7 @@ def test_base_html_navegacion_dinamica_segun_permisos():
     cliente = app.test_client()
 
     # Caso 1: ADMIN debe ver los 5 módulos
-    admin = _crear_usuario(10, "admin_test", RolUsuario.ADMIN)
+    admin = _crear_usuario(20, "admin_test", RolUsuario.ADMIN)
     sesion_admin = _crear_sesion(admin)
     almacen.guardar(sesion_admin, admin)
 
@@ -337,7 +627,7 @@ def test_base_html_navegacion_dinamica_segun_permisos():
     assert "demo-pill" not in html_admin
 
     # Caso 2: COORDINADOR (no debe ver Gestión de usuarios ni Auditoría)
-    coord = _crear_usuario(11, "coord_test", RolUsuario.COORDINADOR)
+    coord = _crear_usuario(21, "coord_test", RolUsuario.COORDINADOR)
     sesion_coord = _crear_sesion(coord)
     almacen.guardar(sesion_coord, coord)
 
