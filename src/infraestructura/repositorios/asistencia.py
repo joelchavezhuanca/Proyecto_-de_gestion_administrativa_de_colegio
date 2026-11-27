@@ -616,9 +616,7 @@ class RepositorioCalendario:
         self, *, fines_de_semana_no_lectivos: bool = True
     ) -> CalendarioEscolar:
         filas = self._session.scalars(select(CalendarioEscolarModel)).all()
-        no_lectivos = frozenset(
-            f.fecha for f in filas if not f.es_lectivo and not f.es_excepcion
-        )
+        no_lectivos = frozenset(f.fecha for f in filas if not f.es_lectivo)
         excepciones = frozenset(f.fecha for f in filas if f.es_lectivo and f.es_excepcion)
         return CalendarioEscolar(
             dias_no_lectivos=no_lectivos,
