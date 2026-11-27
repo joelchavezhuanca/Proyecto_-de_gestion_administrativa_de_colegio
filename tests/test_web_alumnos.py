@@ -742,3 +742,63 @@ def test_pagos_y_alertas_silenciosas_flujo_completo(entorno_web: dict[str, Any])
         ).status_code
         == 404
     )
+
+
+def test_casos_borde_vacantes_filtros_y_servicio_perezoso(
+    entorno_web: dict[str, Any],
+) -> None:
+    app = entorno_web["app"]
+    servicio = entorno_web["servicio"]
+    admin = entorno_web["admin"]
+    salon_a = entorno_web["salon_a"]
+
+    # Salón con capacidad máxima = 1 para validar SalonSinVacantesException (409)
+    salon_lleno = servicio.crear_salon(
+        admin.id,
+        anio_lectivo=2026,
+        nivel=NivelEducativo.SECUNDARIA,
+        grado="4to",
+        seccion="C",
+        capacidad_maxima=1,
+    )
+
+    # Remover servicio pre-inyectado para ejercitar instanciación perezosa desde session_factory
+    app.extensions.pop("servicio_academico", None)
+    cliente, csrf = _autenticar(app, admin)
+
+    # Parámetro de filtro no numérico y GET /estados sin alumno_id
+    assert cliente.get("/matricula?salon_id=abc").status_code == 200
+    assert cliente.get("/estados").status_code == 200
+
+    # Ocupar la única vacante de salon_lleno y luego intentar segunda matrícula -> 409
+    assert (
+        cliente.post(
+            "/matricula",
+            data=_datos_matricula(csrf, salon_lleno.id, codigo="ALU-2026-101", dni="73000001"),
+        ).status_code
+        == 302
+    )
+    assert (
+        cliente.post(
+            "/matricula",
+            data=_datos_matricula(csrf, salon_lleno.id, codigo="ALU-2026-102", dni="73000002"),
+        ).status_code
+        == 409
+    )
+
+    # Matricular otro alumno en salon_a e intentar moverlo a salon_lleno -> 409
+    assert (
+        cliente.post(
+            "/matricula",
+            data=_datos_matricula(csrf, salon_a.id, codigo="ALU-2026-103", dni="73000003"),
+        ).status_code
+        == 302
+    )
+    assert (
+        cliente.post(
+            "/matricula/2/cambiar-salon",
+            data={"csrf_token": csrf, "nuevo_salon_id": str(salon_lleno.id)},
+        ).status_code
+        == 409
+    )
+

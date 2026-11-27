@@ -48,7 +48,7 @@ from src.dominio.matricula import (
     SalonSinVacantesException,
 )
 from src.dominio.pagos import PagosException
-from src.dominio.usuarios import AccesoDenegadoException, PermisoOperacion
+from src.dominio.usuarios import PermisoOperacion
 from src.infraestructura.repositorios import (
     RepositorioCarnets,
     RepositorioEstadosAcademicos,
@@ -587,8 +587,6 @@ def marcar_alerta_revisada(alerta_id: str) -> Response | tuple[str, int]:
     servicio = _obtener_servicio()
     try:
         servicio.marcar_alerta_revisada(_operador_id(), alerta_id)
-    except AccesoDenegadoException:
-        abort(403)
     except ValueError as error:
         flash(str(error), "error")
         status = 404 if _es_no_encontrado(error) else 400
