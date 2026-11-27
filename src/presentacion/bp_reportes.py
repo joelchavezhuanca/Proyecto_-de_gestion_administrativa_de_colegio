@@ -8,6 +8,7 @@ a mensajes flash y respuestas HTTP 400/403/404 sin exponer trazas internas.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import date, timedelta
 from typing import cast
 
@@ -43,6 +44,8 @@ from src.presentacion.seguridad import permiso_requerido
 
 bp_reportes = Blueprint("reportes", __name__, url_prefix="/reportes")
 
+__all__ = ["AlmacenBoletas", "bp_reportes", "registrar_blueprints_reportes"]
+
 _TITULOS_ERROR = {
     400: "Solicitud incorrecta",
     403: "Acceso restringido",
@@ -65,7 +68,7 @@ class AlmacenBoletas:
         self._boletas: dict[tuple[int, str], BoletaCalificaciones] = {}
 
     def guardar(
-        self, operador_id: int, boletas: tuple[BoletaCalificaciones, ...]
+        self, operador_id: int, boletas: Sequence[BoletaCalificaciones]
     ) -> None:
         for boleta in boletas:
             self._boletas[(operador_id, boleta.id)] = boleta
@@ -216,16 +219,21 @@ def _respuesta_descarga(
 
 
 def _contexto_boletas(
-    boletas: tuple[BoletaCalificaciones, ...] = (),
+    boletas: Sequence[BoletaCalificaciones] = (),
 ) -> dict[str, object]:
     anio = _anio_actual()
     return {
-        "boletas": boletas,
+        "boletas": tuple(boletas),
         "salones": _servicio_academico().listar_salones(anio_lectivo=anio),
         "periodos": _servicio_asistencia().listar_periodos(anio_lectivo=anio),
         "anio_lectivo": anio,
         "niveles": list(NivelEducativo),
     }
+
+
+def _render_boletas(boletas: Sequence[BoletaCalificaciones] = ()):
+    """Renderiza el módulo de boletas con su contexto completo."""
+    return render_template("boletas.html", **_contexto_boletas(boletas))
 
 
 # ---------------------------------------------------------------------------
@@ -308,7 +316,7 @@ def exportar_asistencia():
 @permiso_requerido(PermisoOperacion.EMITIR_BOLETAS)
 def boletas():
     """Muestra los formularios de emisión individual y masiva (PBI-14)."""
-    return render_template("boletas.html", **_contexto_boletas())
+    return _render_boletas()
 
 
 @bp_reportes.post("/boletas/individual")
@@ -330,7 +338,7 @@ def emitir_boleta_individual():
         return _respuesta_error(codigo, mensaje)
 
     _almacen_boletas().guardar(_operador_id(), (boleta,))
-    return render_template("boletas.html", **_contexto_boletas((boleta,)))
+    return _render_boletas((boleta,))
 
 
 @bp_reportes.post("/boletas/salon")
@@ -363,7 +371,7 @@ def emitir_boletas_salon():
         return _respuesta_error(codigo, mensaje)
 
     _almacen_boletas().guardar(_operador_id(), resultado.boletas)
-    return render_template("boletas.html", **_contexto_boletas(resultado.boletas))
+    return _render_boletas(resultado.boletas)
 
 
 @bp_reportes.get("/boletas/<boleta_id>/descargar")

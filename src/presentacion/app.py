@@ -121,7 +121,7 @@ def _configurar_persistencia(app: Flask) -> None:
     configuración explícita, la fábrica queda sin definir y los servicios se
     crean de forma perezosa cuando el despliegue la proporcione.
     """
-    fabrica = app.config.get("SESSION_FACTORY")
+    fabrica = app.config.get("SESSION_FACTORY") or app.config.get("session_factory")
     if fabrica is None:
         url = app.config.get("DATABASE_URL") or os.environ.get("DATABASE_URL")
         if url:
