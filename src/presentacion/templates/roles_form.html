@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block titulo %}{{ 'Editar rol' if rol else 'Nuevo rol' }}{% endblock %}
+{% block eyebrow %}Seguridad{% endblock %}
+{% block encabezado %}{{ 'Editar rol' if rol else 'Nuevo rol' }}{% endblock %}
+{% block subtitulo %}
+<p class="page-subtitle">
+  {% if rol %}
+  Actualice la información del rol y los permisos que otorga.
+  {% else %}
+  Defina un rol personalizado y los permisos que otorgará a sus usuarios.
+  {% endif %}
+</p>
+{% endblock %}
+
+{% block contenido %}
+<section class="card">
+  <div class="card-head">
+    <h2>Datos del rol</h2>
+    <a class="btn btn-secundario" href="{{ url_for('roles.listar_roles') }}">Volver al catálogo</a>
+  </div>
+
+  <form class="form"
+        method="post"
+        action="{% if rol %}{{ url_for('roles.editar_rol', codigo=rol.codigo) }}{% else %}{{ url_for('roles.crear_rol') }}{% endif %}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="grid-dos">
+      <div class="field">
+        <label for="codigo">Código</label>
+        {% if rol %}
+        <input id="codigo" type="text" value="{{ datos.get('codigo', rol.codigo) }}" readonly>
+        <p class="field-help">El código del rol no se modifica una vez creado.</p>
+        {% else %}
+        <input id="codigo" type="text" name="codigo" autocomplete="off"
+               value="{{ datos.get('codigo', '') }}" placeholder="EJEMPLO: TESORERIA" required>
+        <p class="field-help">Solo letras mayúsculas, números y guiones bajos.</p>
+        {% endif %}
+      </div>
+
+      <div class="field">
+        <label for="nombre">Nombre</label>
+        <input id="nombre" type="text" name="nombre"
+               value="{{ datos.get('nombre', '') }}" required>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="descripcion">Descripción</label>
+      <textarea id="descripcion" name="descripcion" rows="3" required>{{ datos.get('descripcion', '') }}</textarea>
+    </div>
+
+    <fieldset class="field">
+      <legend>Permisos del rol ({{ permisos|length }} disponibles)</legend>
+      <div class="grid-dos">
+        {% for permiso in permisos %}
+        <label class="checkbox-card">
+          <input type="checkbox" name="permisos" value="{{ permiso.value }}"
+                 {% if permiso in seleccionados %}checked{% endif %}>
+          <span>
+            <strong>{{ permiso.value.replace('_', ' ')|title }}</strong>
+            <span class="field-help">{{ permiso.value }}</span>
+          </span>
+        </label>
+        {% endfor %}
+      </div>
+    </fieldset>
+
+    <div class="page-actions">
+      <button class="btn btn-primario" type="submit">
+        {{ 'Guardar cambios' if rol else 'Crear rol' }}
+      </button>
+      <a class="btn btn-secundario" href="{{ url_for('roles.listar_roles') }}">Cancelar</a>
+    </div>
+  </form>
+</section>
+{% endblock %}

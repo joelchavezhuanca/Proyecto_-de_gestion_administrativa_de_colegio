@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Acceso al sistema de gestión administrativa del Colegio Domingo Savio S.A.C.">
+  <title>Iniciar sesión · Colegio Domingo Savio</title>
+  <link rel="icon" href="{{ url_for('static', filename='assets/branding/escudo-domingo-savio.png') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/estilos.css') }}">
+</head>
+<body class="login-body">
+  <main class="login-shell">
+    <section class="login-brand">
+      <div class="login-brand-top">
+        <img class="login-logo"
+             src="{{ url_for('static', filename='assets/branding/logo-domingo-savio.png') }}"
+             alt="Logotipo del Colegio Domingo Savio">
+        <img class="login-escudo"
+             src="{{ url_for('static', filename='assets/branding/escudo-domingo-savio.png') }}"
+             alt="Escudo institucional del Colegio Domingo Savio">
+      </div>
+
+      <div class="login-brand-copy">
+        <p class="login-kicker">Colegio Domingo Savio S.A.C.</p>
+        <h1>Gestión administrativa escolar</h1>
+        <p>Plataforma institucional para el control de asistencia, justificaciones,
+          usuarios, roles y auditoría del año académico.</p>
+      </div>
+
+      <ul class="login-features">
+        <li>Registro de asistencia con validación en el servidor.</li>
+        <li>Roles y permisos granulares por módulo.</li>
+        <li>Auditoría encadenada con verificación SHA-256.</li>
+      </ul>
+    </section>
+
+    <section class="login-panel">
+      <div class="login-card">
+        <div class="login-card-head">
+          <h2>Iniciar sesión</h2>
+          <p class="muted">Acceda con su cuenta institucional.</p>
+        </div>
+
+        {% set mensajes = get_flashed_messages(with_categories=true) %}
+        {% if mensajes %}
+        <div class="flash-stack" aria-live="polite">
+          {% for categoria, mensaje in mensajes %}
+          <div class="alert alert-{{ categoria }}" role="status">
+            <span class="alert-text">{{ mensaje }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <form class="form" method="post" action="{{ url_for('auth.login') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+          <div class="field">
+            <label for="username">Usuario</label>
+            <input id="username" type="text" name="username" autocomplete="username"
+                   value="{{ request.form.get('username', '') }}" required autofocus>
+          </div>
+
+          <div class="field">
+            <label for="password">Contraseña</label>
+            <input id="password" type="password" name="password"
+                   autocomplete="current-password" required>
+          </div>
+
+          <button class="btn btn-primario btn-bloque" type="submit">Ingresar</button>
+        </form>
+
+        <p class="login-footnote muted">
+          Cada acceso queda registrado en la auditoría institucional.
+        </p>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block titulo %}{{ 'Editar usuario' if usuario else 'Nuevo usuario' }}{% endblock %}
+{% block eyebrow %}Seguridad{% endblock %}
+{% block encabezado %}{{ 'Editar usuario' if usuario else 'Nuevo usuario' }}{% endblock %}
+{% block subtitulo %}
+<p class="page-subtitle">
+  {% if usuario %}
+  Actualice el nombre completo o el rol asignado a la cuenta.
+  {% else %}
+  Registre una nueva cuenta con su rol y contraseña inicial.
+  {% endif %}
+</p>
+{% endblock %}
+
+{% block contenido %}
+<section class="card">
+  <div class="card-head">
+    <h2>Datos de la cuenta</h2>
+    <a class="btn btn-secundario" href="{{ url_for('usuarios.listar_usuarios') }}">Volver al listado</a>
+  </div>
+
+  <form class="form"
+        method="post"
+        action="{% if usuario %}{{ url_for('usuarios.editar_usuario', usuario_id=usuario.id) }}{% else %}{{ url_for('usuarios.crear_usuario') }}{% endif %}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="grid-dos">
+      <div class="field">
+        <label for="username">Usuario</label>
+        {% if usuario %}
+        <input id="username" type="text" value="{{ datos.get('username', usuario.username) }}" readonly>
+        <p class="field-help">El nombre de usuario no se modifica una vez creado.</p>
+        {% else %}
+        <input id="username" type="text" name="username" autocomplete="off"
+               value="{{ datos.get('username', '') }}" required>
+        {% endif %}
+      </div>
+
+      <div class="field">
+        <label for="nombre_completo">Nombre completo</label>
+        <input id="nombre_completo" type="text" name="nombre_completo"
+               value="{{ datos.get('nombre_completo', '') }}" required>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="rol">Rol asignado</label>
+      <select id="rol" name="rol" required>
+        <option value="">Seleccione un rol</option>
+        {% for rol in roles %}
+        <option value="{{ rol.codigo }}"
+                {% if datos.get('rol', '')|upper == rol.codigo %}selected{% endif %}>
+          {{ rol.nombre }} · {{ rol.codigo }}
+        </option>
+        {% endfor %}
+      </select>
+      <p class="field-help">Seleccione uno de los roles disponibles en el catálogo.</p>
+    </div>
+
+    {% if not usuario %}
+    <div class="field">
+      <label for="password">Contraseña inicial</label>
+      <input id="password" type="password" name="password"
+             autocomplete="new-password" minlength="8" required>
+      <p class="field-help">Mínimo 8 caracteres. Nunca se almacena en texto plano.</p>
+    </div>
+    {% endif %}
+
+    <div class="page-actions">
+      <button class="btn btn-primario" type="submit">
+        {{ 'Guardar cambios' if usuario else 'Crear usuario' }}
+      </button>
+      <a class="btn btn-secundario" href="{{ url_for('usuarios.listar_usuarios') }}">Cancelar</a>
+    </div>
+  </form>
+</section>
+
+{% if usuario %}
+<section class="card">
+  <div class="card-head">
+    <div>
+      <h2>Restablecer contraseña</h2>
+      <p class="muted small">Al restablecerla se revocan todas las sesiones de la cuenta.</p>
+    </div>
+  </div>
+
+  <form class="form" method="post"
+        action="{{ url_for('usuarios.restablecer_password', usuario_id=usuario.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="grid-dos">
+      <div class="field">
+        <label for="password">Nueva contraseña</label>
+        <input id="password" type="password" name="password"
+               autocomplete="new-password" minlength="8" required>
+      </div>
+      <div class="field">
+        <label for="confirmar">Confirmar contraseña</label>
+        <input id="confirmar" type="password" name="confirmar"
+               autocomplete="new-password" minlength="8" required>
+      </div>
+    </div>
+
+    <div class="page-actions">
+      <button class="btn btn-peligro" type="submit">Restablecer contraseña</button>
+    </div>
+  </form>
+</section>
+{% endif %}
+{% endblock %}
