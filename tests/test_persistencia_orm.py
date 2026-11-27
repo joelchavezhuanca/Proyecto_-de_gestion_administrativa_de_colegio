@@ -333,7 +333,7 @@ def test_crear_motor_acepta_url_no_sqlite_sin_listener_pragma(
     monkeypatch.setattr("src.infraestructura.base_datos.create_engine", _fake_create_engine)
     motor = crear_motor("postgresql://user:pass@localhost/savio", echo=True)
     assert isinstance(motor, _FakeEngine)
-    assert registrado == ["postgresql://user:pass@localhost/savio|True|True"]
+    assert registrado == ["postgresql+psycopg://user:pass@localhost/savio|True|True"]
 
 
 # ---------------------------------------------------------------------------
@@ -923,3 +923,20 @@ def test_sembrar_admin_inicial_idempotente_y_por_entorno(
 
     # Segunda ejecución es idempotente y no duplica
     assert sembrar_admin_inicial(db_session) is False
+
+
+def test_obtener_database_url_normaliza_esquema_postgresql() -> None:
+    from src.infraestructura.base_datos import obtener_database_url
+
+    assert (
+        obtener_database_url("postgres://usr:pwd@db:5432/colegio")
+        == "postgresql+psycopg://usr:pwd@db:5432/colegio"
+    )
+    assert (
+        obtener_database_url("postgresql://usr:pwd@db:5432/colegio")
+        == "postgresql+psycopg://usr:pwd@db:5432/colegio"
+    )
+    assert (
+        obtener_database_url("postgresql+psycopg://usr:pwd@db:5432/colegio")
+        == "postgresql+psycopg://usr:pwd@db:5432/colegio"
+    )

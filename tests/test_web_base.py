@@ -670,3 +670,28 @@ def test_base_html_navegacion_dinamica_segun_permisos():
     assert "Gestión de usuarios" not in html_coord
     assert "Roles y permisos" not in html_coord
     assert "Auditoría" not in html_coord
+
+
+def test_healthcheck_proxyfix_produccion_y_wsgi(monkeypatch):
+    from werkzeug.middleware.proxy_fix import ProxyFix
+
+    import wsgi
+
+    monkeypatch.setenv("FLASK_ENV", "production")
+    monkeypatch.setenv("SECRET_KEY", "clave-prod-prueba-64chars")
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
+    monkeypatch.setenv("ADMIN_USERNAME", "admin_prod")
+    monkeypatch.setenv("ADMIN_PASSWORD", "ProdClave2026!")
+
+    app_prod = wsgi.crear_app_produccion()
+    assert app_prod.config["SESSION_COOKIE_SECURE"] is True
+    assert isinstance(app_prod.wsgi_app, ProxyFix)
+
+    cliente = app_prod.test_client()
+    resp = cliente.get("/health")
+    assert resp.status_code == 200
+    assert resp.get_json() == {"status": "ok"}
+
+    monkeypatch.delenv("SECRET_KEY", raising=False)
+    with pytest.raises(RuntimeError, match="SECRET_KEY es obligatoria"):
+        wsgi.crear_app_produccion()

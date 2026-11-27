@@ -1,0 +1,34 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-domingo_savio}
+      POSTGRES_USER: ${POSTGRES_USER:-domingo_savio}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-domingo_savio_2026}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-domingo_savio} -d ${POSTGRES_DB:-domingo_savio}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${PORT:-5000}:5000"
+    environment:
+      SECRET_KEY: ${SECRET_KEY:-clave-local-docker-domingo-savio-2026-cambiar-en-produccion}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-domingo_savio}:${POSTGRES_PASSWORD:-domingo_savio_2026}@db:5432/${POSTGRES_DB:-domingo_savio}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin2026!}
+      ADMIN_NOMBRE_COMPLETO: ${ADMIN_NOMBRE_COMPLETO:-Administrador Colegio Domingo Savio}
+      FLASK_ENV: ${FLASK_ENV:-development}
+
+volumes:
+  postgres_data:
